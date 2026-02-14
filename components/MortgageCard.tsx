@@ -49,7 +49,7 @@ export default function MortgageCard({
 				{payment && (
 					<div className="text-sm font-medium text-gray-500 mt-1 ml-1">
 						Est.{" "}
-						<span className="text-gray-900 dark:text-gray-300">{payment}</span>
+						<span className="text-gray-900 dark:text-gray-300">${payment}</span>
 						/mo
 					</div>
 				)}
@@ -59,8 +59,8 @@ export default function MortgageCard({
 			<div
 				className={`flex items-center gap-2 mt-4 font-medium text-lg ${color}`}
 			>
-				<Icon size={20} />
 				<span>{Math.abs(change || 0).toFixed(2)}%</span>
+				<Icon size={20} />
 			</div>
 
 			{/* FOOTER */}

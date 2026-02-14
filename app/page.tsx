@@ -6,8 +6,8 @@ import { calculateMonthlyPayment } from "@/lib/monthlypayment";
 import FinancialCard from "@/components/FinancialCard";
 import MortgageCard from "@/components/MortgageCard";
 
-const HERO_SYMBOL = "AAPL";
-const WATCHLIST_SYMBOLS = ["GOOGL", "AMZN", "MSFT"];
+const HERO_SYMBOL = "MSFT";
+const WATCHLIST_SYMBOLS = ["GOOGL", "AMZN"];
 
 export default async function Home() {
 	// 1. Parallel fetching
