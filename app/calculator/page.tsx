@@ -5,7 +5,7 @@ import { getMortgageData } from "@/lib/mortgage";
 export default async function CalculatorPage() {
 	// 1. Fetch real rate (server side)
 	const mortgageData = await getMortgageData();
-	const currentRate = mortgageData ? mortgageData.frm_30 : 6;
+	const currentRate = mortgageData ? mortgageData.frm30.rate : 6;
 
 	return (
 		<main className="min-h-screen bg-gray-50 dark:bg-gray-900 py-12 px-4 transition-colors duration-300">

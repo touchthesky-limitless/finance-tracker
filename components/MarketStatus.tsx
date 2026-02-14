@@ -1,5 +1,3 @@
-import React from "react";
-
 interface MarketStatusProps {
 	date: string;
 	time: string;
@@ -16,11 +14,11 @@ export default function MarketStatus({
 			"Open": "bg-green-100 text-green-700 border-green-200",
 			"Pre-Market": "bg-yellow-100 text-yellow-700 border-yellow-200",
 			"After-Hours": "bg-blue-100 text-blue-700 border-blue-200",
-			"Closed": "bg-gray-100 text-gray-500 border-gray-200",
+			"Closed": "bg-red-100 text-red-500 border-red-200",
 		}[session] || "bg-gray-100 text-gray-500 border-gray-200";
 
 	return (
-		<div className="flex flex-wrap items-center gap-3 mt-2">
+		<div className="flex flex-wrap items-center gap-3">
 			{/* Date & Time */}
 			<span className="text-gray-500 text-sm font-medium">
 				{date} • as of {time} EST

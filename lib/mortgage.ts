@@ -15,7 +15,11 @@ export async function getMortgageData(): Promise<MortgageInnerData | null> {
 		);
 
 		const latestList = (await latestRes.json()) as MortgageResponse[];
-		if (!latestList.length || !latestList[0].data) return null;
+
+		if (!latestList || !latestList.length || !latestList[0].data) {
+			console.warn("Mortgage API returned no data.");
+			return null;
+		}
 
 		const currentData = latestList[0];
 
@@ -36,22 +40,30 @@ export async function getMortgageData(): Promise<MortgageInnerData | null> {
 		const historyList = (await historyRes.json()) as MortgageResponse[];
 		const previousData = historyList.length > 0 ? historyList[0] : null;
 
-		// 4. Math
-		const currentRate = parseFloat(currentData.data.frm_30);
-		const previousRate = previousData
-			? parseFloat(previousData.data.frm_30)
+		// 4. Helper Function to Calculate Metrics
+        // This avoids writing the same math twice for 30y and 15y
+		const calculateMetric = (currentVal: string, previousVal: string | undefined) => {
+			const currentRate = parseFloat(currentVal);
+			const previousRate = previousVal
+			? parseFloat(previousVal)
 			: currentRate;
-
-		const change = currentRate - previousRate;
-		const percentChange =
+			
+			const change = currentRate - previousRate;
+			const changePercent =
 			previousRate !== 0 ? (change / previousRate) * 100 : 0;
+			
+			return {
+				rate: currentRate,
+				change: change,
+				changePercent: changePercent,
+			} 
+		};
 
+		// 5. Build and Return the Clean Data Object
 		return {
-			frm_30: currentRate,
-			frm_15: parseFloat(currentData.data.frm_15),
-			week: currentData.data.week,
-			d: change,
-			dp: percentChange,
+			date: currentData.data.week,
+			frm15: calculateMetric(currentData.data.frm_15, previousData?.data.frm_15),
+			frm30: calculateMetric(currentData.data.frm_30, previousData?.data.frm_30),
 		};
 	} catch (error) {
 		console.log("Mortgage API Error: ", error);

@@ -1,22 +1,26 @@
 // TypeScript Definitions
 
 export interface LenderOffer {
-  name: string;
-  nmls: string;
-  rate: string;
-  apr: string;
-  payment: string;
-  fees: string;
-  link: string;
+	name: string;
+	nmls: string;
+	rate: string;
+	apr: string;
+	payment: string;
+	fees: string;
+	link: string;
+}
+
+export interface MortgageRateMetric {
+	rate: number;
+	change: number; // The 'd' value (e.g. -0.05)
+	changePercent: number; // The 'dp' value (e.g. -0.82)
 }
 
 // 1. Define the inner object first
 export interface MortgageInnerData {
-	frm_30: number;
-	frm_15: number;
-	week: string;
-	d?: number; // Change value (e.g., -0.05)
-	dp?: number; // Percent change (e.g., -0.82%)
+	date: string;
+	frm30: MortgageRateMetric;
+	frm15: MortgageRateMetric;
 }
 
 // 2. Define the outer object (the container)
@@ -32,10 +36,11 @@ export interface MortgageResponse {
 export interface StockData {
 	symbol: string;
 	name: string;
-	c: number; // Current price
-	d: number; // change = Current Price - Previous Close
-	dp: number; // percent change = (Change / Previous Close) × 100
-	pc: number; // previous close
+	price: number;
+	change: number;
+	changePercent: number;
+	currency: string;
+	exchange: string;
 	logo?: string;
 }
 
