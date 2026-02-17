@@ -1,0 +1,156 @@
+import { 
+    AlertCircle, ShoppingBag, ShoppingCart, DollarSign, 
+    Utensils, CreditCard, PiggyBank, Edit3, 
+    Plane, Car, Fuel, Info, Hotel, Briefcase, Home, Gift 
+} from "lucide-react";
+
+export const CATEGORY_ICONS = [
+    Plane, Car, DollarSign, Fuel, Info, Edit3, Briefcase, Hotel, 
+    Briefcase, Home, Gift, Utensils, ShoppingCart, AlertCircle
+];
+
+export const COLORS_HEX = ["#3B82F6", "#EAB308", "#EC4899", "#EF4444", "#A855F7", "#6366F1", "#10B981", "#F97316"];
+export const COLORS_TW = ["bg-blue-500", "bg-yellow-500", "bg-pink-500", "bg-red-500", "bg-purple-500", "bg-indigo-500", "bg-emerald-500", "bg-orange-500"];
+export const TEXT_TW = ["text-blue-500", "text-yellow-500", "text-pink-500", "text-red-500", "text-purple-500", "text-indigo-500", "text-emerald-500", "text-orange-500"];
+
+export const DEFAULT_TAGS = [
+	"✈️ Flights",
+	"🚗 Rentals",
+	"💰 Annual Fees",
+	"⛽ Gas",
+	"🅿️ Parkings",
+	"📝 Subscriptions",
+	"🏛️ Government",
+	"🏨 Hotels",
+	"💼 Business",
+	"🏠 Personal",
+	"🎁 Gifts",
+	"🍽️ Dining",
+	"🛒 Groceries",
+];
+
+export const CATEGORY_HIERARCHY: Record<string, string[]> = {
+	"Income": [
+		"Wages",
+		"Dvidiends",
+		"Interest",
+		"Benefits & pension",
+		"Tax refunds",
+		"Unemployment",
+		"Other income",
+	],
+	"Transfers": [
+		"Account transfers",
+		"Investment transfers",
+		"Savings transfers",
+		"Cash deposits",
+		"Cash withdraws",
+		"Loans & cash advances",
+		"Person to person payments",
+		"Other transfers",
+	],
+	"Debt payments": [
+		"Credit card payments",
+		"Auto loan payments",
+		"Student loan payments",
+		"Personal loan payments",
+		"Other debt payments",
+	],
+	"Investments": ["Buy", "Sell", "ETFs", "Crypto"],
+	"Bank fees": [
+		"ATM fees",
+		"Foreign transaction fees",
+		"Insufficient funds",
+		"Interest charge",
+		"Late fees",
+		"Wire fees",
+		"Overdraft fees",
+		"Other bank fees",
+	],
+	"Food & drink": [
+		"Restaurants & bars",
+		"Groceries",
+		"Coffee shops",
+		"Liquor stores",
+		"Other food & drink",
+	],
+	"Shopping": [
+		"Clothing & accessories",
+		"Electronics",
+		"Pets supplies",
+		"Gifts",
+		"Office supplies",
+		"Sports & outdoors",
+		"Retail",
+		"Convenience stores",
+		"Hair & beauty",
+		"Tobaco & vape",
+		"Other shopping",
+	],
+	"Housing & utilities": [
+		"Rent",
+		"Mortgage payments",
+		"Home improvement & repairs",
+		"Phone & internet",
+		"Gas & electricity",
+		"Water sewer & garbage",
+		"Security",
+		"Hoa fee",
+		"Property tax",
+		"Other housing & utilities",
+	],
+	"Health & wellness": [
+		"Medical",
+		"Pharmacy",
+		"Dental",
+		"Vision",
+		"Nursing",
+		"Fitness",
+		"Personal care",
+		"Other health & wellness",
+	],
+	"Entertainment": [
+		"Gambling",
+		"Book & news",
+		"Movies & TV",
+		"Music & audio",
+		"Games",
+		"Events & Recreation",
+		"Other entertainment",
+	],
+	"Insurance": [
+		"Life insurance",
+		"Health insurance",
+		"Auto insurance",
+		"Home insurance",
+		"Other insurance",
+	],
+	"Services": [
+		"Household services",
+		"Education services",
+		"Veterinary services",
+		"Childcare services",
+		"Digital services",
+		"Legal services",
+		"Financial services",
+		"Shipping",
+		"Moving & storage",
+		"Other services",
+	],
+	"Transportation": [
+		"Gasoline & EV charing",
+		"Car services",
+		"Public transit",
+		"Taxi & ride shares",
+		"Parking & tolls",
+		"Other transportation",
+	],
+	"Travel": ["Flights", "Hotels", "Rental cars", "Other travel"],
+	"Government & charity": [
+		"Tax payments",
+		"Government fees",
+		"Charity",
+		"Other government & charity",
+	],
+	"Other": ["Uncategorized", "Other"],
+};

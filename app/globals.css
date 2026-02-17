@@ -1,47 +1,113 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+	--background: #ffffff;
+	--foreground: #171717;
+	--border: #e2e8f0; /* Light mode border (slate-200) */
+	--app-text: #0f172a; /* Slate 900 */
+	--card-bg: #f8fafc; /* Slate 50 */
+	--border-color: #e2e8f0; /* Slate 200 */
+}
+
+.dark {
+	--app-bg: #0d0d0d;
+	--app-text: #d1d5db; /* Gray 300 */
+	--card-bg: #161616;
+	--border-color: #262626;
+}
+
+html {
+	/* This prevents the layout shift by always keeping the scrollbar gutter */
+	scrollbar-gutter: stable;
 }
 
 @theme {
-  /* 👇 CHANGE "color" TO ANY COLOR NAME FROM THE DOCS (blue, indigo, sky, emerald...) */
-  
-  --color-primary-50:  var(--color-lime-50);
-  --color-primary-100: var(--color-lime-100);
-  --color-primary-200: var(--color-lime-200);
-  --color-primary-300: var(--color-lime-300);
-  --color-primary-400: var(--color-lime-400);
-  --color-primary-500: var(--color-lime-500);
-  --color-primary-600: var(--color-lime-600);
-  --color-primary-700: var(--color-lime-700);
-  --color-primary-800: var(--color-lime-800);
-  --color-primary-900: var(--color-lime-900);
-  --color-primary-950: var(--color-lime-950);
+	/* 👇 CHANGE "color" TO ANY COLOR NAME FROM THE DOCS (blue, indigo, sky, emerald...) */
+	/* Primary Colors */
+	--color-primary-50: var(--color-lime-50);
+	--color-primary-100: var(--color-lime-100);
+	--color-primary-200: var(--color-lime-200);
+	--color-primary-300: var(--color-lime-300);
+	--color-primary-400: var(--color-lime-400);
+	--color-primary-500: var(--color-lime-500);
+	--color-primary-600: var(--color-lime-600);
+	--color-primary-700: var(--color-lime-700);
+	--color-primary-800: var(--color-lime-800);
+	--color-primary-900: var(--color-lime-900);
+	--color-primary-950: var(--color-lime-950);
 
-  /* You can do the same for Secondary if you want */
-  --color-secondary-50:  var(--color-slate-50);
-  --color-secondary-500: var(--color-slate-500);
-  --color-secondary-900: var(--color-slate-900);
+	/* Secondary Colors */
+	--color-secondary-50: var(--color-slate-50);
+	--color-secondary-500: var(--color-slate-500);
+	--color-secondary-900: var(--color-slate-900);
+
+	/* System Variables */
+	--color-background: var(--background);
+	--color-foreground: var(--foreground);
+	--font-sans: var(--font-geist-sans);
+	--font-mono: var(--font-geist-mono);
+
+	--animate-shrink-width: shrink 5s linear forwards;
+
+	@keyframes shrink {
+		from {
+			width: 100%;
+		}
+		to {
+			width: 0%;
+		}
+	}
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+@keyframes shrink {
+	from {
+		width: 100%;
+	}
+	to {
+		width: 0%;
+	}
+}
+
+.animate-shrink {
+	animation: shrink linear forwards;
+}
+
+@layer base {
+	/* Force cursor pointer on all interactive elements */
+	button,
+	select,
+	input[type="checkbox"],
+	input[type="radio"],
+	input[type="file"],
+	label[for] {
+		cursor: pointer;
+	}
+
+	/* Target Recharts interactive elements */
+	.recharts-pie-sector,
+	.recharts-bar-rectangle,
+	.recharts-sector {
+		cursor: pointer;
+	}
+
+	/* Handle disabled states */
+	button:disabled,
+	select:disabled,
+	input:disabled {
+		cursor: not-allowed;
+		opacity: 0.5;
+	}
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+	:root {
+		--background: #0a0a0a;
+		--foreground: #ededed;
+	}
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+	background: var(--background);
+	color: var(--foreground);
+	font-family: Arial, Helvetica, sans-serif;
 }

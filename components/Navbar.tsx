@@ -38,9 +38,11 @@ export default function Navbar() {
 		};
 	}, [isOpen]);
 
-	// Define links here for cleaner code
+	// Define links using browser-friendly URL paths
 	const navLinks = [
-		// { name: "Budget Tracking", href: "/budget" },
+		{ name: "Budget Tracking Free", href: "/budget-free" },
+		{ name: "Budget Tracking Pro", href: "/budget-pro" },
+		{ name: "Budget Tracking Premium", href: "/budget-premium" },
 		{ name: "Stocks", href: "/stocks" },
 		// { name: "Mortgage Rates", href: "/mortgage" },
 		{ name: "Refi Calculator", href: "/calculator" },
