@@ -38,7 +38,6 @@ export default function EditTransactionModal({
 	transaction,
 	isOpen,
 	onClose,
-	onUpdate,
 	onRuleSaved,
 }: EditTransactionModalProps) {
 	// 1. STATE INITIALIZATION
@@ -56,11 +55,6 @@ export default function EditTransactionModal({
 	);
 
 	if (!isOpen || !transaction) return null;
-
-	// const handleSave = () => {
-	// 	onUpdate(transaction.id, editedData);
-	// 	onClose();
-	// };
 
 	const handleSave = () => {
 		const isExisting = transactions.some((t) => t.id === editedData.id);
@@ -214,7 +208,7 @@ export default function EditTransactionModal({
 										/>
 										<input
 											type="date"
-											className="w-full bg-[#F8F9FB] dark:bg-[#0d0d0d] border border-gray-800 rounded-xl py-3 pl-12 pr-4 text-sm text-gray-300 outline-none focus:border-orange-500/50 [color-scheme:dark]"
+											className="w-full bg-[#F8F9FB] dark:bg-[#0d0d0d] border border-gray-800 rounded-xl py-3 pl-12 pr-4 text-sm text-gray-300 outline-none focus:border-orange-500/50 scheme-dark"
 											value={editedData.date}
 											onChange={(e) =>
 												setEditedData({ ...editedData, date: e.target.value })
