@@ -3,13 +3,11 @@
 import React, { useState } from "react";
 import { createPortal } from "react-dom";
 import {
-	X,
 	Calculator,
 	Info,
 	MapPin,
 	Image as ImageIcon,
 	MoreVertical,
-	NotebookPen,
 	Zap,
 	Calendar,
 	Landmark,

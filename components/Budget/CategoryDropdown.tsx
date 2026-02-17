@@ -153,12 +153,12 @@ export default function CategoryDropdown({ currentCategory, onSelect, width = "w
 										<ComboboxOption
 											key={opt}
 											value={opt}
-											className="group relative cursor-pointer select-none py-2.5 pl-10 pr-4 text-xs data-[focus]:bg-blue-50 dark:data-[focus]:bg-blue-900/20 text-gray-900 dark:text-gray-300"
+											className="group relative cursor-pointer select-none py-2.5 pl-10 pr-4 text-xs data-focus:bg-blue-50 dark:data-focus:bg-blue-900/20 text-gray-900 dark:text-gray-300"
 										>
-											<span className="block truncate group-data-[selected]:font-bold group-data-[selected]:text-blue-600">
+											<span className="block truncate group-data-selected:font-bold group-data-selected:text-blue-600">
 												{opt}
 											</span>
-											<span className="absolute inset-y-0 left-0 hidden group-data-[selected]:flex items-center pl-3 text-blue-600">
+											<span className="absolute inset-y-0 left-0 hidden group-data-selected:flex items-center pl-3 text-blue-600">
 												<Check className="h-4 w-4" />
 											</span>
 										</ComboboxOption>

@@ -1,27 +1,14 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
-import {
-	Plus,
-	Search,
-	Filter,
-	MoreHorizontal,
-	Upload,
-	ArrowUp,
-	ArrowDown,
-	Trash2,
-	ChevronDown,
-} from "lucide-react";
+import { Plus, Search, Filter, Upload, Trash2 } from "lucide-react";
 import { useBudgetStore } from "@/hooks/useBudgetStore";
-import { formatMoney, formatDateLong } from "@/utils/formatters";
-import CategoryDropdown from "@/components/Budget/CategoryDropdown";
+import { formatDateLong } from "@/utils/formatters";
 import CsvUploader from "@/components/CsvUploader";
 import { Transaction } from "@/store/createBudgetStore";
 import ClearDataModal from "@/components/ClearDataModal";
 import { TransactionRow } from "@/components/Transactions/TransactionRow";
 import { SortableHeader } from "@/components/Transactions/SortableHeader";
-
-import EditTransactionModal from "@/components/Budget/EditTransactionModal";
 import dynamic from "next/dynamic";
 import { UndoToast } from "@/components/ui/UndoToast";
 
@@ -48,24 +35,26 @@ export default function TransactionsPage() {
 	const [sortPriority, setSortPriority] = useState<SortConfig[]>([
 		{ key: "date", direction: "desc" },
 	]);
-    // const [toast, setToast] = useState<{ message: string; count: number } | null>(null);
-    const [toast, setToast] = useState<{ count: number; snapshot: Transaction[] } | null>(null);
-    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+	// const [toast, setToast] = useState<{ message: string; count: number } | null>(null);
+	const [toast, setToast] = useState<{
+		count: number;
+		snapshot: Transaction[];
+	} | null>(null);
+	const [, setIsEditModalOpen] = useState(false);
 
-    // Get the undo function from store
-    const undoBulkUpdate = useStore((state) => state.undoBulkUpdate);
-    const [snapshot, setSnapshot] = useState<Transaction[]>([]);
+	// Get the undo function from store
+	const undoBulkUpdate = useStore((state) => state.undoBulkUpdate);
 
-const handleRuleSaved = (count: number, snapshot: Transaction[]) => {
-    // 1. Capture the snapshot for the Undo action
-    setToast({ count, snapshot });
+	const handleRuleSaved = (count: number, snapshot: Transaction[]) => {
+		// 1. Capture the snapshot for the Undo action
+		setToast({ count, snapshot });
 
-    // 2. Close the Edit Transaction Modal by clearing the selection
-    setSelectedTransaction(null);
+		// 2. Close the Edit Transaction Modal by clearing the selection
+		setSelectedTransaction(null);
 
-    // 3. Set a timer to hide the toast automatically
-    setTimeout(() => setToast(null), 5000);
-};
+		// 3. Set a timer to hide the toast automatically
+		setTimeout(() => setToast(null), 5000);
+	};
 
 	// --- Sort & Filter Logic ---
 	const filteredAndGrouped = useMemo(() => {
@@ -123,21 +112,21 @@ const handleRuleSaved = (count: number, snapshot: Transaction[]) => {
 		});
 	};
 
-const handleAddTransaction = () => {
-    const blankTx: Transaction = {
-        id: crypto.randomUUID(),
-        description: "",
-        amount: 0,
-        category: "Uncategorized",
-        date: new Date().toISOString().split('T')[0], // YYYY-MM-DD
-        account: "", 
-        needsReview: false,
-        needsSubcat: false,
-    };
-    
-    setSelectedTransaction(blankTx);
-    setIsEditModalOpen(true);
-};
+	const handleAddTransaction = () => {
+		const blankTx: Transaction = {
+			id: crypto.randomUUID(),
+			description: "",
+			amount: 0,
+			category: "Uncategorized",
+			date: new Date().toISOString().split("T")[0], // YYYY-MM-DD
+			account: "",
+			needsReview: false,
+			needsSubcat: false,
+		};
+
+		setSelectedTransaction(blankTx);
+		setIsEditModalOpen(true);
+	};
 
 	const EditTransactionModal = dynamic(
 		() => import("@/components/Budget/EditTransactionModal"),
@@ -310,21 +299,21 @@ const handleAddTransaction = () => {
 					isOpen={!!selectedTransaction}
 					onClose={() => setSelectedTransaction(null)}
 					onUpdate={updateTransaction}
-                    onRuleSaved={handleRuleSaved}
+					onRuleSaved={handleRuleSaved}
 				/>
 			)}
 
-                        {/* Render the Toast */}
-            {toast && (
-                <UndoToast 
-                    message={`Updated ${toast.count} transactions`}
-                    onUndo={() => {
-                        undoBulkUpdate(toast.snapshot);
-                        setToast(null);
-                    }}
-                    onClose={() => setToast(null)}
-                />
-            )}
+			{/* Render the Toast */}
+			{toast && (
+				<UndoToast
+					message={`Updated ${toast.count} transactions`}
+					onUndo={() => {
+						undoBulkUpdate(toast.snapshot);
+						setToast(null);
+					}}
+					onClose={() => setToast(null)}
+				/>
+			)}
 		</div>
 	);
 }
