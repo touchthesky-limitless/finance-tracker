@@ -18,6 +18,7 @@ import {
 	Moon,
 	Lock,
 	LucideIcon,
+	PiggyBank,
 } from "lucide-react";
 
 interface SidebarItemType {
@@ -115,11 +116,11 @@ export default function ProSidebar({ onItemClick }: ProSidebarProps) {
 		<aside className="w-64 h-screen bg-[#F8F9FB] dark:bg-[#0a0a0a] dark:text-gray-100 border-r border-gray-800 flex flex-col shrink-0">
 			{/* Logo Section */}
 			<div className="p-6 flex items-center gap-3">
-				<div className="w-6 h-6 bg-orange-200 rounded-sm flex items-center justify-center">
+				{/* <div className="w-6 h-6 bg-orange-200 rounded-sm flex items-center justify-center">
 					<div className="w-3 h-3 bg-orange-800 rounded-sm" />
-				</div>
+				</div> */}
 				<span className="text-lg font-semibold text-gray-600 dark:text-gray-100 tracking-tight">
-					Pro
+					<PiggyBank size={34} />
 				</span>
 			</div>
 

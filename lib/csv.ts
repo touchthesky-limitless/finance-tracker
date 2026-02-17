@@ -27,7 +27,9 @@ export function parseBankCSV(
 			(v) =>
 				v.includes("description") ||
 				v.includes("payee") ||
-				v.includes("merchant"),
+				v.includes("merchant") ||
+				v === "name"  // Add this for US Bank
+
 		);
 
 		if (hasDate && hasAmount && hasDesc) {
@@ -58,9 +60,14 @@ export function parseBankCSV(
 				? postDateIdx
 				: headers.findIndex((h) => h === "date"); // Fallback for simple "Date" header
 
-	const descIdx = headers.findIndex(
-		(h) => h === "description" || h.includes("merchant") || h.includes("payee"),
-	);
+// Mapping the description index
+const descIdx = headers.findIndex(
+    (h) => 
+        h === "description" || 
+        h.includes("merchant") || 
+        h.includes("payee") ||
+        h === "name" // us bank
+);
 
 	const amountIdx = headers.findIndex((h) => h === "amount");
 	if (dateIdx === -1 || descIdx === -1 || amountIdx === -1) {
@@ -104,7 +111,7 @@ export function parseBankCSV(
 		if (cols.length < 3) continue;
 
 		const date = cols[dateIdx];
-		const description = cols[descIdx];
+		const description = cols[descIdx]?.replace(/\s+/g, ' ').trim();
 
 		const amountRaw = cols[amountIdx]?.replace(/[$,\s]/g, "");
 		let amount = parseFloat(amountRaw);
