@@ -10,12 +10,6 @@ interface TransactionRowProps {
 	onRowClick: () => void;
 }
 
-// interface TransactionRowProps {
-//     transaction: Transaction;
-//     onUpdate: (id: string, updates: Partial<Transaction>) => void;
-//     onRowClick: () => void;
-// }
-
 export function TransactionRow({
 	transaction,
 	onUpdate,
@@ -29,13 +23,11 @@ export function TransactionRow({
 
 	// A transaction needs review if the flag is true
 	// OR if the category is just a generic Parent name
-const needsReview = 
-    transaction.needsSubcat || 
-    transaction.needsReview || 
-    transaction.category === "Uncategorized" || // Add this
-    Object.keys(CATEGORY_HIERARCHY).includes(transaction.category);
-    console.log("needsReview:",needsReview);
-    console.log(`Desc: ${transaction.description} | Cat: ${transaction.category} | NeedsSubcat: ${transaction.needsSubcat}`);
+	const needsReview =
+		transaction.needsSubcat ||
+		transaction.needsReview ||
+		transaction.category === "Uncategorized" ||
+		Object.keys(CATEGORY_HIERARCHY).includes(transaction.category);
 
 	return (
 		<tr
@@ -69,14 +61,17 @@ const needsReview =
 							}}
 						/>
 					</div>
-                    {needsReview && <NeedsReviewBadge />}
+					{needsReview && <NeedsReviewBadge />}
 				</div>
 			</td>
 
 			{/* 3. AMOUNT */}
 			<td
-				className={`py-4 px-2 text-right font-bold ${transaction.amount < 0 ? "text-slate-900 dark:text-slate-100" 
-        : "text-emerald-500 dark:text-emerald-400"}`}
+				className={`py-4 px-2 text-right font-bold ${
+					transaction.amount < 0
+						? "text-slate-900 dark:text-slate-100"
+						: "text-emerald-500 dark:text-emerald-400"
+				}`}
 			>
 				{transaction.amount < 0 ? "-" : ""}$
 				{Math.abs(transaction.amount).toLocaleString()}

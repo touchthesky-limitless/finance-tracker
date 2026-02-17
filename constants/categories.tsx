@@ -79,8 +79,6 @@ import {
 	Package,
 	Cog,
 	Gavel,
-	HeartHandshake as CharityIcon,
-	Globe as GovtIcon,
 	HelpCircle,
 	Briefcase,
 	ShoppingBag,
@@ -387,40 +385,6 @@ export function CategoryIcon({ name, size, colorClass }: IconProps) {
 		default:
 			return <Tag size={size} className={colorClass} />;
 	}
-	// switch (name) {
-	// 	case "Income":
-	// 		return <TrendingUp size={size} className="text-emerald-500" />;
-	// 	case "Transfers":
-	// 		return <ArrowLeftRight size={size} className="text-blue-400" />;
-	// 	case "Debt payments":
-	// 		return <CreditCard size={size} className="text-red-400" />;
-	// 	case "Investments":
-	// 		return <Briefcase size={size} className="text-indigo-400" />;
-	// 	case "Bank fees":
-	// 		return <Landmark size={size} className="text-amber-500" />;
-	// 	case "Food & drink":
-	// 		return <Utensils size={size} className="text-orange-500" />;
-	// 	case "Shopping":
-	// 		return <ShoppingBag size={size} className="text-pink-500" />;
-	// 	case "Housing & utilities":
-	// 		return <Home size={size} className="text-yellow-600" />;
-	// 	case "Health & wellness":
-	// 		return <HeartPulse size={size} className="text-rose-500" />;
-	// 	case "Entertainment":
-	// 		return <Gamepad2 size={size} className="text-purple-500" />;
-	// 	case "Insurance":
-	// 		return <ShieldCheck size={size} className="text-cyan-500" />;
-	// 	case "Services":
-	// 		return <Wrench size={size} className="text-orange-500" />;
-	// 	case "Transportation":
-	// 		return <Car size={size} className="text-blue-500" />;
-	// 	case "Travel":
-	// 		return <Plane size={size} className="text-sky-400" />;
-	// 	case "Government & charity":
-	// 		return <Gavel size={size} className="text-amber-900" />;
-	// 	default:
-	// 		return <Tag size={size} className="text-gray-500" />;
-	// }
 }
 
 export function getParentColor(parentName: string): string {

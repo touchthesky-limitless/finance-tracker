@@ -59,21 +59,22 @@ export default function CsvUploader({ onComplete }: CsvUploaderProps) {
 				const accountName = file.name.replace(".csv", "").replace(/_/g, " ");
 				const parsed = parseBankCSV(text, accountName);
 				// --- NEW TRANSFORMATION START ---
-    const resolvedParsed = parsed.map((t): Transaction => {
-        const parent = resolveToParent(t.category);
-        
-        // A transaction needs review if it's mapped to a generic Parent name
-        const isGenericParent = Object.keys(CATEGORY_HIERARCHY).includes(parent) || 
-                 parent === "Uncategorized";
+				const resolvedParsed = parsed.map((t): Transaction => {
+					const parent = resolveToParent(t.category);
 
-        return {
-            ...t,
-            category: parent,
-            needsSubcat: isGenericParent // This triggers your badge
-        };
-    });
-	console.log(resolvedParsed[0])
-    // --------------------------------
+					// A transaction needs review if it's mapped to a generic Parent name
+					const isGenericParent =
+						Object.keys(CATEGORY_HIERARCHY).includes(parent) ||
+						parent === "Uncategorized";
+
+					return {
+						...t,
+						category: parent,
+						needsSubcat: isGenericParent, // This triggers your badge
+					};
+				});
+
+				// --------------------------------
 
 				// --- AUTO-ADOPT CATEGORIES START ---
 				// Access state and actions separately

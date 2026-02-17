@@ -19,6 +19,8 @@ interface BudgetState {
 	transactions: Transaction[];
 	isLoading: boolean;
 	customTags: string[];
+	rules: { keyword: string; category: string }[];
+	saveRule: (rule: { keyword: string; category: string }) => void;
 	addCustomTag: (tag: string) => void;
 	setLoading: (loading: boolean) => void;
 	addTransactions: (newTxs: Transaction[]) => void;
@@ -35,13 +37,36 @@ export const createBudgetStore = (versionKey: string) =>
 			(set, get) => ({
 				transactions: [],
 				customTags: [],
+				rules: [],
 				isLoading: true,
 
+				// Rules - FUTURE TRANSACTIONS: Process them before they enter the state
 				// For manual "Add"
-				addTransactions: (newTxs) =>
+				addTransactions: (newTxs) => {
+					const currentRules = get().rules; // Get current rules from state
+					console.log("Processing with rules 1111:", currentRules);
+					const processedTxs = newTxs.map((tx) => {
+						// Look for a rule where the description contains the keyword
+						const matchingRule = currentRules.find((rule) =>
+							tx.description.toLowerCase().includes(rule.keyword.toLowerCase()),
+						);
+						console.log("matchingRule:", matchingRule);
+						if (matchingRule) {
+							return {
+								...tx,
+								category: matchingRule.category,
+								needsReview: false,
+								needsSubcat: false,
+							};
+						}
+						return tx;
+					});
+
+                    console.log("New Transaction Description:", newTxs[0].description);
 					set((state) => ({
-						transactions: [...state.transactions, ...newTxs],
-					})),
+						transactions: [...state.transactions, ...processedTxs],
+					}));
+				},
 
 				// For "Edit" - logic to update and clear flags
 				updateTransaction: (id, updates) =>
@@ -107,6 +132,35 @@ export const createBudgetStore = (versionKey: string) =>
 
 				undoBulkUpdate: (previousTransactions) =>
 					set({ transactions: previousTransactions }),
+
+				// RETROACTIVE: Apply rule to existing data when created
+				saveRule: (newRule) => {
+					set((state) => {
+						const updatedRules = [...state.rules, newRule];
+
+						// Apply this new rule to all existing transactions immediately
+						const updatedTransactions = state.transactions.map((tx) => {
+							if (
+								tx.description
+									.toLowerCase()
+									.includes(newRule.keyword.toLowerCase())
+							) {
+								return {
+									...tx,
+									category: newRule.category,
+									needsReview: false,
+									needsSubcat: false,
+								};
+							}
+							return tx;
+						});
+
+						return {
+							rules: updatedRules,
+							transactions: updatedTransactions,
+						};
+					});
+				},
 			}),
 			{
 				// 2. Use the versionKey to keep Simple and Advanced data separate

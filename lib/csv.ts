@@ -69,8 +69,8 @@ export function parseBankCSV(
 		);
 	}
 
-	// Category Priority: Expense Category -> Category -> Any "category"
-	let categoryIdx = headers.findIndex((h) => h === "expense category");
+	// Category Priority: Merchant Category -> Category -> Any "category"
+	let categoryIdx = headers.findIndex((h) => h === "merchant category");
 	if (categoryIdx === -1) {
 		categoryIdx = headers.findIndex((h) => h === "category");
 	}
