@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from "react";
+import React, { useState, useMemo, useRef, useEffect } from "react";
 import {
 	X,
 	Search,
@@ -8,10 +8,12 @@ import {
 	Calendar,
 	Tag,
 	Check,
+	AlertCircle,
 } from "lucide-react";
 import { useBudgetStore } from "@/hooks/useBudgetStore";
 import { CategorySelector } from "@/components/CategorySelector";
 import { Transaction } from "@/store/createBudgetStore";
+import { formatThousandWithCommas } from "@/utils/formatters";
 
 interface CreateRuleModalProps {
 	isOpen: boolean;
@@ -31,12 +33,13 @@ export function CreateRuleModal({
 	const [step, setStep] = useState(1);
 	const useStore = useBudgetStore();
 	const transactions = useStore((state) => state.transactions);
-	const undoBulkUpdate = useStore((state) => state.transactions);
+	const saveRule = useStore((state) => state.saveRule);
 	const updateTransaction = useStore((state) => state.updateTransaction);
+
+	const rules = useStore((state) => state.rules);
 
 	// Criteria State (Step 1)
 	const [matchName, setMatchName] = useState(initialName || "");
-	const [matchAmount, setMatchAmount] = useState<number | null>(null);
 
 	// Action State (Step 2)
 	const [targetCategory, setTargetCategory] = useState("");
@@ -44,7 +47,7 @@ export function CreateRuleModal({
 
 	const [useAmount, setUseAmount] = useState(false);
 	const [amountLogic, setAmountLogic] = useState("Equal to");
-	const [amountValue, setAmountValue] = useState<number>(0);
+	const [amountValue, setAmountValue] = useState<string>("0");
 
 	const [useAccount, setUseAccount] = useState(false);
 	const [selectedAccount, setSelectedAccount] = useState("");
@@ -59,22 +62,34 @@ export function CreateRuleModal({
 	const [matchCategory, setMatchCategory] = useState(initialCategory || "");
 	// const [matchCategory, setMatchCategory] = useState(false);
 
-	// Live filtering for the right pane
-	// 	const matchedTransactions = useMemo(() => {
-	// 		return transactions
-	// 			.filter((t) => {
-	// 				const nameMatch =
-	// 					!useName ||
-	// 					t.description.toLowerCase().includes(matchName.toLowerCase());
-	// 				// const categoryMatch = !useCategory || t.category === matchCategory;
-	// 				const categoryMatch = !useCategory || t.category === matchCategory;
+	const inputRef = useRef<HTMLInputElement>(null);
 
-	// 				return nameMatch && categoryMatch;
-	// 			})
-	// 			.slice(0, 15);
-	// 	}, [transactions, useName, matchName, useCategory, matchCategory]);
+	const isDuplicate = rules.some(
+		(r) =>
+			r.keyword.toLowerCase() === matchName.toLowerCase() &&
+			r.keyword !== initialName,
+	);
+
+	// Find rules that might overlap with the current input
+	const conflictingRule = rules.find((r) => {
+		const newK = matchName.toLowerCase().trim();
+		const existingK = r.keyword.toLowerCase().trim();
+
+		if (newK === "" || newK === existingK) return false;
+
+		// Check if one keyword is contained within the other
+		return newK.includes(existingK) || existingK.includes(newK);
+	});
+
+	// Calculate how many transactions match the current keyword
+	const matchCount = transactions.filter((tx) =>
+		tx.description?.toLowerCase().includes(matchName.toLowerCase().trim()),
+	).length;
 
 	const matchedTransactions = useMemo(() => {
+		// CALCULATE ONCE HERE
+		const numericAmountValue = parseFloat(amountValue.replace(/,/g, "")) || 0;
+
 		return transactions
 			.filter((t) => {
 				// Name Matching
@@ -96,10 +111,14 @@ export function CreateRuleModal({
 				const amountMatch =
 					!useAmount ||
 					(amountLogic === "Equal to"
-						? amountNum === amountValue
+						? // ? amountNum === amountValue
+							// : amountLogic === "Greater than"
+							// 	? amountNum > amountValue
+							// 	: amountNum < amountValue);
+							amountNum === numericAmountValue
 						: amountLogic === "Greater than"
-							? amountNum > amountValue
-							: amountNum < amountValue);
+							? amountNum > numericAmountValue
+							: amountNum < numericAmountValue);
 
 				// Account Matching (Wiring up the unused state)
 				const accountMatch = !useAccount || t.account === selectedAccount;
@@ -122,21 +141,70 @@ export function CreateRuleModal({
 	]);
 
 	const handleSaveRule = () => {
-		// 1. Take a snapshot of the current transactions for UNDO
+		// 1. Take a snapshot for undo
 		const snapshot = [...transactions];
 
-		// 2. Perform updates
-		matchedTransactions.forEach((t) => {
-			const updates: Partial<Transaction> = {};
-			if (targetCategory) updates.category = targetCategory;
-			if (newName) updates.description = newName;
-			updateTransaction(t.id, updates);
-		});
+		// 2. SAVE & APPLY RULE
+		// We pass the new data AND the original name (initialName)
+		// to the store to handle the rename/update logic.
+		if (useName && matchName.trim() !== "") {
+			saveRule(
+				{
+					keyword: matchName.trim(),
+					category: targetCategory || matchCategory,
+				},
+				initialName, // Store uses this to find the old rule to replace
+			);
+		}
 
-		// 3. Trigger success chain
+		// 3. Handle CUSTOM DESCRIPTIONS (Only if you are renaming the transactions themselves)
+		// Note: saveRule already updates the Category retroactively.
+		// You only need this loop if 'newName' is actually a NEW description for the bank line.
+		if (newName && newName.trim() !== "") {
+			matchedTransactions.forEach((t) => {
+				updateTransaction(t.id, { description: newName });
+			});
+		}
+
+		// 4. Trigger success chain
 		onSaveSuccess(matchedTransactions.length, snapshot);
 		onClose();
 	};
+
+	const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+		let rawValue = e.target.value.replace(/[^0-9.]/g, "");
+
+		// Prevent multiple decimal points
+		const parts = rawValue.split(".");
+		if (parts.length > 2) {
+			rawValue = parts[0] + "." + parts.slice(1).join("");
+		}
+
+		// Leading zero logic (Keep your current one, it works well!)
+		if (
+			rawValue.length > 1 &&
+			rawValue.startsWith("0") &&
+			rawValue[1] !== "."
+		) {
+			rawValue = rawValue.substring(1);
+		}
+
+		setAmountValue(rawValue);
+	};
+
+	// 2. Focus logic inside your existing useEffect
+	useEffect(() => {
+		if (isOpen) {
+			setMatchName(initialName || "");
+			setTargetCategory(initialCategory || "");
+			setStep(1);
+
+			// Focus the input automatically
+			setTimeout(() => {
+				inputRef.current?.focus();
+			}, 100);
+		}
+	}, [isOpen, initialName, initialCategory]);
 
 	if (!isOpen) return null;
 
@@ -146,7 +214,11 @@ export function CreateRuleModal({
 				{/* Header */}
 				<div className="p-6 border-b border-slate-100 dark:border-white/5 flex justify-between items-center bg-white dark:bg-[#0f0f0f]">
 					<h2 className="text-xl font-bold text-slate-900 dark:text-white">
-						{step === 1 ? "Create a Rule" : "Apply Updates"}
+						{step === 1
+							? initialName
+								? "Edit Rule"
+								: "Create a Rule"
+							: "Apply Updates"}
 					</h2>
 					<button
 						onClick={onClose}
@@ -194,10 +266,54 @@ export function CreateRuleModal({
 											<option>Starts with</option>
 										</select>
 										<input
+											ref={inputRef}
 											className="w-full bg-slate-50 dark:bg-[#121212] border border-slate-200 dark:border-white/10 rounded-lg p-2 text-xs"
 											value={matchName}
 											onChange={(e) => setMatchName(e.target.value)}
 										/>
+										{/* --- Duplicate Check --- */}
+										{/* Enhanced Duplicate Warning with Match Count */}
+										{isDuplicate && matchName.trim().length > 0 && (
+											<div className="mt-2 px-4 py-3 bg-amber-500/10 border border-amber-500/20 rounded-2xl flex items-center justify-between">
+												<div className="flex flex-col">
+													<p className="text-[10px] text-amber-500 font-black uppercase tracking-wider">
+														Rule Already Exists
+													</p>
+													<p className="text-[11px] text-gray-400 mt-0.5">
+														Saving will overwrite the current category.
+													</p>
+												</div>
+
+												<div className="text-right">
+													<span className="text-sm font-black text-amber-500">
+														{matchCount}
+													</span>
+													<p className="text-[9px] text-gray-500 uppercase font-bold">
+														Matches
+													</p>
+												</div>
+											</div>
+										)}
+										{/* Conflict Warning */}
+										{conflictingRule && (
+											<div className="mt-3 p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl flex items-start gap-3">
+												<div className="mt-0.5 text-blue-500">
+													<AlertCircle size={14} />
+												</div>
+												<div>
+													<p className="text-[10px] leading-tight text-blue-400 font-bold uppercase tracking-wider">
+														Potential Conflict
+													</p>
+													<p className="text-[11px] text-gray-400 mt-0.5">
+														This overlaps with your existing rule:{" "}
+														<span className="text-white font-bold">
+															&quot;{conflictingRule.keyword}&quot;
+														</span>
+														. The most specific keyword usually wins.
+													</p>
+												</div>
+											</div>
+										)}
 									</div>
 								)}
 							</div>
@@ -265,7 +381,9 @@ export function CreateRuleModal({
 												$
 											</span>
 											<input
-												type="number"
+												type="text"
+												value={formatThousandWithCommas(amountValue)}
+												onChange={handleAmountChange}
 												className="w-full bg-slate-50 dark:bg-[#121212] border border-slate-200 dark:border-white/10 rounded-lg p-2 pl-5 text-xs"
 												placeholder="0.00"
 											/>
@@ -399,6 +517,19 @@ export function CreateRuleModal({
 					</div>
 				)}
 
+				{/* MATCH COUNT NOTIFICATION (Place it here) */}
+				{step === 2 && matchCount > 0 && (
+					<div className="flex items-center justify-center gap-2 mb-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+						<div className="h-px flex-1 bg-linear-to-r from-transparent to-gray-200 dark:to-white/5" />
+						<p className="text-[10px] text-gray-500 italic whitespace-nowrap">
+							This rule will update{" "}
+							<span className="text-orange-500 font-black">{matchCount}</span>{" "}
+							transactions
+						</p>
+						<div className="h-px flex-1 bg-linear-to-l from-transparent to-gray-200 dark:to-white/5" />
+					</div>
+				)}
+
 				{/* Footer Actions */}
 				<div className="p-6 border-t border-slate-100 dark:border-white/5 flex justify-end gap-3 bg-white dark:bg-[#0f0f0f] mt-auto">
 					{/* DYNAMIC FOOTER BUTTONS */}
@@ -428,7 +559,11 @@ export function CreateRuleModal({
 						}}
 						className="bg-black dark:bg-white text-white dark:text-black px-8 py-2.5 rounded-full text-sm font-bold hover:opacity-90 transition-opacity shadow-lg"
 					>
-						{step === 1 ? "Continue" : "Save Rule"}
+						{step === 1
+							? "Continue"
+							: isDuplicate
+								? "Update Rule"
+								: "Save Rule"}
 					</button>
 				</div>
 			</div>

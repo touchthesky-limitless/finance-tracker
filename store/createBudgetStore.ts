@@ -20,7 +20,11 @@ interface BudgetState {
 	isLoading: boolean;
 	customTags: string[];
 	rules: { keyword: string; category: string }[];
-	saveRule: (rule: { keyword: string; category: string }) => void;
+	saveRule: (
+		rule: { keyword: string; category: string },
+		oldKeyword?: string,
+	) => void;
+	deleteRule: (keyword: string) => void;
 	addCustomTag: (tag: string) => void;
 	setLoading: (loading: boolean) => void;
 	addTransactions: (newTxs: Transaction[]) => void;
@@ -37,20 +41,24 @@ export const createBudgetStore = (versionKey: string) =>
 			(set, get) => ({
 				transactions: [],
 				customTags: [],
-				rules: [],
+				rules: [], // Initial state
 				isLoading: true,
 
-				// Rules - FUTURE TRANSACTIONS: Process them before they enter the state
-				// For manual "Add"
 				addTransactions: (newTxs) => {
-					const currentRules = get().rules; // Get current rules from state
-					console.log("Processing with rules 1111:", currentRules);
+					// const currentRules = get().rules || []; // Defensive check
+					const currentRules = [...get().rules].sort(
+						(a, b) => b.keyword.length - a.keyword.length,
+					);
+
 					const processedTxs = newTxs.map((tx) => {
-						// Look for a rule where the description contains the keyword
+						// Ensure description exists before calling toLowerCase
+						const desc = tx.description?.toLowerCase() || "";
+
+						// Because we sorted by length, "Starbucks Coffee" will match before "Starbucks"
 						const matchingRule = currentRules.find((rule) =>
-							tx.description.toLowerCase().includes(rule.keyword.toLowerCase()),
+							desc.includes(rule.keyword.toLowerCase()),
 						);
-						console.log("matchingRule:", matchingRule);
+
 						if (matchingRule) {
 							return {
 								...tx,
@@ -62,52 +70,78 @@ export const createBudgetStore = (versionKey: string) =>
 						return tx;
 					});
 
-                    console.log("New Transaction Description:", newTxs[0].description);
 					set((state) => ({
 						transactions: [...state.transactions, ...processedTxs],
 					}));
 				},
 
-				// For "Edit" - logic to update and clear flags
+				saveRule: (newRule, oldKeyword) => {
+					set((state) => {
+						const rules = state.rules || [];
+
+						// Update: 1. Find the target index -
+						// If we have oldKeyword, we look for that (renaming).
+						// Otherwise, we look for newRule.keyword (updating category).
+						const targetIndex = oldKeyword
+							? rules.findIndex(
+									(r) => r.keyword.toLowerCase() === oldKeyword.toLowerCase(),
+								)
+							: rules.findIndex(
+									(r) =>
+										r.keyword.toLowerCase() === newRule.keyword.toLowerCase(),
+								);
+
+						let updatedRules = [...rules];
+						if (targetIndex > -1) {
+							// REPLACE: Update or rename existing rule
+							updatedRules[targetIndex] = newRule;
+						} else {
+							// ADD: Brand new rule
+							updatedRules = [...rules, newRule];
+						}
+
+						// Retroactive update for transactions
+						const updatedTransactions = state.transactions.map((tx) => {
+							if (
+								tx.description
+									?.toLowerCase()
+									.includes(newRule.keyword.toLowerCase())
+							) {
+								return {
+									...tx,
+									category: newRule.category,
+									needsReview: false,
+								};
+							}
+							return tx;
+						});
+
+						return { rules: updatedRules, transactions: updatedTransactions };
+					});
+				},
+
+				deleteRule: (keyword) => {
+					set((state) => ({
+						rules: state.rules.filter((r) => r.keyword !== keyword),
+					}));
+				},
+
+				// ... (Rest of your functions: updateTransaction, deleteTransaction, etc.)
 				updateTransaction: (id, updates) =>
 					set((state) => ({
 						transactions: state.transactions.map((t) =>
 							t.id === id
-								? {
-										...t,
-										...updates,
-										// Automatically clear review flags when any update is made
-										// (Or you can wrap this in an 'if' to check if updates.category exists)
-										needsReview: false,
-										needsSubcat: false,
-									}
+								? { ...t, ...updates, needsReview: false, needsSubcat: false }
 								: t,
 						),
 					})),
-
-				//only want the badge to disappear when the category is changed
-				// (and not just for notes or tags), you can do this:
-				// updateTransaction: (id, updates) =>
-				//     set((state) => ({
-				//         transactions: state.transactions.map((t) => {
-				//             if (t.id !== id) return t;
-
-				//             const isCategoryUpdate = !!updates.category;
-				//             return {
-				//                 ...t,
-				//                 ...updates,
-				//                 needsReview: isCategoryUpdate ? false : t.needsReview,
-				//                 needsSubcat: isCategoryUpdate ? false : t.needsSubcat,
-				//             };
-				//         }),
-				//     })),
 
 				deleteTransaction: (id) =>
 					set((state) => ({
 						transactions: state.transactions.filter((t) => t.id !== id),
 					})),
 
-				clearData: () => set({ transactions: [], customTags: [] }),
+				clearData: () => set({ transactions: [], customTags: [], rules: [] }),
 
 				setLoading: (loading) => set({ isLoading: loading }),
 
@@ -132,38 +166,8 @@ export const createBudgetStore = (versionKey: string) =>
 
 				undoBulkUpdate: (previousTransactions) =>
 					set({ transactions: previousTransactions }),
-
-				// RETROACTIVE: Apply rule to existing data when created
-				saveRule: (newRule) => {
-					set((state) => {
-						const updatedRules = [...state.rules, newRule];
-
-						// Apply this new rule to all existing transactions immediately
-						const updatedTransactions = state.transactions.map((tx) => {
-							if (
-								tx.description
-									.toLowerCase()
-									.includes(newRule.keyword.toLowerCase())
-							) {
-								return {
-									...tx,
-									category: newRule.category,
-									needsReview: false,
-									needsSubcat: false,
-								};
-							}
-							return tx;
-						});
-
-						return {
-							rules: updatedRules,
-							transactions: updatedTransactions,
-						};
-					});
-				},
 			}),
 			{
-				// 2. Use the versionKey to keep Simple and Advanced data separate
 				name: `budget-storage-${versionKey}`,
 				storage: createJSONStorage(() => localStorage),
 				onRehydrateStorage: () => (state) => {
