@@ -2,112 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-	LayoutDashboard,
-	Receipt,
-	BarChart3,
-	Compass,
-	Wallet,
-	Tags,
-	Calendar,
-	Repeat,
-	RefreshCcw,
-	Smartphone,
-	Info,
-	PlusCircle,
-	Moon,
-	Lock,
-	LucideIcon,
-	PiggyBank,
-} from "lucide-react";
-
-interface SidebarItemType {
-	name: string;
-	href: string;
-	icon: LucideIcon; // Specifically types the Lucide component
-	hasAdd?: boolean; // Optional property for the 'Add' button
-	category?: string;
-	isLocked?: boolean;
-}
-
-interface NavGroupType {
-	label: string;
-	items: SidebarItemType[];
-}
+import { PlusCircle, Moon, PiggyBank } from "lucide-react";
+import { NAV_GROUPS, SidebarItemType } from "@/config/navigation";
+import { FeatureGuard } from "@/components/ui/FeatureGuard";
 
 interface ProSidebarProps {
 	onItemClick?: () => void; // Add this prop
 }
-
-// Sectioned Navigation for "Pro" features
-const NAV_GROUPS: NavGroupType[] = [
-	{
-		label: "",
-		items: [{ name: "Overview", href: "/budget-pro", icon: LayoutDashboard }],
-	},
-	{
-		label: "Transaction Data",
-		items: [
-			{
-				name: "Transaction Details",
-				href: "/budget-pro/transactions",
-				icon: Receipt,
-				hasAdd: true,
-			},
-			{
-				name: "Statistics & Analysis",
-				href: "/budget-pro/stats",
-				icon: BarChart3,
-			},
-			{
-				name: "Insights Explorer",
-				href: "/budget-pro/insights",
-				icon: Compass,
-			},
-		],
-	},
-	{
-		label: "Basis Data",
-		items: [
-			{ name: "Accounts", href: "/budget-pro/accounts", icon: Wallet },
-			{
-				name: "Transaction Categories",
-				href: "/budget-pro/categories",
-				icon: LayoutDashboard,
-			},
-			{ name: "Transaction Tags", href: "/budget-pro/tags", icon: Tags },
-			{
-				name: "Transaction Templates",
-				href: "/budget-pro/templates",
-				icon: Calendar,
-				isLocked: true,
-			},
-			{
-				name: "Scheduled Transactions",
-				href: "/budget-pro/scheduled",
-				icon: Repeat,
-				isLocked: true,
-			},
-		],
-	},
-	{
-		label: "Miscellaneous",
-		items: [
-			{
-				name: "Exchange Rates Data",
-				href: "/budget-pro/exchange",
-				icon: RefreshCcw,
-				isLocked: true,
-			},
-			{
-				name: "Use on Mobile Device",
-				href: "/budget-pro/mobile",
-				icon: Smartphone,
-			},
-			{ name: "About", href: "/budget-pro/about", icon: Info },
-		],
-	},
-];
 
 export default function ProSidebar({ onItemClick }: ProSidebarProps) {
 	const pathname = usePathname();
@@ -133,12 +34,14 @@ export default function ProSidebar({ onItemClick }: ProSidebarProps) {
 						</h3>
 						<nav className="space-y-1">
 							{group.items.map((item) => (
-								<SidebarItem
-									key={item.name}
-									item={item}
-									isActive={pathname === item.href}
-									onClick={onItemClick}
-								/>
+								<FeatureGuard key={item.name} isLocked={item.isLocked}>
+									<SidebarItem
+										key={item.name}
+										item={item}
+										isActive={pathname === item.href}
+										onClick={onItemClick}
+									/>
+								</FeatureGuard>
 							))}
 						</nav>
 					</div>
@@ -151,9 +54,9 @@ export default function ProSidebar({ onItemClick }: ProSidebarProps) {
 					<Moon size={18} />
 				</button>
 				<div className="flex items-center gap-3">
-					<span className="text-xs text-gray-400 font-medium">JD</span>
+					<span className="text-xs text-gray-400 font-medium">FT</span>
 					<div className="w-8 h-8 rounded-full bg-orange-200 flex items-center justify-center text-orange-900 text-xs font-bold">
-						JD
+						FT
 					</div>
 				</div>
 			</div>
@@ -170,15 +73,6 @@ function SidebarItem({
 	isActive: boolean;
 	onClick?: () => void;
 }) {
-	if (item.isLocked) {
-		return (
-			<div className="flex items-center px-3 py-2 rounded-lg text-sm font-medium text-gray-300 dark:text-gray-600 cursor-not-allowed opacity-60">
-				<item.icon size={18} className="text-gray-700" />
-				<span className="ml-3 flex-1">{item.name}</span>
-				<Lock size={12} className="text-gray-700" />
-			</div>
-		);
-	}
 
 	return (
 		<div className="flex items-center group">

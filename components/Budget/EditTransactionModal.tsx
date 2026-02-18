@@ -23,6 +23,7 @@ import { CategorySelector } from "@/components/CategorySelector";
 import { CreateRuleModal } from "@/components/Transactions/CreateRuleModal";
 import { useBudgetStore } from "@/hooks/useBudgetStore";
 import { formatThousandWithCommas } from "@/utils/formatters";
+import { FeatureGuard } from "@/components/ui/FeatureGuard";
 
 interface EditTransactionModalProps {
 	transaction: Transaction;
@@ -125,18 +126,22 @@ export default function EditTransactionModal({
 							active={activeTab === "Rules"}
 							onClick={() => setActiveTab("Rules")}
 						/>
-						<NavButton
-							icon={<MapPin size={18} />}
-							label="Location on Map"
-							active={activeTab === "Location on Map"}
-							onClick={() => setActiveTab("Location on Map")}
-						/>
-						<NavButton
-							icon={<ImageIcon size={18} />}
-							label="Pictures"
-							active={activeTab === "Pictures"}
-							onClick={() => setActiveTab("Pictures")}
-						/>
+						<FeatureGuard feature="MAP_INTEGRATION">
+							<NavButton
+								icon={<MapPin size={18} />}
+								label="Location on Map"
+								active={activeTab === "Location on Map"}
+								onClick={() => setActiveTab("Location on Map")}
+							/>
+						</FeatureGuard>
+						<FeatureGuard feature="MEDIA_UPLOADS">
+							<NavButton
+								icon={<ImageIcon size={18} />}
+								label="Pictures"
+								active={activeTab === "Pictures"}
+								onClick={() => setActiveTab("Pictures")}
+							/>
+						</FeatureGuard>
 					</div>
 
 					<button className="flex items-center gap-2 px-4 py-2 text-gray-500 hover:text-white transition-colors">

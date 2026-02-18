@@ -22,15 +22,11 @@ export function UndoToast({
 		// OR if the message is empty/default.
 		if (!show || !message || message === "") return;
 
-		console.log("⏱️ Toast timer started for:", message);
-
 		const timer = setTimeout(() => {
-			console.log("⏰ Timer finished, calling onClose");
 			onClose();
 		}, duration);
 
 		return () => {
-			console.log("🧹 Cleaning up toast timer");
 			clearTimeout(timer);
 		};
 	}, [show, message, duration, onClose]);
