@@ -20,6 +20,8 @@ interface BudgetState {
 	isLoading: boolean;
 	customTags: string[];
 	rules: { keyword: string; category: string }[];
+	toast: { count: number; snapshot: Transaction[] } | null;
+	setToast: (toast: { count: number; snapshot: Transaction[] } | null) => void;
 	saveRule: (
 		rule: { keyword: string; category: string },
 		oldKeyword?: string,
@@ -41,8 +43,14 @@ export const createBudgetStore = (versionKey: string) =>
 			(set, get) => ({
 				transactions: [],
 				customTags: [],
-				rules: [], // Initial state
+				rules: [],
 				isLoading: true,
+				toast: null,
+				// setToast: (toast) => set({ toast }),
+				setToast: (toastValue) => {
+					// console.log("🚀 Store is receiving toast data:", toastValue);
+					set({ toast: toastValue });
+				},
 
 				addTransactions: (newTxs) => {
 					// const currentRules = get().rules || []; // Defensive check

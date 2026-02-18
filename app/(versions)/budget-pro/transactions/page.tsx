@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Plus, Search, Filter, Upload, Trash2 } from "lucide-react";
 import { useBudgetStore } from "@/hooks/useBudgetStore";
 import { formatDateLong } from "@/utils/formatters";
@@ -10,7 +10,6 @@ import ClearDataModal from "@/components/ClearDataModal";
 import { TransactionRow } from "@/components/Transactions/TransactionRow";
 import { SortableHeader } from "@/components/Transactions/SortableHeader";
 import dynamic from "next/dynamic";
-import { UndoToast } from "@/components/ui/UndoToast";
 
 // --- Types for Sorting ---
 type SortKey = "date" | "category" | "name" | "amount" | "account";
@@ -24,6 +23,7 @@ export default function TransactionsPage() {
 	const useStore = useBudgetStore();
 	const transactions = useStore((state) => state.transactions);
 	const updateTransaction = useStore((state) => state.updateTransaction);
+
 	const [selectedTransaction, setSelectedTransaction] =
 		useState<Transaction | null>(null);
 
@@ -36,24 +36,19 @@ export default function TransactionsPage() {
 		{ key: "date", direction: "desc" },
 	]);
 	// const [toast, setToast] = useState<{ message: string; count: number } | null>(null);
-	const [toast, setToast] = useState<{
-		count: number;
-		snapshot: Transaction[];
-	} | null>(null);
+	// const [toast, setToast] = useState<{
+	// 	count: number;
+	// 	snapshot: Transaction[];
+	// } | null>(null);
 	const [, setIsEditModalOpen] = useState(false);
-
-	// Get the undo function from store
-	const undoBulkUpdate = useStore((state) => state.undoBulkUpdate);
+	const setToast = useStore((state) => state.setToast);
 
 	const handleRuleSaved = (count: number, snapshot: Transaction[]) => {
-		// 1. Capture the snapshot for the Undo action
+		// Set the state
 		setToast({ count, snapshot });
 
-		// 2. Close the Edit Transaction Modal by clearing the selection
+		// Close the modal
 		setSelectedTransaction(null);
-
-		// 3. Set a timer to hide the toast automatically
-		setTimeout(() => setToast(null), 5000);
 	};
 
 	// --- Sort & Filter Logic ---
@@ -134,6 +129,15 @@ export default function TransactionsPage() {
 			ssr: false, // This disables server-side rendering
 		},
 	);
+
+	useEffect(() => {
+		const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+			e.preventDefault();
+			e.returnValue = ""; // This will trigger a "Do you want to leave this site?" popup
+		};
+		window.addEventListener("beforeunload", handleBeforeUnload);
+		return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+	}, []);
 
 	return (
 		<div className="flex flex-col h-full bg-white dark:bg-[#0d0d0d] text-slate-900 dark:text-gray-300 transition-colors">
@@ -300,18 +304,6 @@ export default function TransactionsPage() {
 					onClose={() => setSelectedTransaction(null)}
 					onUpdate={updateTransaction}
 					onRuleSaved={handleRuleSaved}
-				/>
-			)}
-
-			{/* Render the Toast */}
-			{toast && (
-				<UndoToast
-					message={`Updated ${toast.count} transactions`}
-					onUndo={() => {
-						undoBulkUpdate(toast.snapshot);
-						setToast(null);
-					}}
-					onClose={() => setToast(null)}
 				/>
 			)}
 		</div>

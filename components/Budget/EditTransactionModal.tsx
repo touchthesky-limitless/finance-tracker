@@ -45,7 +45,6 @@ export default function EditTransactionModal({
 	onClose,
 	onRuleSaved,
 }: EditTransactionModalProps) {
-
 	// initialize directly from props. The 'key' in the parent handles resets.
 	const [activeTab, setActiveTab] = useState<
 		"Basic Information" | "Location on Map" | "Pictures" | "Rules"
@@ -81,12 +80,24 @@ export default function EditTransactionModal({
 	const handleSave = () => {
 		const isExisting = transactions.some((t) => t.id === editedData.id);
 
+		// 1. Capture the snapshot before the update if you need it for Undo
+		const snapshot = [...transactions];
+
+		// 2. Perform the update
 		if (isExisting) {
-			updateTransaction(editedData.id, editedData); // Updates existing
+			updateTransaction(editedData.id, editedData);
 		} else {
-			addTransactions([editedData]); // Adds as a new array entry
+			addTransactions([editedData]);
 		}
+
+		// 3. CLOSE FIRST to clear 'selectedTransaction' in the parent
 		onClose();
+
+		// 4. Trigger the toast AFTER closing
+		// If you are calling onRuleSaved here, pass the snapshot and count
+		if (onRuleSaved) {
+			onRuleSaved(1, snapshot);
+		}
 	};
 
 	return createPortal(
@@ -465,6 +476,7 @@ export default function EditTransactionModal({
 							Cancel
 						</button>
 						<button
+							type="button"
 							onClick={handleSave}
 							className="px-10 py-2.5 bg-orange-600 hover:bg-orange-500 text-white text-sm font-black rounded-xl transition-all shadow-lg shadow-orange-600/20 active:scale-95"
 						>
@@ -472,7 +484,6 @@ export default function EditTransactionModal({
 						</button>
 					</div>
 				</div>
-
 
 				{/* --- Create Rule Modal update --- */}
 				<CreateRuleModal
