@@ -35,7 +35,7 @@ export function UndoToast({
 
 	return createPortal(
 		<div
-			className={`fixed bottom-8 left-1/2 -translate-x-1/2 z-[9999] transition-all duration-500 ${
+			className={`fixed bottom-8 left-1/2 -translate-x-1/2 z-9999 transition-all duration-500 ${
 				show
 					? "opacity-100 translate-y-0 pointer-events-auto"
 					: "opacity-0 translate-y-10 pointer-events-none"

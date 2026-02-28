@@ -269,14 +269,14 @@ export default function TransactionsPage() {
 						className="absolute inset-0 bg-black/80 backdrop-blur-md"
 						onClick={() => setShowUploader(false)}
 					/>
-					<div className="relative bg-[#1a1a1a] border border-gray-800 w-full max-w-xl rounded-2xl shadow-2xl overflow-hidden">
+					<div className="relative bg-[#F8F9FB] dark:bg-[#1a1a1a] border border-gray-800 w-full max-w-xl rounded-2xl shadow-2xl overflow-hidden">
 						<div className="p-6 border-b border-gray-800 flex justify-between items-center">
-							<h3 className="text-lg font-bold text-white">
+							<h3 className="text-lg font-bold text-gray-500 dark:text-white">
 								Import CSV Statement
 							</h3>
 							<button
 								onClick={() => setShowUploader(false)}
-								className="text-gray-500 hover:text-white"
+								className="text-gray-500  hover:text-gray-700"
 							>
 								✕
 							</button>

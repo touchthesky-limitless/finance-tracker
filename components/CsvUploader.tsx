@@ -223,7 +223,7 @@ export default function CsvUploader({ onComplete }: CsvUploaderProps) {
 					)}
 					<div>
 						<p
-							className={`font-medium text-lg ${message?.type === "error" ? "text-red-400" : "text-white"}`}
+							className={`font-medium text-lg ${message?.type === "error" ? "text-red-400" : "text-gray-500 dark:text-white"}`}
 						>
 							{isProcessing
 								? `Processing ${uploadProgress.current} of ${uploadProgress.total}...`
