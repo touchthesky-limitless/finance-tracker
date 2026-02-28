@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
-import { Plus, Search, Filter, Upload, Trash2 } from "lucide-react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { Plus, Search, Filter, Upload, Trash2, X } from "lucide-react";
 import { useBudgetStore } from "@/hooks/useBudgetStore";
 import { formatDateLong } from "@/utils/formatters";
 import CsvUploader from "@/components/CsvUploader";
@@ -10,14 +10,18 @@ import ClearDataModal from "@/components/ClearDataModal";
 import { TransactionRow } from "@/components/Transactions/TransactionRow";
 import { SortableHeader } from "@/components/Transactions/SortableHeader";
 import dynamic from "next/dynamic";
+import { SearchInput } from "@/components/ui/SearchInput";
+import { useSearchState } from "@/hooks/useSearchState";
 
 const EditTransactionModal = dynamic(
-    () => import("@/components/Budget/EditTransactionModal"),
-    {
-        ssr: false,
-        // Optional: Add a loading placeholder to keep the UI from jumping
-        loading: () => <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50" />
-    }
+	() => import("@/components/Budget/EditTransactionModal"),
+	{
+		ssr: false,
+		// Optional: Add a loading placeholder to keep the UI from jumping
+		loading: () => (
+			<div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50" />
+		),
+	},
 );
 
 // --- Types for Sorting ---
@@ -51,6 +55,8 @@ export default function TransactionsPage() {
 	// } | null>(null);
 	const [, setIsEditModalOpen] = useState(false);
 	const setToast = useStore((state) => state.setToast);
+
+	const mainSearch = useSearchState(setSearchQuery);
 
 	const handleRuleSaved = (count: number, snapshot: Transaction[]) => {
 		// Set the state
@@ -133,17 +139,21 @@ export default function TransactionsPage() {
 	};
 
 	const handleRowClick = React.useCallback((t: Transaction) => {
-    	setSelectedTransaction(t);
+		setSelectedTransaction(t);
 	}, []);
 
 	useEffect(() => {
+		// Only set the listener if a transaction is currently being edited
+		if (!selectedTransaction) return;
+
 		const handleBeforeUnload = (e: BeforeUnloadEvent) => {
 			e.preventDefault();
-			e.returnValue = ""; // This will trigger a "Do you want to leave this site?" popup
+			e.returnValue = "";
 		};
+
 		window.addEventListener("beforeunload", handleBeforeUnload);
 		return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-	}, []);
+	}, [selectedTransaction]); // Re-run when selection changes
 
 	return (
 		<div className="flex flex-col h-full bg-white dark:bg-[#0d0d0d] text-slate-900 dark:text-gray-300 transition-colors">
@@ -165,16 +175,14 @@ export default function TransactionsPage() {
 						<Filter size={18} />
 					</button>
 					<div className="relative">
-						<Search
-							className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"
-							size={14}
-						/>
-						<input
-							type="text"
-							placeholder="Search..."
+						<SearchInput
+							ref={mainSearch.inputRef}
+							searchIconClassName="text-gray-500"
+							inputClassName="dark:bg-gray-900 border border-gray-400 dark:border-gray-800 rounded-lg py-1.5 pl-9 pr-4 text-sm focus:ring-1 focus:ring-orange-500 outline-none w-40 md:w-64"
 							value={searchQuery}
+							onClear={mainSearch.handleClear}
 							onChange={(e) => setSearchQuery(e.target.value)}
-							className="bg-[#F8F9FB] dark:bg-gray-900 border border-gray-400 dark:border-gray-800 rounded-lg py-1.5 pl-9 pr-4 text-sm focus:ring-1 focus:ring-orange-500 outline-none w-40 md:w-64"
+							placeholder="Search transactions..."
 						/>
 					</div>
 

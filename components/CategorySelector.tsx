@@ -1,6 +1,10 @@
-import { useState, useMemo } from "react";
-import { ChevronRight, Search, Check } from "lucide-react";
-import { CATEGORY_HIERARCHY, getParentColor } from "@/constants/categories";
+import { useState, useMemo, memo, useDeferredValue, useRef } from "react";
+import { ChevronRight, Search, Check, X } from "lucide-react";
+import {
+	CATEGORY_HIERARCHY,
+	getParentColor,
+	searchCategories,
+} from "@/constants";
 import {
 	useFloating,
 	offset,
@@ -20,13 +24,72 @@ interface CategorySelectorProps {
 	onSelect: (category: string, parent: string) => void;
 }
 
+interface ParentTabProps {
+	parent: string;
+	isActive: boolean;
+	onClick: (parent: string) => void;
+}
+
+interface SubCategoryRowProps {
+	sub: string;
+	parent: string;
+	isSelected: boolean;
+	onSelect: (sub: string, parent: string) => void;
+}
+
+// Optimized Left Pane Item
+const ParentTab = memo(({ parent, isActive, onClick }: ParentTabProps) => (
+	<button
+		type="button"
+		onClick={() => onClick(parent)}
+		className={`w-full flex items-center gap-2 p-2.5 rounded-lg text-[11px] mb-1 transition-all ${
+			isActive
+				? "bg-orange-600/10 text-orange-500 font-bold border border-orange-500/20"
+				: "text-gray-500 hover:text-gray-300"
+		}`}
+	>
+		<CategoryIcon name={parent} size={14} colorClass={getParentColor(parent)} />
+		<span className="truncate">{parent}</span>
+	</button>
+));
+ParentTab.displayName = "ParentTab";
+
+// Optimized Right Pane Item
+const SubCategoryRow = memo(
+	({ sub, parent, isSelected, onSelect }: SubCategoryRowProps) => (
+		<button
+			type="button"
+			onClick={() => onSelect(sub, parent)}
+			className="w-full text-left px-4 py-3 rounded-lg flex items-center justify-between transition-colors group"
+		>
+			<div className="flex items-center gap-3">
+				<CategoryIcon
+					name={sub}
+					size={14}
+					colorClass={getParentColor(parent)}
+				/>
+				<span
+					className={`text-xs ${isSelected ? "text-orange-400 font-bold" : "text-gray-400"}`}
+				>
+					{sub}
+				</span>
+			</div>
+			{isSelected && <Check size={14} className="text-orange-500" />}
+		</button>
+	),
+);
+SubCategoryRow.displayName = "SubCategoryRow";
+
 export function CategorySelector({
 	currentCategory,
 	onSelect,
 }: CategorySelectorProps) {
 	const [isOpen, setIsOpen] = useState(false);
 	const [catQuery, setCatQuery] = useState("");
-	// const containerRef = useRef<HTMLDivElement>(null);
+	const inputRef = useRef<HTMLInputElement>(null);
+
+	// This creates a "low-priority" version of the query
+	const deferredQuery = useDeferredValue(catQuery);
 
 	// Initialize selectedParent based on current category
 	const [selectedParent, setSelectedParent] = useState<string>(() => {
@@ -40,7 +103,7 @@ export function CategorySelector({
 
 	// Filtering Logic
 	const visibleParents = useMemo(() => {
-		const query = catQuery.toLowerCase().trim();
+		const query = deferredQuery.toLowerCase().trim(); // Changed from catQuery
 		if (!query) return Object.keys(CATEGORY_HIERARCHY);
 		return Object.keys(CATEGORY_HIERARCHY).filter(
 			(parent) =>
@@ -49,14 +112,13 @@ export function CategorySelector({
 					sub.toLowerCase().includes(query),
 				),
 		);
-	}, [catQuery]);
+	}, [deferredQuery]); // Dependency changed
 
 	// Derived Active Parent (The Auto-Snap Fix)
 	const activeParent = useMemo(() => {
-		const query = catQuery.toLowerCase().trim();
+		const query = deferredQuery.toLowerCase().trim(); // Changed from catQuery
 		if (!query) return selectedParent;
 
-		// Only change parent if the CURRENT one has zero matches for the search
 		const currentHasMatch =
 			selectedParent.toLowerCase().includes(query) ||
 			CATEGORY_HIERARCHY[selectedParent]?.some((s) =>
@@ -66,7 +128,7 @@ export function CategorySelector({
 		if (currentHasMatch) return selectedParent;
 
 		return visibleParents.length > 0 ? visibleParents[0] : selectedParent;
-	}, [catQuery, visibleParents, selectedParent]);
+	}, [deferredQuery, visibleParents, selectedParent]); // Dependency changed
 
 	// Helper to find the parent name
 	const findParent = (name: string) => {
@@ -122,6 +184,8 @@ export function CategorySelector({
 		dismiss,
 	]);
 
+	const bestMatch = useMemo(() => searchCategories(catQuery), [catQuery]);
+
 	return (
 		<div
 			// data-category-selector
@@ -170,45 +234,56 @@ export function CategorySelector({
 						{...getFloatingProps()} // ATTACH PROPS HERE
 						className="z-200 bg-white dark:bg-[#0d0d0d] shadow-2xl rounded-xl border border-slate-200 dark:border-gray-800 overflow-hidden"
 					>
-						{/* <div className="absolute z-100 top-full left-0 w-full mt-1 bg-white dark:bg-[#0d0d0d] shadow-2xl rounded-xl border border-slate-200 dark:border-gray-800 overflow-hidden"> */}
 						{/* SEARCH AREA */}
 						<div className="p-3 border-b border-gray-800">
 							<div className="flex items-center gap-2 bg-[#F8F9FB] dark:bg-[#1a1a1a] px-3 py-2 rounded-lg border border-gray-800 focus-within:border-orange-500/50">
 								<Search size={14} className="text-gray-500" />
 								<input
 									autoFocus
+									ref={inputRef}
 									placeholder="Search all categories..."
 									className="bg-transparent text-xs text-gray-900 dark:text-white outline-none w-full"
 									value={catQuery}
 									onChange={(e) => setCatQuery(e.target.value)}
 								/>
+								{/* CLEAR BUTTON */}
+								{catQuery && (
+									<button
+										type="button"
+										onClick={() => {
+											setCatQuery("");
+											inputRef.current?.focus();
+										}}
+										className="p-0.5 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-md transition-colors text-gray-500 hover:text-gray-900 dark:hover:text-white"
+									>
+										<X size={14} />
+									</button>
+								)}
 							</div>
+							{/* SHOW BEST MATCH */}
+							{bestMatch && catQuery && (
+								<div className="mt-2 px-1 text-[10px] text-gray-500 italic">
+									Best match:{" "}
+									<span className="text-orange-500">{bestMatch}</span>
+								</div>
+							)}
 						</div>
 
-						<div className="h-80 flex">
+						<div
+							className={`h-80 flex transition-opacity duration-200 ${catQuery !== deferredQuery ? "opacity-50" : "opacity-100"}`}
+						>
 							{/* LEFT PANE */}
 							<div
 								className="w-1/3 border-r border-gray-800 overflow-y-auto p-2 scrollbar-hide"
 								style={{ scrollbarWidth: "none" }}
 							>
 								{visibleParents.map((parent) => (
-									<button
+									<ParentTab
 										key={parent}
-										type="button"
-										onClick={() => setSelectedParent(parent)}
-										className={`w-full flex items-center gap-2 p-2.5 rounded-lg text-[11px] mb-1 transition-all ${
-											activeParent === parent
-												? "bg-orange-600/10 text-orange-500 font-bold border border-orange-500/20"
-												: "text-gray-500 hover:text-gray-300"
-										}`}
-									>
-										<CategoryIcon
-											name={parent}
-											size={14}
-											colorClass={getParentColor(parent)}
-										/>
-										<span className="truncate">{parent}</span>
-									</button>
+										parent={parent}
+										isActive={activeParent === parent}
+										onClick={setSelectedParent}
+									/>
 								))}
 							</div>
 
@@ -224,32 +299,17 @@ export function CategorySelector({
 											sub.toLowerCase().includes(catQuery.toLowerCase()),
 									)
 									.map((sub) => (
-										<button
+										<SubCategoryRow
 											key={sub}
-											type="button"
-											onClick={() => {
-												onSelect(sub, activeParent);
+											sub={sub}
+											parent={activeParent}
+											isSelected={currentCategory === sub}
+											onSelect={(s, p) => {
+												onSelect(s, p);
 												setIsOpen(false);
 												setCatQuery("");
 											}}
-											className="w-full text-left px-4 py-3 rounded-lg flex items-center justify-between transition-colors group"
-										>
-											<div className="flex items-center gap-3">
-												<CategoryIcon
-													name={sub}
-													size={14}
-													colorClass={getParentColor(activeParent)}
-												/>
-												<span
-													className={`text-xs ${currentCategory === sub ? "text-orange-400 font-bold" : "text-gray-400"}`}
-												>
-													{sub}
-												</span>
-											</div>
-											{currentCategory === sub && (
-												<Check size={14} className="text-orange-500" />
-											)}
-										</button>
+										/>
 									))}
 							</div>
 						</div>

@@ -13,7 +13,6 @@ import {
 	Plane,
 	LucideIcon,
 	Utensils,
-	Smartphone,
 	Stethoscope,
 	GraduationCap,
 	Gamepad2,
@@ -29,11 +28,11 @@ import {
 	Shirt,
 	Music,
 	Tv,
-	HeartPulse,
-	Hammer,
 	Receipt,
 } from "lucide-react";
 import { CATEGORY_HIERARCHY } from "@/data/categories";
+import { clsx, type ClassValue } from "clsx";
+import { twMerge } from "tailwind-merge";
 
 type TrendType = "asset" | "liability" | "neutral";
 
@@ -219,3 +218,11 @@ export const getCategoryDetails = (currentCategory: string) => {
 	// 3. Fallback
 	return { group: "Uncategorized", sub: currentCategory, icon: HelpCircle };
 };
+
+/**
+ * Merges Tailwind classes safely. 
+ * Prevents "class hell" by resolving conflicts (e.g., 'px-2 px-4' becomes 'px-4').
+ */
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}

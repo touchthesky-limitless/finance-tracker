@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
 	Calculator,
@@ -16,6 +16,7 @@ import {
 	Plus,
 	BotMessageSquare,
 	Edit3,
+	X,
 } from "lucide-react";
 
 import { Transaction } from "@/store/createBudgetStore";
@@ -64,6 +65,7 @@ export default function EditTransactionModal({
 	const addTransactions = useStore((state) => state.addTransactions);
 	const updateTransaction = useStore((state) => state.updateTransaction);
 	const [deletingRule, setDeletingRule] = useState<string | null>(null);
+	const inputRef = useRef<HTMLInputElement>(null);
 
 	const isNew = !useStore((state) =>
 		state.transactions.some((t) => t.id === transaction.id),
@@ -181,7 +183,7 @@ export default function EditTransactionModal({
 									categorized.
 								</p>
 
-								{/* Search Input */}
+								{/* Search Input with Clear Button */}
 								<div className="relative group">
 									<Search
 										className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-orange-500 transition-colors"
@@ -189,11 +191,25 @@ export default function EditTransactionModal({
 									/>
 									<input
 										type="text"
+										ref={inputRef}
 										placeholder="Search by keyword or category..."
-										className="w-full bg-[#F8F9FB] dark:bg-[#121212] border border-gray-100 dark:border-gray-800 rounded-xl py-3 pl-12 pr-4 text-sm outline-none focus:border-orange-500/50 transition-all"
+										className="w-full bg-[#F8F9FB] dark:bg-[#121212] border border-gray-100 dark:border-gray-800 rounded-xl py-3 pl-12 pr-12 text-sm outline-none focus:border-orange-500/50 transition-all"
 										value={searchTerm}
 										onChange={(e) => setSearchTerm(e.target.value)}
 									/>
+
+									{searchTerm && (
+										<button
+											type="button"
+											onClick={() => {
+												setSearchTerm("");
+												inputRef.current?.focus();
+											}}
+											className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 hover:bg-gray-200 dark:hover:bg-gray-800 rounded-md text-gray-500 hover:text-gray-900 dark:hover:text-white transition-colors"
+										>
+											<X size={16} />
+										</button>
+									)}
 								</div>
 							</div>
 
