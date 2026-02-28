@@ -18,22 +18,17 @@ import {
 	ChevronRight,
 } from "lucide-react";
 import { useBudgetData } from "@/hooks/useBudgetData";
-// Ensure you import your ICON_MAP from your constants file
 import { ICON_MAP } from "@/constants/icons";
 
 export default function OverviewPage() {
 	const [chartScope, setChartScope] = useState<string | null>(null);
 	const [timeFilter, setTimeFilter] = useState("This Year");
 
-	// 1. Get processed data from the hook
-	// 'stats' already contains income, expenses, remaining, and unreviewedCount
-	const { stats, categoryData, monthlyData, maxMonthlyValue } =
-		useBudgetData(timeFilter);
+	const { stats, categoryData, monthlyData, maxMonthlyValue } = useBudgetData(timeFilter);
 
-	// 2. State for the chart view
 	const isYearView = chartScope === null;
 
-	// 3. Helper formatters (Defensive against NaN)
+	// --- HELPERS ---
 	const formatCurrency = (num: number) => {
 		if (isNaN(num) || num === undefined) return "$0.00";
 		return `$${num.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -44,305 +39,192 @@ export default function OverviewPage() {
 		return `$${(num / 1000).toFixed(1)}k`;
 	};
 
-	// 4. Donut Percentages (Defensive against division by zero)
-	const remainingPct =
-		stats.income > 0
-			? Math.min(
-					Math.round((Math.max(stats.remaining, 0) / stats.income) * 100),
-					100,
-				)
-			: 0;
-	const spentPct =
-		stats.income > 0 ? Math.round((stats.expenses / stats.income) * 100) : 0;
-	const renderSpent = Math.min(spentPct, 100);
-
 	const formatYAxis = (num: number) => {
 		if (num === 0) return "0";
-		// For values >= 1000, show 1k, 2k, etc.
-		if (num >= 1000) {
-			return `$${Math.round(num / 1000)}k`;
-		}
-		// For smaller values, just show the dollar amount
+		if (num >= 1000) return `$${Math.round(num / 1000)}k`;
 		return `$${Math.round(num)}`;
 	};
 
-	// Create dynamic labels based on the actual maximum value
-	const yAxisLabels = useMemo(() => {
-		// Round the max value up to the nearest 1000 to give the bars some "headroom"
-		const topScale = Math.ceil((maxMonthlyValue || 1000) / 1000) * 1000;
+	// --- CALCULATIONS ---
+	const remainingPct = stats.income > 0
+		? Math.min(Math.round((Math.max(stats.remaining, 0) / stats.income) * 100), 100)
+		: 0;
+	const spentPct = stats.income > 0 ? Math.round((stats.expenses / stats.income) * 100) : 0;
+	const renderSpent = Math.min(spentPct, 100);
 
+	const yAxisLabels = useMemo(() => {
+		const topScale = Math.ceil((maxMonthlyValue || 1000) / 1000) * 1000;
 		return [
-			formatYAxis(topScale), // e.g., "4k"
-			formatYAxis(topScale * 0.66), // e.g., "3k" (approx)
-			formatYAxis(topScale * 0.33), // e.g., "1k" (approx)
+			formatYAxis(topScale),
+			formatYAxis(topScale * 0.66),
+			formatYAxis(topScale * 0.33),
 			"0",
 		];
 	}, [maxMonthlyValue]);
 
 	return (
-		<div className="min-h-screen bg-[#F4F6F8] dark:bg-[#0a0a0a] text-slate-800 dark:text-slate-200 p-4 md:p-8 font-sans pb-24">
-			{/* --- HEADER --- */}
-			<div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 mb-8 relative z-50">
-				<div className="max-w-2xl">
-					<h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white tracking-tight mb-2">
-						Financial Overview
-					</h1>
-					<p className="text-sm text-gray-500 dark:text-gray-400">
-						You have{" "}
-						<strong className="text-gray-900 dark:text-white font-medium">
-							{formatCurrency(stats.remaining)}
-						</strong>{" "}
-						safe to spend before your next payday.
-					</p>
-				</div>
+		<div className="relative w-full">
+			{/* --- STICKY HEADER --- 
+			    We use sticky top-0 with a backdrop blur. 
+			    -mx-4 and px-4 ensure the background spans the full width of the container padding. 
+			*/}
+			<header className="sticky top-0 z-[100] w-full bg-[#F4F6F8]/80 dark:bg-[#0a0a0a]/80 backdrop-blur-md border-b border-gray-200/50 dark:border-gray-800/50 mb-8">
+				<div className="max-w-[1600px] mx-auto flex flex-col lg:flex-row lg:items-end justify-between gap-6 py-6 px-4 md:px-8">
+					<div className="max-w-2xl">
+						<h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white tracking-tight mb-2">
+							Financial Overview
+						</h1>
+						<p className="text-sm text-gray-500 dark:text-gray-400">
+							You have{" "}
+							<strong className="text-gray-900 dark:text-white font-medium">
+								{formatCurrency(stats.remaining)}
+							</strong>{" "}
+							safe to spend before your next payday.
+						</p>
+					</div>
 
-				<div className="flex flex-wrap items-center gap-3 shrink-0">
-					{/* We pass setTimeFilter to the dropdown to update the whole page */}
-					<DateRangeDropdown
-						onApply={(val) => setTimeFilter(val || "This Month")}
-					/>
-					<button className="flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-[#121212] border border-gray-200 dark:border-gray-800 text-gray-700 dark:text-gray-300 rounded-xl text-sm font-semibold hover:bg-gray-50 dark:hover:bg-[#1a1a1a] transition-colors shadow-sm">
-						<Download size={16} />
-						<span className="hidden sm:inline">Export</span>
-					</button>
-					<button className="flex items-center gap-2 px-4 py-2.5 bg-orange-600 hover:bg-orange-700 text-white rounded-xl text-sm font-semibold transition-colors shadow-sm shadow-orange-600/20">
-						<Plus size={16} />
-						<span className="hidden sm:inline">Add Transaction</span>
-					</button>
+					<div className="flex flex-wrap items-center gap-3 shrink-0">
+						<DateRangeDropdown onApply={(val) => setTimeFilter(val || "This Month")} />
+						<button className="flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-[#121212] border border-gray-200 dark:border-gray-800 text-gray-700 dark:text-gray-300 rounded-xl text-sm font-semibold hover:bg-gray-50 dark:hover:bg-[#1a1a1a] transition-colors shadow-sm">
+							<Download size={16} />
+							<span className="hidden sm:inline">Export</span>
+						</button>
+						<button className="flex items-center gap-2 px-4 py-2.5 bg-orange-600 hover:bg-orange-700 text-white rounded-xl text-sm font-semibold transition-colors shadow-sm shadow-orange-600/20">
+							<Plus size={16} />
+							<span className="hidden sm:inline">Add Transaction</span>
+						</button>
+					</div>
 				</div>
-			</div>
+			</header>
 
-			{/* --- TOP ROW: Hero Summary --- */}
-			<div className="bg-white dark:bg-[#121212] border border-gray-100 dark:border-gray-800/80 rounded-3xl p-6 shadow-sm mb-6 flex flex-col lg:flex-row items-center gap-8 relative z-10">
-				<div className="flex items-center gap-6 w-full lg:w-[35%] lg:border-r border-gray-100 dark:border-gray-800 lg:pr-8 shrink-0">
-					<div
-						className="relative w-28 h-28 shrink-0 rounded-full flex items-center justify-center drop-shadow-sm"
-						style={{
-							background: `conic-gradient(#10b981 0% ${remainingPct}%, #8b5cf6 ${remainingPct}% ${remainingPct + renderSpent}%, #f59e0b ${remainingPct + renderSpent}% 100%)`,
-						}}
-					>
-						<div className="w-20 h-20 bg-white dark:bg-[#121212] rounded-full flex flex-col items-center justify-center shadow-[inset_0_2px_4px_rgba(0,0,0,0.05)]">
-							<span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">
-								Income
-							</span>
-							<span className="text-sm font-black text-gray-900 dark:text-white">
-								{formatCompact(stats.income)}
-							</span>
+			{/* --- CONTENT WRAPPER --- */}
+			<main className="max-w-[1600px] mx-auto px-4 md:px-8 pb-24">
+				
+				{/* --- TOP ROW: Hero Summary --- */}
+				<div className="bg-white dark:bg-[#121212] border border-gray-100 dark:border-gray-800/80 rounded-3xl p-6 shadow-sm mb-6 flex flex-col lg:flex-row items-center gap-8 relative z-10">
+					<div className="flex items-center gap-6 w-full lg:w-[35%] lg:border-r border-gray-100 dark:border-gray-800 lg:pr-8 shrink-0">
+						<div
+							className="relative w-28 h-28 shrink-0 rounded-full flex items-center justify-center drop-shadow-sm"
+							style={{
+								background: `conic-gradient(#10b981 0% ${remainingPct}%, #8b5cf6 ${remainingPct}% ${remainingPct + renderSpent}%, #f59e0b ${remainingPct + renderSpent}% 100%)`,
+							}}
+						>
+							<div className="w-20 h-20 bg-white dark:bg-[#121212] rounded-full flex flex-col items-center justify-center shadow-[inset_0_2px_4px_rgba(0,0,0,0.05)]">
+								<span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Income</span>
+								<span className="text-sm font-black text-gray-900 dark:text-white">{formatCompact(stats.income)}</span>
+							</div>
+						</div>
+						<div className="flex flex-col gap-3 w-full">
+							<DonutLegend color="bg-green-500" label="Remaining" value={`${remainingPct}%`} amount={formatCurrency(stats.remaining)} />
+							<DonutLegend color="bg-purple-500" label="Spent" value={`${spentPct}%`} amount={formatCurrency(stats.expenses)} />
+							<DonutLegend color="bg-orange-500" label="Debt/Bills" value="0%" amount="$0.00" />
 						</div>
 					</div>
-					<div className="flex flex-col gap-3 w-full">
-						<DonutLegend
-							color="bg-green-500"
-							label="Remaining"
-							value={`${remainingPct}%`}
-							amount={formatCurrency(stats.remaining)}
-						/>
-						<DonutLegend
-							color="bg-purple-500"
-							label="Spent"
-							value={`${spentPct}%`}
-							amount={formatCurrency(stats.expenses)}
-						/>
-						<DonutLegend
-							color="bg-orange-500"
-							label="Debt/Bills"
-							value="0%"
-							amount="$0.00"
-						/>
+
+					<div className="w-full lg:w-[65%] grid grid-cols-1 sm:grid-cols-3 gap-6 lg:gap-8">
+						<SparklineStat title="Net Worth" amount="$142,500" trend="+2.4%" isPositive={true} sparklineColor="#10b981" path="M0 25 Q 15 20, 30 25 T 70 15 T 100 5" />
+						<SparklineStat title="Total Spent" amount={formatCurrency(stats.expenses)} trend="Active" isPositive={true} sparklineColor="#8b5cf6" path="M0 10 C 20 10, 30 20, 50 15 C 70 10, 80 25, 100 20" />
+						<SparklineStat title="Total Debt" amount="$12,340" trend="+0.8%" isPositive={false} sparklineColor="#f59e0b" path="M0 5 C 20 5, 40 15, 60 10 C 80 5, 90 15, 100 20" />
 					</div>
 				</div>
 
-				<div className="w-full lg:w-[65%] grid grid-cols-1 sm:grid-cols-3 gap-6 lg:gap-8">
-					<SparklineStat
-						title="Net Worth"
-						amount="$142,500"
-						trend="+2.4%"
-						isPositive={true}
-						sparklineColor="#10b981"
-						path="M0 25 Q 15 20, 30 25 T 70 15 T 100 5"
-					/>
-					<SparklineStat
-						title="Total Spent"
-						amount={formatCurrency(stats.expenses)}
-						trend="Active"
-						isPositive={true}
-						sparklineColor="#8b5cf6"
-						path="M0 10 C 20 10, 30 20, 50 15 C 70 10, 80 25, 100 20"
-					/>
-					<SparklineStat
-						title="Total Debt"
-						amount="$12,340"
-						trend="+0.8%"
-						isPositive={false}
-						sparklineColor="#f59e0b"
-						path="M0 5 C 20 5, 40 15, 60 10 C 80 5, 90 15, 100 20"
-					/>
-				</div>
-			</div>
-
-			{/* --- MIDDLE ROW --- */}
-			<div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-6 relative z-10">
-				{/* DYNAMIC SPENDING CHART */}
-				<Card
-					className="xl:col-span-2 flex flex-col"
-					title="Spending Trends"
-					action={<DateRangeDropdown compact onApply={setChartScope} />}
-				>
-					<div className="flex items-center justify-between mt-4 mb-8">
-						<div className="flex flex-col">
-							<span className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white tracking-tight">
-								{formatCurrency(stats.expenses).split(".")[0]}
-								<span className="text-gray-400 text-2xl">
-									.{formatCurrency(stats.expenses).split(".")[1]}
+				{/* --- MIDDLE ROW --- */}
+				<div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-6 relative z-10">
+					<Card className="xl:col-span-2 flex flex-col" title="Spending Trends" action={<DateRangeDropdown compact onApply={setChartScope} />}>
+						<div className="flex items-center justify-between mt-4 mb-8">
+							<div className="flex flex-col">
+								<span className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white tracking-tight">
+									{formatCurrency(stats.expenses).split(".")[0]}
+									<span className="text-gray-400 text-2xl">.{formatCurrency(stats.expenses).split(".")[1]}</span>
 								</span>
-							</span>
-							<span className="text-sm text-gray-500 font-medium mt-1">
-								{isYearView
-									? "Total spent this year"
-									: `Total spent in ${chartScope}`}
-							</span>
+								<span className="text-sm text-gray-500 font-medium mt-1">
+									{isYearView ? "Total spent this year" : `Total spent in ${chartScope}`}
+								</span>
+							</div>
 						</div>
-					</div>
 
-					<div className="flex h-48 w-full mb-2">
-						<div className="flex flex-col justify-between text-[10px] font-bold text-gray-400 text-right pr-3 pb-1 w-10 shrink-0 mt-0.5">
-							{yAxisLabels.map((label, idx) => (
-								<span key={idx}>{label}</span>
+						<div className="flex h-48 w-full mb-2">
+							<div className="flex flex-col justify-between text-[10px] font-bold text-gray-400 text-right pr-3 pb-1 w-10 shrink-0 mt-0.5">
+								{yAxisLabels.map((label, idx) => <span key={idx}>{label}</span>)}
+							</div>
+							<div className="relative flex-1 flex items-end gap-1 sm:gap-2 px-1 border-b border-gray-100 dark:border-gray-800/50">
+								<div className="absolute inset-0 flex flex-col justify-between pointer-events-none pb-1">
+									<div className="w-full border-t border-gray-100 dark:border-gray-800/30 h-0 mt-2"></div>
+									<div className="w-full border-t border-gray-100 dark:border-gray-800/30 h-0"></div>
+									<div className="w-full border-t border-gray-100 dark:border-gray-800/30 h-0"></div>
+									<div className="w-full h-0"></div>
+								</div>
+								{monthlyData.map((d, i) => (
+									<div
+										key={i}
+										className="relative flex-1 bg-orange-100 dark:bg-orange-500/20 hover:bg-orange-500 dark:hover:bg-orange-500 transition-colors rounded-t-sm group cursor-pointer"
+										style={{ height: `${d.height}%` }}
+									>
+										<div className="absolute -top-9 left-1/2 -translate-x-1/2 bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-[10px] font-bold py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10 pointer-events-none shadow-lg">
+											{formatCurrency(d.value)}
+										</div>
+									</div>
+								))}
+							</div>
+						</div>
+						<div className="flex justify-between text-[10px] sm:text-xs text-gray-400 font-bold tracking-wider pl-12 pr-2">
+							{monthlyData.map((d, i) => (
+								<span key={i} className={i % 2 !== 0 ? "hidden sm:inline" : ""}>{d.label}</span>
 							))}
 						</div>
+					</Card>
 
-						<div className="relative flex-1 flex items-end gap-1 sm:gap-2 px-1 border-b border-gray-100 dark:border-gray-800/50">
-							<div className="absolute inset-0 flex flex-col justify-between pointer-events-none pb-1">
-								<div className="w-full border-t border-gray-100 dark:border-gray-800/30 h-0 mt-2"></div>
-								<div className="w-full border-t border-gray-100 dark:border-gray-800/30 h-0"></div>
-								<div className="w-full border-t border-gray-100 dark:border-gray-800/30 h-0"></div>
-								<div className="w-full h-0"></div>
-							</div>
-
-							{/* Uses dynamic monthlyData from the hook */}
-							{monthlyData.map((d, i) => (
-								<div
-									key={i}
-									className="relative flex-1 bg-orange-100 dark:bg-orange-500/20 hover:bg-orange-500 dark:hover:bg-orange-500 transition-colors rounded-t-sm group cursor-pointer"
-									style={{ height: `${d.height}%` }}
-								>
-									<div className="absolute -top-9 left-1/2 -translate-x-1/2 bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-[10px] font-bold py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10 pointer-events-none shadow-lg">
-										{formatCurrency(d.value)}
+					<Card className="xl:col-span-1 flex flex-col" title="Top Budgets">
+						<div className="flex-1 flex flex-col gap-5 mt-4">
+							{categoryData.length > 0 ? (
+								categoryData.slice(0, 5).map((cat) => (
+									<BudgetProgress
+										key={cat.name}
+										icon={cat.icon || Home}
+										name={cat.name}
+										spent={cat.value}
+										limit={cat.value + 200}
+										color={cat.color}
+									/>
+								))
+							) : (
+								<div className="text-sm text-gray-500 italic mt-4 text-center">No transactions found.</div>
+							)}
+							{stats.unreviewedCount > 0 && (
+								<div className="mt-2 p-3 bg-red-50 dark:bg-red-500/10 border border-red-100 dark:border-red-500/20 rounded-xl flex gap-3 cursor-pointer">
+									<AlertCircle size={16} className="text-red-500 shrink-0 mt-0.5" />
+									<div>
+										<h4 className="text-xs font-bold text-red-700 dark:text-red-400">Action Required</h4>
+										<p className="text-[10px] text-red-600 dark:text-red-300 mt-0.5">{stats.unreviewedCount} transactions need review.</p>
 									</div>
 								</div>
-							))}
+							)}
 						</div>
-					</div>
+					</Card>
+				</div>
 
-					<div className="flex justify-between text-[10px] sm:text-xs text-gray-400 font-bold tracking-wider pl-12 pr-2">
-						{monthlyData.map((d, i) => (
-							<span key={i} className={i % 2 !== 0 ? "hidden sm:inline" : ""}>
-								{d.label}
-							</span>
-						))}
-					</div>
-				</Card>
+				{/* --- BOTTOM ROW --- */}
+				<div className="grid grid-cols-1 xl:grid-cols-2 gap-6 relative z-10">
+					<Card title="Accounts & Balances">
+						<div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+							<AccountBox icon={Landmark} type="Checking" name="Chase Primary" balance="$4,250.00" bg="bg-blue-600" />
+							<AccountBox icon={PiggyBank} type="Savings" name="Discover HYSA" balance="$15,300.25" bg="bg-orange-500" />
+							<AccountBox icon={CreditCard} type="Credit" name="Amex Platinum" balance="-$1,240.50" bg="bg-slate-800 dark:bg-slate-700" isDebt />
+							<AccountBox icon={TrendingUp} type="Investment" name="Vanguard 401k" balance="$42,100.00" bg="bg-emerald-600" />
+						</div>
+						<button className="mt-5 text-xs font-bold text-orange-600 dark:text-orange-500 hover:text-orange-700 flex items-center gap-1 w-fit">
+							Manage Connections <ArrowRight size={14} />
+						</button>
+					</Card>
 
-				{/* DYNAMIC Category Budgets */}
-				<Card className="xl:col-span-1 flex flex-col" title="Top Budgets">
-					<div className="flex-1 flex flex-col gap-5 mt-4">
-						{categoryData.length > 0 ? (
-							categoryData.slice(0, 5).map((cat) => (
-								<BudgetProgress
-									key={cat.name}
-									icon={cat.icon || Home}
-									name={cat.name}
-									spent={cat.value}
-									limit={cat.value + 200} // Temporary logic for limit
-									color={cat.color}
-								/>
-							))
-						) : (
-							<div className="text-sm text-gray-500 italic mt-4 text-center">
-								No transactions found for this period.
-							</div>
-						)}
-
-						{stats.unreviewedCount > 0 && (
-							<div className="mt-2 p-3 bg-red-50 dark:bg-red-500/10 border border-red-100 dark:border-red-500/20 rounded-xl flex gap-3 cursor-pointer">
-								<AlertCircle
-									size={16}
-									className="text-red-500 shrink-0 mt-0.5"
-								/>
-								<div>
-									<h4 className="text-xs font-bold text-red-700 dark:text-red-400">
-										Action Required
-									</h4>
-									<p className="text-[10px] text-red-600 dark:text-red-300 mt-0.5">
-										{stats.unreviewedCount} transactions need review.
-									</p>
-								</div>
-							</div>
-						)}
-					</div>
-				</Card>
-			</div>
-
-			{/* --- BOTTOM ROW --- */}
-			<div className="grid grid-cols-1 xl:grid-cols-2 gap-6 relative z-10">
-				<Card title="Accounts & Balances">
-					<div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
-						<AccountBox
-							icon={Landmark}
-							type="Checking"
-							name="Chase Primary"
-							balance="$4,250.00"
-							bg="bg-blue-600"
-						/>
-						<AccountBox
-							icon={PiggyBank}
-							type="Savings"
-							name="Discover HYSA"
-							balance="$15,300.25"
-							bg="bg-orange-500"
-						/>
-						<AccountBox
-							icon={CreditCard}
-							type="Credit"
-							name="Amex Platinum"
-							balance="-$1,240.50"
-							bg="bg-slate-800 dark:bg-slate-700"
-							isDebt
-						/>
-						<AccountBox
-							icon={TrendingUp}
-							type="Investment"
-							name="Vanguard 401k"
-							balance="$42,100.00"
-							bg="bg-emerald-600"
-						/>
-					</div>
-					<button className="mt-5 text-xs font-bold text-orange-600 dark:text-orange-500 hover:text-orange-700 flex items-center gap-1 w-fit">
-						Manage Connections <ArrowRight size={14} />
-					</button>
-				</Card>
-
-				<Card title="Upcoming Actions">
-					<div className="flex flex-col gap-1 mt-4">
-						<ActionRow
-							day="28"
-							month="Jun"
-							title="Auto Insurance"
-							subtitle="Geico · Scheduled"
-							amount="$124.50"
-							status="upcoming"
-						/>
-						<ActionRow
-							day="01"
-							month="Jul"
-							title="Rent Payment"
-							subtitle="Zillow · Scheduled"
-							amount="$2,400.00"
-							status="upcoming"
-						/>
-					</div>
-				</Card>
-			</div>
+					<Card title="Upcoming Actions">
+						<div className="flex flex-col gap-1 mt-4">
+							<ActionRow day="28" month="Jun" title="Auto Insurance" subtitle="Geico · Scheduled" amount="$124.50" status="upcoming" />
+							<ActionRow day="01" month="Jul" title="Rent Payment" subtitle="Zillow · Scheduled" amount="$2,400.00" status="upcoming" />
+						</div>
+					</Card>
+				</div>
+			</main>
 		</div>
 	);
 }
