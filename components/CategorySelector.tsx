@@ -2,7 +2,7 @@ import { useState, useMemo, memo, useDeferredValue, useRef } from "react";
 import { ChevronRight, Search, Check, X } from "lucide-react";
 import {
 	CATEGORY_HIERARCHY,
-	getParentColor,
+	getCategoryTheme,
 	searchCategories,
 } from "@/constants";
 import {
@@ -48,7 +48,11 @@ const ParentTab = memo(({ parent, isActive, onClick }: ParentTabProps) => (
 				: "text-gray-500 hover:text-gray-300"
 		}`}
 	>
-		<CategoryIcon name={parent} size={14} colorClass={getParentColor(parent)} />
+		<CategoryIcon
+			name={parent}
+			size={14}
+			colorClass={getCategoryTheme(parent).text}
+		/>
 		<span className="truncate">{parent}</span>
 	</button>
 ));
@@ -66,7 +70,7 @@ const SubCategoryRow = memo(
 				<CategoryIcon
 					name={sub}
 					size={14}
-					colorClass={getParentColor(parent)}
+					colorClass={getCategoryTheme(parent).text}
 				/>
 				<span
 					className={`text-xs ${isSelected ? "text-orange-400 font-bold" : "text-gray-400"}`}
@@ -141,7 +145,7 @@ export function CategorySelector({
 	};
 
 	const parentName = findParent(currentCategory);
-	const subCategoryColor = getParentColor(parentName);
+	const subCategoryColor = getCategoryTheme(parentName);
 
 	// 1. Initialize Floating UI logic
 	const {
@@ -213,7 +217,7 @@ export function CategorySelector({
 					<CategoryIcon
 						name={currentCategory}
 						size={18}
-						colorClass={subCategoryColor}
+						colorClass={subCategoryColor.text}
 					/>
 					<span className="text-sm text-gray-900 dark:text-white font-medium">
 						{currentCategory}

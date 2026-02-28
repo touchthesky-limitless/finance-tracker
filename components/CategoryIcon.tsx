@@ -10,5 +10,7 @@ interface IconProps {
 
 export const CategoryIcon = memo(function CategoryIcon({ name, size, colorClass }: IconProps) {
     const IconComponent = ICON_MAP[name] || Tag;
-    return <IconComponent size={size} className={colorClass} />;
+    // Safety check: Ensure colorClass is a string before passing to Lucide
+    const finalClass = typeof colorClass === 'string' ? colorClass : '';
+    return <IconComponent size={size} className={finalClass} />;
 });

@@ -51,17 +51,15 @@ export default function BudgetPage() {
 		useState<Transaction | null>(null);
 
 	const {
+		stats,
 		yearTabs,
 		filteredTransactions,
-		income,
-		expenses,
-		savings,
+		largestPurchases,
 		categoryData,
 		topMerchants,
-		largestPurchases,
 		monthlyData,
 		maxMonthlyValue,
-	} = useBudgetData(transactions, timeFilter);
+	} = useBudgetData(timeFilter);
 
 	const uncategorizedCount = categoryData.find(
 		(c) => c.name === "Uncategorized",
@@ -267,7 +265,7 @@ export default function BudgetPage() {
 												Total Spend
 											</span>
 											<span className="text-2xl font-bold text-gray-900 dark:text-white mt-1">
-												{formatMoney(expenses)}
+												{formatMoney(stats.expenses)}
 											</span>
 										</>
 									)}
@@ -279,7 +277,7 @@ export default function BudgetPage() {
 											Total Spend
 										</span>
 										<span className="text-2xl font-bold text-gray-900 dark:text-white mt-1">
-											{formatMoney(expenses)}
+											{formatMoney(stats.expenses)}
 										</span>
 									</div>
 								)}
@@ -394,7 +392,7 @@ export default function BudgetPage() {
 							</div>
 							<SummaryRow
 								label="Income"
-								value={formatMoney(income)}
+								value={formatMoney(stats.income)}
 								icon={Plus}
 								iconColor="text-green-500"
 								valueColor="text-green-600"
@@ -402,7 +400,7 @@ export default function BudgetPage() {
 								/>
 							<SummaryRow
 								label="Spending"
-								value={formatMoney(expenses)}
+								value={formatMoney(stats.expenses)}
 								icon={Minus}
 								iconColor="text-gray-500"
 								transactions={transactions}
@@ -422,10 +420,10 @@ export default function BudgetPage() {
 									</div>
 								</div>
 								<span
-									className={`text-sm font-bold ${savings >= 0 ? "text-green-600 dark:text-green-400" : "text-orange-500 dark:text-orange-400"}`}
+									className={`text-sm font-bold ${stats.savings >= 0 ? "text-green-600 dark:text-green-400" : "text-orange-500 dark:text-orange-400"}`}
 								>
-									{savings >= 0 ? "+" : ""}
-									{formatMoney(savings)}
+									{stats.savings >= 0 ? "+" : ""}
+									{formatMoney(stats.savings)}
 								</span>
 							</div>
 						</div>

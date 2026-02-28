@@ -1,3 +1,8 @@
+export interface CategoryTheme {
+    text: string;
+    bg: string;
+}
+
 export const CATEGORY_HIERARCHY: Record<string, string[]> = {
 	"Income": [
 		"Wages",
@@ -124,22 +129,23 @@ export const CATEGORY_HIERARCHY: Record<string, string[]> = {
 	"Other": ["Uncategorized", "Other"],
 };
 
-export const PARENT_COLORS: Record<string, string> = {
-	"Income": "text-emerald-500",
-	"Transfers": "text-blue-500",
-	"Debt payments": "text-red-400",
-	"Investments": "text-indigo-400",
-	"Bank fees": "text-amber-400",
-	"Food & drink": "text-orange-500",
-	"Shopping": "text-pink-500",
-	"Housing & utilities": "text-yellow-600",
-	"Health & wellness": "text-rose-500",
-	"Entertainment": "text-purple-500",
-	"Insurance": "text-cyan-500",
-	"Services": "text-orange-500",
-	"Transportation": "text-blue-500",
-	"Travel": "text-sky-400",
-	"Government & charity": "text-amber-900",
+export const PARENT_COLORS: Record<string, CategoryTheme> = {
+    "Income": { text: "text-emerald-500", bg: "bg-emerald-500" },
+    "Transfers": { text: "text-blue-500", bg: "bg-blue-500" },
+    "Debt payments": { text: "text-red-400", bg: "bg-red-400" },
+    "Investments": { text: "text-indigo-400", bg: "bg-indigo-400" },
+    "Bank fees": { text: "text-amber-400", bg: "bg-amber-400" },
+    "Food & drink": { text: "text-orange-500", bg: "bg-orange-500" },
+    "Shopping": { text: "text-pink-500", bg: "bg-pink-500" },
+    "Housing & utilities": { text: "text-yellow-600", bg: "bg-yellow-600" },
+    "Health & wellness": { text: "text-rose-500", bg: "bg-rose-500" },
+    "Entertainment": { text: "text-purple-500", bg: "bg-purple-500" },
+    "Insurance": { text: "text-cyan-500", bg: "bg-cyan-500" },
+    "Services": { text: "text-orange-500", bg: "bg-orange-500" },
+    "Transportation": { text: "text-blue-500", bg: "bg-blue-500" },
+    "Travel": { text: "text-sky-400", bg: "bg-sky-400" },
+    "Government & charity": { text: "text-amber-900", bg: "bg-amber-900" },
+    "Uncategorized": { text: "text-gray-400", bg: "bg-gray-400" },
 };
 
 export function findParentCategory(subCategory: string): string {
@@ -151,8 +157,12 @@ export function findParentCategory(subCategory: string): string {
 	return "Other";
 }
 
-export function getParentColor(parentName: string): string {
-	return PARENT_COLORS[parentName] || "text-gray-400";
+/**
+ * Helper to get the full theme object for a category.
+ * Always returns the Uncategorized theme as a fallback.
+ */
+export function getCategoryTheme(categoryName: string): CategoryTheme {
+    return PARENT_COLORS[categoryName] || PARENT_COLORS["Uncategorized"];
 }
 
 /**

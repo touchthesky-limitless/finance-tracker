@@ -19,7 +19,7 @@ export default function SidebarList({
 				{title}
 			</h3>
 			<div className="space-y-4">
-				{items.slice(0, showAll ? 10 : 3).map((item, i) => {
+				{(items || []).slice(0, showAll ? 10 : 3).map((item, i) => {
 					// Type assertions to help TS distinguish between Transaction and Merchant
 					const tx = item as Transaction;
 					const merchant = item as Merchant;

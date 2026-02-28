@@ -1,15 +1,22 @@
-import { useMemo } from "react";
-import { Transaction } from "@/store/createBudgetStore";
-import { CategoryData, Merchant } from "@/types/budget";
-import {
-	CATEGORY_ICONS,
-	COLORS_HEX,
-	COLORS_TW,
-	TEXT_TW,
-} from "@/data/categories";
+"use client";
 
-export function useBudgetData(transactions: Transaction[], timeFilter: string) {
-	// 1. Filtered Transactions
+import { useMemo } from "react";
+import { useBudgetStore } from "@/hooks/useBudgetStore";
+import { ICON_MAP } from "@/constants/icons";
+import { CategoryData, Merchant } from "@/types/budget";
+import { COLORS_HEX, COLORS_TW, TEXT_TW } from "@/data/categories";
+import { CATEGORY_HIERARCHY, getCategoryTheme } from "@/constants/categories";
+
+/**
+ * The single source of truth for processed budget data.
+ * @param timeFilter - "This Month", "Last Month", "Last 12 Months", or a Year string "2026"
+ */
+export function useBudgetData(timeFilter: string) {
+	// 1. Pull raw transactions from store
+	const useStore = useBudgetStore();
+	const transactions = useStore((state) => state.transactions);
+
+	// 2. Filter Transactions based on the time selection
 	const filteredTransactions = useMemo(() => {
 		const now = new Date();
 		const currentMonth = now.getMonth();
@@ -26,77 +33,59 @@ export function useBudgetData(transactions: Transaction[], timeFilter: string) {
 			const txMonth = txDate.getMonth();
 			const txYear = txDate.getFullYear();
 
-			// 1. Check for "This Month"
+			// Filter logic
 			if (timeFilter === "This Month") {
 				return txMonth === currentMonth && txYear === currentYear;
 			}
-
-			// 2. Check for "Last Month"
 			if (timeFilter === "Last Month") {
 				return txMonth === lastMonthVal && txYear === lastMonthYear;
 			}
+			if (timeFilter === "Last 12 Months") {
+				const twelveMonthsAgo = new Date();
+				twelveMonthsAgo.setMonth(now.getMonth() - 12);
+				return txDate >= twelveMonthsAgo;
+			}
 
-			// 3. Fallback: Check for Year (e.g., "2026", "2025")
-			// This is where you add the logic
+			// Year filter (e.g., "2025")
 			const filterYear = parseInt(timeFilter, 10);
 			if (!isNaN(filterYear)) {
 				return txYear === filterYear;
 			}
 
-			return false;
+			return true; // Default to all if filter doesn't match
 		});
 	}, [transactions, timeFilter]);
 
-	// Generate dynamic year tabs
-	const yearTabs = useMemo(() => {
-		// If no data, default to current and previous year
-		if (transactions.length === 0) {
-			const currentYear = new Date().getFullYear();
-			return [
-				"Last Month",
-				"This Month",
-				currentYear.toString(),
-				(currentYear - 1).toString(),
-			];
-		}
+	// 3. Derived Statistics (Totals)
+	const stats = useMemo(() => {
+		let income = 0;
+		let expenses = 0;
+		let unreviewedCount = 0;
 
-		// Extract unique years from actual transaction dates
-		const years = transactions.map((t) => {
-			const d = new Date(t.date);
-			return isNaN(d.getTime()) ? null : d.getFullYear().toString();
+		filteredTransactions.forEach((t) => {
+			if (t.needsReview) unreviewedCount++;
+
+			if (t.amount > 0) {
+				income += t.amount;
+			} else {
+				expenses += Math.abs(t.amount);
+			}
 		});
 
-		// Create a unique, sorted list of years
-		const uniqueYears = Array.from(new Set(years))
-			.filter((y): y is string => y !== null)
-			.sort((a, b) => b.localeCompare(a)); // 2026, 2025, etc.
+		return {
+			income,
+			expenses,
+			remaining: income - expenses,
+			savings: income - expenses,
+			unreviewedCount,
+			totalTransactions: filteredTransactions.length,
+		};
+	}, [filteredTransactions]);
 
-		return ["Last Month", "This Month", ...uniqueYears];
-	}, [transactions]);
-
-	// 2. High-level Totals
-	const income = useMemo(
-		() =>
-			filteredTransactions
-				.filter((t) => t.amount > 0)
-				.reduce((acc, t) => acc + t.amount, 0),
-		[filteredTransactions],
-	);
-
-	const expenses = useMemo(
-		() =>
-			filteredTransactions
-				.filter((t) => t.amount < 0)
-				.reduce((acc, t) => acc + Math.abs(t.amount), 0),
-		[filteredTransactions],
-	);
-
-	// Savings
-	const savings = income - expenses;
-
-	// 3. Category Data (for Pie Chart)
+	// 4. Category Grouping (for Pie Charts and Budget Bars)
 	const categoryData = useMemo<CategoryData[]>(() => {
 		const groups: Record<string, number> = {};
+
 		filteredTransactions
 			.filter((t) => t.amount < 0)
 			.forEach((t) => {
@@ -106,20 +95,33 @@ export function useBudgetData(transactions: Transaction[], timeFilter: string) {
 
 		return Object.entries(groups)
 			.sort(([, a], [, b]) => b - a)
-			.map(([name, amount], i) => ({
-				name,
-				value: amount,
-				percent: expenses > 0 ? Math.round((amount / expenses) * 100) : 0,
-				color: COLORS_TW[i % COLORS_TW.length],
-				fill: COLORS_HEX[i % COLORS_HEX.length],
-				textColor: TEXT_TW[i % TEXT_TW.length],
-				icon: CATEGORY_ICONS[i % CATEGORY_ICONS.length],
-			}));
-	}, [filteredTransactions, expenses]);
+			.map(([name, amount], i) => {
+				const theme = getCategoryTheme(name);
 
-	// 4. Aggregated Merchant Data
+				return {
+					name,
+					value: Number(amount.toFixed(2)), // Fixed rounding issue
+					percent:
+						stats.expenses > 0
+							? Math.round((amount / stats.expenses) * 100)
+							: 0,
+
+					// --- NEW COLOR LOGIC ---
+					color: theme.bg, // Used for bg-color in progress bars
+					textColor: theme.text, // Used for text-color in legends
+
+					// Fallback fill for charts if they don't support Tailwind classes
+					fill: COLORS_HEX[i % COLORS_HEX.length],
+
+					icon: ICON_MAP[name] || ICON_MAP["Uncategorized"],
+				};
+			});
+	}, [filteredTransactions, stats.expenses]);
+
+	// 5. Merchant Aggregation
 	const topMerchants = useMemo<Merchant[]>(() => {
 		const map: Record<string, { count: number; total: number }> = {};
+
 		filteredTransactions
 			.filter((t) => t.amount < 0)
 			.forEach((t) => {
@@ -128,12 +130,12 @@ export function useBudgetData(transactions: Transaction[], timeFilter: string) {
 				map[name].count++;
 				map[name].total += Math.abs(t.amount);
 			});
+
 		return Object.entries(map)
-			.sort(([, a], [, b]) => b.count - a.count)
+			.sort(([, a], [, b]) => b.total - a.total)
 			.map(([name, data]) => ({ name, ...data }));
 	}, [filteredTransactions]);
 
-	// 5. Largest Purchases
 	const largestPurchases = useMemo(
 		() =>
 			filteredTransactions
@@ -142,38 +144,38 @@ export function useBudgetData(transactions: Transaction[], timeFilter: string) {
 		[filteredTransactions],
 	);
 
-	// 6. Monthly Trend Data
+	// 6. Monthly Trend Data (for Bar Charts)
 	const monthlyData = useMemo(() => {
 		const months = Array(12).fill(0);
+
+		// If filtering by a specific year, use that year's months
+		// If "Last 12 Months", this logic would need to be more dynamic
 		filteredTransactions
 			.filter((t) => t.amount < 0)
 			.forEach((t) => {
 				const d = new Date(t.date);
 				if (!isNaN(d.getTime())) months[d.getMonth()] += Math.abs(t.amount);
 			});
+
 		const max = Math.max(...months, 1);
 		return months.map((val, i) => ({
-			label: new Date(0, i).toLocaleString("default", { month: "short" }),
+			label: new Date(0, i)
+				.toLocaleString("default", { month: "short" })
+				.toUpperCase(),
 			value: val,
-			height: max > 0 ? (val / max) * 100 : 0,
+			height: (val / max) * 100,
 		}));
 	}, [filteredTransactions]);
 
-	// Monthly value
-	const maxMonthlyValue = useMemo(() => {
-		return Math.max(...monthlyData.map((d) => d.value), 0);
-	}, [monthlyData]);
-
 	return {
-		yearTabs,
 		filteredTransactions,
-		income,
-		expenses,
-		savings,
+		stats,
 		categoryData,
 		topMerchants,
 		largestPurchases,
 		monthlyData,
-		maxMonthlyValue,
+		maxMonthlyValue: Math.max(...monthlyData.map((d) => d.value), 0),
+		// Helper to generate tabs in UI
+		yearTabs: ["This Month", "Last Month", "Last 12 Months"],
 	};
 }

@@ -1,5 +1,5 @@
 import { memo } from "react";
-import { CATEGORY_HIERARCHY, getParentColor } from "@/constants/categories";
+import { CATEGORY_HIERARCHY, getCategoryTheme } from "@/constants/categories";
 import { Transaction } from "@/store/createBudgetStore";
 import { NeedsReviewBadge } from "@/components/ui/NeedsReviewBadge";
 import { CategoryIcon } from "@/components/CategoryIcon";
@@ -22,7 +22,7 @@ export const TransactionRow = memo(function TransactionRow({
 				parent === transaction.category,
 		) || "Uncategorized";
 
-	const subCategoryColor = getParentColor(parentName);
+	const subCategoryColor = getCategoryTheme(parentName);
 
 	// A transaction needs review if the flag is true
 	// OR if the category is just a generic Parent name
@@ -58,7 +58,7 @@ export const TransactionRow = memo(function TransactionRow({
 					<CategoryIcon
 						name={transaction.category}
 						size={16}
-						colorClass={subCategoryColor}
+						colorClass={subCategoryColor.text}
 					/>
 					<span className="text-xs font-medium text-gray-700 dark:text-gray-300">
 						{transaction.category}
