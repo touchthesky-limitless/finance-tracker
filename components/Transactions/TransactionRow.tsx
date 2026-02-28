@@ -1,25 +1,28 @@
-import { CategorySelector } from "@/components/CategorySelector";
-import { CATEGORY_HIERARCHY } from "@/constants/categories";
-import { useBudgetStore } from "@/hooks/useBudgetStore";
+import { memo } from "react";
+import { CATEGORY_HIERARCHY, getParentColor } from "@/constants/categories";
 import { Transaction } from "@/store/createBudgetStore";
 import { NeedsReviewBadge } from "@/components/ui/NeedsReviewBadge";
+import { CategoryIcon } from "@/components/CategoryIcon";
 
 interface TransactionRowProps {
 	transaction: Transaction;
 	onUpdate?: () => void;
-	onRowClick: () => void;
+	onRowClick: (transaction: Transaction) => void;
 }
 
-export function TransactionRow({
+export const TransactionRow = memo(function TransactionRow({
 	transaction,
-	onUpdate,
 	onRowClick,
 }: TransactionRowProps) {
-	// 1. Get the store hook
-	const useStore = useBudgetStore();
+	// Helper to find parent for the color
+	const parentName =
+		Object.keys(CATEGORY_HIERARCHY).find(
+			(parent) =>
+				CATEGORY_HIERARCHY[parent].includes(transaction.category) ||
+				parent === transaction.category,
+		) || "Uncategorized";
 
-	// 2. Select the update action
-	const updateTransaction = useStore((state) => state.updateTransaction);
+	const subCategoryColor = getParentColor(parentName);
 
 	// A transaction needs review if the flag is true
 	// OR if the category is just a generic Parent name
@@ -31,10 +34,10 @@ export function TransactionRow({
 
 	return (
 		<tr
-			onClick={onRowClick}
+			onClick={() => onRowClick(transaction)}
 			className="hover:bg-gray-100 dark:hover:bg-gray-800/40 cursor-pointer transition-colors group border-b border-gray-800/30 text-sm"
 		>
-			{/* 1. DESCRIPTION (Expanded space) */}
+			{/* 1. DESCRIPTION */}
 			<td className="py-4 px-2">
 				<div className="flex flex-col">
 					<span className="font-medium text-gray-900 dark:text-gray-200 uppercase tracking-tight truncate max-w-75">
@@ -49,19 +52,17 @@ export function TransactionRow({
 				</div>
 			</td>
 
-			<td className="py-4 px-2" onClick={(e) => e.stopPropagation()}>
-				<div className="flex items-center">
-					<div className="min-w-80">
-						<CategorySelector
-							currentCategory={transaction.category}
-							onSelect={(sub) => {
-								//update the transaction in the database
-								updateTransaction(transaction.id, { category: sub });
-								onUpdate?.();
-							}}
-						/>
-					</div>
-					{needsReview && <NeedsReviewBadge />}
+			{/* 2. Category Column */}
+			<td className="py-4 px-2">
+				<div className="inline-flex items-center gap-2 px-3 py-1.5">
+					<CategoryIcon
+						name={transaction.category}
+						size={16}
+						colorClass={subCategoryColor}
+					/>
+					<span className="text-xs font-medium text-gray-700 dark:text-gray-300">
+						{transaction.category}
+					</span>
 				</div>
 			</td>
 
@@ -81,6 +82,24 @@ export function TransactionRow({
 			<td className="py-4 px-2 text-gray-500 text-xs italic">
 				{transaction.account}
 			</td>
+
+			{/* 5: Tags Column */}
+			<td className="py-4 px-2">
+				<span className="text-[10px] text-gray-400 dark:text-gray-600 font-medium uppercase tracking-wider">
+					Tags
+				</span>
+			</td>
+
+			{/* 6: Status Column */}
+			<td className="py-4 px-2">
+				{needsReview ? (
+					<NeedsReviewBadge />
+				) : (
+					<span className="text-[10px] text-gray-400 dark:text-gray-600 font-medium uppercase tracking-wider">
+						Done
+					</span>
+				)}
+			</td>
 		</tr>
 	);
-}
+});

@@ -1,10 +1,6 @@
 import { useState, useMemo } from "react";
 import { ChevronRight, Search, Check } from "lucide-react";
-import {
-	CATEGORY_HIERARCHY,
-	CategoryIcon,
-	getParentColor,
-} from "@/constants/categories";
+import { CATEGORY_HIERARCHY, getParentColor } from "@/constants/categories";
 import {
 	useFloating,
 	offset,
@@ -17,7 +13,7 @@ import {
 	FloatingPortal,
 	size,
 } from "@floating-ui/react";
-// import { useOutsideClick } from "@/hooks/useOutsideClick";
+import { CategoryIcon } from "@/components/CategoryIcon";
 
 interface CategorySelectorProps {
 	currentCategory: string;
@@ -59,14 +55,17 @@ export function CategorySelector({
 	const activeParent = useMemo(() => {
 		const query = catQuery.toLowerCase().trim();
 		if (!query) return selectedParent;
+
+		// Only change parent if the CURRENT one has zero matches for the search
 		const currentHasMatch =
 			selectedParent.toLowerCase().includes(query) ||
-			CATEGORY_HIERARCHY[selectedParent].some((s) =>
+			CATEGORY_HIERARCHY[selectedParent]?.some((s) =>
 				s.toLowerCase().includes(query),
 			);
-		return !currentHasMatch && visibleParents.length > 0
-			? visibleParents[0]
-			: selectedParent;
+
+		if (currentHasMatch) return selectedParent;
+
+		return visibleParents.length > 0 ? visibleParents[0] : selectedParent;
 	}, [catQuery, visibleParents, selectedParent]);
 
 	// Helper to find the parent name
@@ -93,7 +92,8 @@ export function CategorySelector({
 		onOpenChange: setIsOpen,
 		whileElementsMounted: (reference, floating, update) =>
 			autoUpdate(reference, floating, update, {
-				animationFrame: true, // Keep this for maximum smoothness
+				animationFrame: false, // Keep this for maximum smoothness
+				elementResize: true,
 			}),
 		middleware: [
 			offset(8), // Gap between button and menu
@@ -116,7 +116,7 @@ export function CategorySelector({
 		outsidePress: true, // Handles "Click Outside"
 		escapeKey: true, // Handles "ESC" key
 	});
-    
+
 	const { getReferenceProps, getFloatingProps } = useInteractions([
 		useClick(context),
 		dismiss,

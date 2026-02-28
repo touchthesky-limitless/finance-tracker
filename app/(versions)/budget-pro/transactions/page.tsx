@@ -11,6 +11,15 @@ import { TransactionRow } from "@/components/Transactions/TransactionRow";
 import { SortableHeader } from "@/components/Transactions/SortableHeader";
 import dynamic from "next/dynamic";
 
+const EditTransactionModal = dynamic(
+    () => import("@/components/Budget/EditTransactionModal"),
+    {
+        ssr: false,
+        // Optional: Add a loading placeholder to keep the UI from jumping
+        loading: () => <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50" />
+    }
+);
+
 // --- Types for Sorting ---
 type SortKey = "date" | "category" | "name" | "amount" | "account";
 
@@ -123,12 +132,9 @@ export default function TransactionsPage() {
 		setIsEditModalOpen(true);
 	};
 
-	const EditTransactionModal = dynamic(
-		() => import("@/components/Budget/EditTransactionModal"),
-		{
-			ssr: false, // This disables server-side rendering
-		},
-	);
+	const handleRowClick = React.useCallback((t: Transaction) => {
+    	setSelectedTransaction(t);
+	}, []);
 
 	useEffect(() => {
 		const handleBeforeUnload = (e: BeforeUnloadEvent) => {
@@ -234,6 +240,7 @@ export default function TransactionsPage() {
 								onClick={handleSort}
 							/>
 							<th className="py-4 px-2 w-32">Tags</th>
+							<th className="py-4 px-2 w-32">Status</th>
 							<th className="py-4 px-2">Description</th>
 							<th className="py-4 px-2 w-10"></th>
 						</tr>
@@ -253,7 +260,7 @@ export default function TransactionsPage() {
 									<TransactionRow
 										key={t.id}
 										transaction={t}
-										onRowClick={() => setSelectedTransaction(t)}
+										onRowClick={handleRowClick}
 									/>
 								))}
 							</React.Fragment>
