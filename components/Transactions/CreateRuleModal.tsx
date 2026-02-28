@@ -265,12 +265,28 @@ export function CreateRuleModal({
 											<option>Exactly matches</option>
 											<option>Starts with</option>
 										</select>
-										<input
-											ref={inputRef}
-											className="w-full bg-slate-50 dark:bg-[#121212] border border-slate-200 dark:border-white/10 rounded-lg p-2 text-xs"
-											value={matchName}
-											onChange={(e) => setMatchName(e.target.value)}
-										/>
+										<div className="relative">
+											<input
+												ref={inputRef}
+												placeholder="Search..."
+												className="w-full bg-slate-50 dark:bg-[#121212] border border-slate-200 dark:border-white/10 rounded-lg p-2 text-xs"
+												value={matchName}
+												onChange={(e) => setMatchName(e.target.value)}
+											/>
+											{/* CLEAR BUTTON */}
+											{matchName && (
+												<button
+													type="button"
+													onClick={() => {
+														setMatchName("");
+														inputRef.current?.focus();
+													}}
+													className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-md transition-colors text-gray-500 hover:text-gray-900 dark:hover:text-white"
+												>
+													<X size={14} />
+												</button>
+											)}
+										</div>
 										{/* --- Duplicate Check --- */}
 										{/* Enhanced Duplicate Warning with Match Count */}
 										{isDuplicate && matchName.trim().length > 0 && (
