@@ -2,7 +2,6 @@
 
 import { useState, ReactNode, ElementType, useMemo } from "react";
 import {
-	Plus,
 	Download,
 	MoreHorizontal,
 	Landmark,
@@ -15,20 +14,16 @@ import {
 	Calendar,
 	ChevronDown,
 	ChevronLeft,
-	ChevronRight,
 } from "lucide-react";
 import { useBudgetData } from "@/hooks/useBudgetData";
-import { ICON_MAP } from "@/constants/icons";
 
 export default function OverviewPage() {
-	const [chartScope, setChartScope] = useState<string | null>(null);
+
 	const [timeFilter, setTimeFilter] = useState("Year 2026");
 	const FALL_BACK_DATE = "This Month";
 
 	const { stats, categoryData, monthlyData, maxMonthlyValue } =
 		useBudgetData(timeFilter);
-
-	const isYearView = chartScope === null;
 
 	// --- HELPERS ---
 	const formatCurrency = (num: number) => {
@@ -86,8 +81,8 @@ export default function OverviewPage() {
 			    We use sticky top-0 with a backdrop blur. 
 			    -mx-4 and px-4 ensure the background spans the full width of the container padding. 
 			*/}
-			<header className="sticky top-0 z-[100] w-full bg-[#F4F6F8]/80 dark:bg-[#0a0a0a]/80 backdrop-blur-md border-b border-gray-200/50 dark:border-gray-800/50 mb-8">
-				<div className="max-w-[1600px] mx-auto flex flex-col lg:flex-row lg:items-end justify-between gap-6 py-6 px-4 md:px-8">
+			<header className="sticky top-0 z-100 w-full bg-[#F4F6F8]/80 dark:bg-[#0a0a0a]/80 backdrop-blur-md border-b border-gray-200/50 dark:border-gray-800/50 mb-8">
+				<div className="max-w-400 mx-auto flex flex-col lg:flex-row lg:items-end justify-between gap-6 py-6 px-4 md:px-8">
 					<div className="max-w-2xl">
 						<h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white tracking-tight mb-2">
 							Financial Overview
@@ -107,8 +102,6 @@ export default function OverviewPage() {
 								const selectedDate = val || FALL_BACK_DATE;
 								// 1. Update the Master Filter for the whole page
 								setTimeFilter(selectedDate);
-								// 2. Sync the Chart Scope to the same selection
-								setChartScope(selectedDate);
 							}}
 						/>
 						<button className="flex items-center gap-2 px-4 py-2.5 bg-orange-600 hover:bg-orange-700 text-white rounded-xl text-sm font-semibold transition-colors shadow-sm shadow-orange-600/20">
@@ -120,7 +113,7 @@ export default function OverviewPage() {
 			</header>
 
 			{/* --- CONTENT WRAPPER --- */}
-			<main className="max-w-[1600px] mx-auto px-4 md:px-8 pb-24">
+			<main className="max-w-400 mx-auto px-4 md:px-8 pb-24">
 				{/* --- TOP ROW: Hero Summary --- */}
 				<div className="bg-white dark:bg-[#121212] border border-gray-100 dark:border-gray-800/80 rounded-3xl p-6 shadow-sm mb-6 flex flex-col lg:flex-row items-center gap-8 relative z-10">
 					<div className="flex items-center gap-6 w-full lg:w-[35%] lg:border-r border-gray-100 dark:border-gray-800 lg:pr-8 shrink-0">
@@ -203,7 +196,6 @@ export default function OverviewPage() {
 										onClick={() => {
 											const resetFilter = `Year ${activeYear}`;
 											setTimeFilter(resetFilter);
-											setChartScope(null);
 										}}
 										className="flex items-center gap-1 text-[10px] font-bold text-orange-600 hover:text-orange-700 bg-orange-50 dark:bg-orange-500/10 px-2 py-1 rounded-md transition-all active:scale-95"
 									>
@@ -221,7 +213,6 @@ export default function OverviewPage() {
 												onClick={() => {
 													const newYearFilter = `Year ${y}`;
 													setTimeFilter(newYearFilter);
-													setChartScope(null); // Ensure we stay in yearly view
 												}}
 												className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${
 													activeYear === y
@@ -279,7 +270,6 @@ export default function OverviewPage() {
 												if (isYearlyView) {
 													const newFilter = `${d.label} ${activeYear}`;
 													setTimeFilter(newFilter);
-													setChartScope(newFilter);
 												}
 											}}
 											className={`relative flex-1 transition-all duration-300 group rounded-t-sm
@@ -446,7 +436,6 @@ function DateRangeDropdown({
 	onApply,
 }: DateRangeDropdownProps) {
 	const [isOpen, setIsOpen] = useState(false);
-	const [view, setView] = useState<"months" | "days">("months");
 
 	// Track both Month and Year locally until "Apply" is clicked
 	const [tempYear, setTempYear] = useState(new Date().getFullYear());
@@ -538,7 +527,7 @@ function DateRangeDropdown({
 						className="fixed inset-0 z-40"
 						onClick={() => setIsOpen(false)}
 					/>
-					<div className="absolute right-0 mt-2 w-[320px] sm:w-[480px] bg-white dark:bg-[#121212] border border-gray-200 dark:border-gray-800 rounded-2xl shadow-2xl z-50 flex flex-col sm:flex-row overflow-hidden animate-in fade-in slide-in-from-top-2">
+					<div className="absolute right-0 mt-2 w-[320px] sm:w-120 bg-white dark:bg-[#121212] border border-gray-200 dark:border-gray-800 rounded-2xl shadow-2xl z-50 flex flex-col sm:flex-row overflow-hidden animate-in fade-in slide-in-from-top-2">
 						{/* --- LEFT: PRESETS --- */}
 						<div className="w-full sm:w-1/3 bg-gray-50 dark:bg-[#0d0d0d] border-b sm:border-b-0 sm:border-r border-gray-200 dark:border-gray-800 p-2 flex flex-col gap-1">
 							<p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider px-3 pt-2 pb-1">
@@ -638,7 +627,7 @@ interface CardProps {
 function Card({ title, children, className = "", action }: CardProps) {
 	return (
 		<div
-			className={`bg-white dark:bg-[#121212] border border-gray-100 dark:border-gray-800/80 rounded-[24px] p-6 shadow-sm ${className}`}
+			className={`bg-white dark:bg-[#121212] border border-gray-100 dark:border-gray-800/80 rounded-3xl p-6 shadow-sm ${className}`}
 		>
 			<div className="flex items-center justify-between mb-2">
 				<div className="flex items-center gap-2 text-gray-900 dark:text-white font-bold">
