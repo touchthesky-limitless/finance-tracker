@@ -18,12 +18,18 @@ import {
 import { useBudgetData } from "@/hooks/useBudgetData";
 
 export default function OverviewPage() {
-
 	const [timeFilter, setTimeFilter] = useState("Year 2026");
 	const FALL_BACK_DATE = "This Month";
 
-	const { stats, categoryData, monthlyData, maxMonthlyValue } =
-		useBudgetData(timeFilter);
+	const {
+		stats,
+		categoryData,
+		monthlyData,
+		maxMonthlyValue,
+		topMerchants,
+		largestPurchases,
+		predictedBills,
+	} = useBudgetData(timeFilter);
 
 	// --- HELPERS ---
 	const formatCurrency = (num: number) => {
@@ -357,64 +363,108 @@ export default function OverviewPage() {
 					</Card>
 				</div>
 
-				{/* --- BOTTOM ROW --- */}
+				{/* --- BOTTOM ROW: SPENDING INTELLIGENCE --- */}
 				<div className="grid grid-cols-1 xl:grid-cols-2 gap-6 relative z-10">
-					<Card title="Accounts & Balances">
-						<div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
-							<AccountBox
-								icon={Landmark}
-								type="Checking"
-								name="Chase Primary"
-								balance="$4,250.00"
-								bg="bg-blue-600"
-							/>
-							<AccountBox
-								icon={PiggyBank}
-								type="Savings"
-								name="Discover HYSA"
-								balance="$15,300.25"
-								bg="bg-orange-500"
-							/>
-							<AccountBox
-								icon={CreditCard}
-								type="Credit"
-								name="Amex Platinum"
-								balance="-$1,240.50"
-								bg="bg-slate-800 dark:bg-slate-700"
-								isDebt
-							/>
-							<AccountBox
-								icon={TrendingUp}
-								type="Investment"
-								name="Vanguard 401k"
-								balance="$42,100.00"
-								bg="bg-emerald-600"
-							/>
+					{/* COLUMN 1: TOP MERCHANTS & LARGEST HITS */}
+					<Card title="Merchant Insights">
+						<div className="grid grid-cols-1 sm:grid-cols-2 gap-8 mt-4">
+							{/* Top Merchants List */}
+							<div>
+								<p className="text-[10px] font-black text-gray-400 tracking-widest mb-4">
+									Top Merchants
+								</p>
+								<div className="flex flex-col gap-4">
+									{topMerchants.slice(0, 5).map((m) => (
+										<div
+											key={m.name}
+											className="flex items-start justify-between group gap-4" // Changed items-center to items-start
+										>
+											{/* Left side: Icon + Name Info */}
+											<div className="flex items-start gap-3 min-w-0 flex-1">
+												{/* Icon wrapper */}
+												<div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-xs font-bold text-gray-500 group-hover:bg-orange-100 dark:group-hover:bg-orange-500/20 group-hover:text-orange-600 transition-colors shrink-0">
+													{m.name.charAt(0)}
+												</div>
+
+												{/* Text wrapper */}
+												<div className="min-w-0 pt-0.5">
+													{" "}
+													{/* Added slight padding to align with icon top */}
+													<p className="text-sm font-bold text-gray-900 dark:text-white truncate leading-none mb-1">
+														{m.name}
+													</p>
+													<p className="text-[10px] text-gray-500 font-medium leading-none">
+														{m.count} transactions
+													</p>
+												</div>
+											</div>
+
+											{/* Right side: Currency aligned to the top name */}
+											<span className="text-sm font-black text-gray-900 dark:text-white whitespace-nowrap ">
+												{formatCurrency(m.total)}
+											</span>
+										</div>
+									))}
+								</div>
+							</div>
+
+							{/* Largest Hits List */}
+							<div className="border-l border-gray-100 dark:border-gray-800 pl-8">
+								<p className="text-[10px] font-black text-gray-400 tracking-widest mb-4">
+									Largest Hits
+								</p>
+								<div className="flex flex-col gap-4">
+									{largestPurchases.slice(0, 5).map((t, i) => (
+										<div key={i} className="flex flex-col gap-1">
+											<div className="flex justify-between items-center">
+												<span className="text-sm font-bold text-gray-900 dark:text-white truncate max-w-[100px]">
+													{t.description}
+												</span>
+												<span className="text-sm font-black text-white-600 dark:text-white-400">
+													-{formatCurrency(Math.abs(t.amount))}
+												</span>
+											</div>
+											<span className="text-[10px] text-gray-500 font-medium italic">
+												{new Date(t.date).toLocaleDateString("en-US", {
+													month: "short",
+													day: "numeric",
+												})}
+											</span>
+										</div>
+									))}
+								</div>
+							</div>
 						</div>
-						<button className="mt-5 text-xs font-bold text-orange-600 dark:text-orange-500 hover:text-orange-700 flex items-center gap-1 w-fit">
-							Manage Connections <ArrowRight size={14} />
-						</button>
 					</Card>
 
-					<Card title="Upcoming Actions">
+					{/* COLUMN 2: UPCOMING ACTIONS (PREDICTED) */}
+					<Card title="Predicted Bills & Subscriptions">
 						<div className="flex flex-col gap-1 mt-4">
-							<ActionRow
-								day="28"
-								month="Jun"
-								title="Auto Insurance"
-								subtitle="Geico · Scheduled"
-								amount="$124.50"
-								status="upcoming"
-							/>
-							<ActionRow
-								day="01"
-								month="Jul"
-								title="Rent Payment"
-								subtitle="Zillow · Scheduled"
-								amount="$2,400.00"
-								status="upcoming"
-							/>
+							{predictedBills.length > 0 ? (
+								predictedBills.map((bill, i) => (
+									<ActionRow
+										key={i}
+										day={bill.dueDate.getDate().toString().padStart(2, "0")}
+										month={bill.dueDate.toLocaleDateString("en-US", {
+											month: "short",
+										})}
+										title={bill.name}
+										subtitle={`Estimated based on ${bill.frequency} history`}
+										amount={formatCurrency(bill.avgAmount)}
+										status="upcoming"
+									/>
+								))
+							) : (
+								<div className="py-12 text-center">
+									<p className="text-sm text-gray-400 italic">
+										No recurring patterns detected yet.
+									</p>
+								</div>
+							)}
 						</div>
+						<button className="mt-5 text-xs font-bold text-gray-400 hover:text-orange-600 flex items-center gap-1 w-fit transition-colors">
+							View Subscription Manager <ArrowRight size={14} />
+						</button>
 					</Card>
 				</div>
 			</main>

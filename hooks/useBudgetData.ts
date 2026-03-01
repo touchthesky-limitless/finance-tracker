@@ -233,8 +233,12 @@ export function useBudgetData(timeFilter: string) {
 				// Clean description: Remove "SQ *" or "TST*" and take the first word
 				const cleanName =
 					t.description
-						.replace(/^(SQ\s\*|TST\s\*|PY\s\*)/i, "")
-						.split(" ")[0] || "Unknown";
+						.replace(/^(SQ\s\*|TST\s\*|PY\s\*|Check\s#\d+\s-\s)/i, "") // Clean prefix
+						.split(" ") // Split into words
+						.filter((word) => word.length > 0) // Remove empty spaces
+						.slice(0, 2) // Take first two words
+						.join(" ") || // Join them back
+					"Unknown";
 
 				if (!map[cleanName]) map[cleanName] = { count: 0, total: 0 };
 				map[cleanName].count++;
@@ -258,6 +262,49 @@ export function useBudgetData(timeFilter: string) {
 			.slice(0, 10); // Usually only need the top 5-10 for UI
 	}, [filteredTransactions]);
 
+	// Inside useBudgetData.ts
+	const predictedBills = useMemo(() => {
+		const merchants: Record<string, { dates: number[]; amounts: number[] }> =
+			{};
+
+		// 1. Group transaction dates by merchant
+		transactions.forEach((t) => {
+			if (t.amount < 0) {
+				const name = t.description
+					.replace(/^(SQ\s\*|TST\s\*|PY\s\*)/i, "")
+					.split(" ")
+					.slice(0, 2)
+					.join(" ");
+				if (!merchants[name]) merchants[name] = { dates: [], amounts: [] };
+				merchants[name].dates.push(new Date(t.date).getTime());
+				merchants[name].amounts.push(Math.abs(t.amount));
+			}
+		});
+
+		// 2. Identify patterns (occurring ~once a month)
+		return Object.entries(merchants)
+			.filter(([_, data]) => data.dates.length >= 2) // Need at least 2 occurrences
+			.map(([name, data]) => {
+				const lastDate = new Date(Math.max(...data.dates));
+				const avgAmount =
+					data.amounts.reduce((a, b) => a + b, 0) / data.amounts.length;
+
+				// Project the next date (30 days after the last one)
+				const nextDate = new Date(lastDate);
+				nextDate.setDate(lastDate.getDate() + 30);
+
+				return {
+					name,
+					avgAmount,
+					dueDate: nextDate,
+					frequency: data.dates.length >= 12 ? "Yearly" : "Monthly",
+				};
+			})
+			.filter((bill) => bill.dueDate > new Date()) // Only show future ones
+			.sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime())
+			.slice(0, 4); // Top 4 upcoming
+	}, [transactions]);
+
 	return {
 		stats,
 		categoryData,
@@ -267,5 +314,6 @@ export function useBudgetData(timeFilter: string) {
 		largestPurchases,
 		filteredTransactions,
 		yearTabs: ["This Month", "Last Month", "Last 12 Months"],
+		predictedBills,
 	};
 }
