@@ -12,6 +12,7 @@ import { SortableHeader } from "@/components/Transactions/SortableHeader";
 import dynamic from "next/dynamic";
 import { SearchInput } from "@/components/ui/SearchInput";
 import { useSearchState } from "@/hooks/useSearchState";
+import { CategorySelector } from "@/components/CategorySelector";
 
 const EditTransactionModal = dynamic(
 	() => import("@/components/Budget/EditTransactionModal"),
@@ -48,6 +49,7 @@ export default function TransactionsPage() {
 	const [sortPriority, setSortPriority] = useState<SortConfig[]>([
 		{ key: "date", direction: "desc" },
 	]);
+	const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
 	// const [toast, setToast] = useState<{ message: string; count: number } | null>(null);
 	// const [toast, setToast] = useState<{
 	// 	count: number;
@@ -68,10 +70,14 @@ export default function TransactionsPage() {
 
 	// --- Sort & Filter Logic ---
 	const filteredAndGrouped = useMemo(() => {
-		// 1. Filter by search
-		const filtered = transactions.filter((t) =>
-			t.description.toLowerCase().includes(searchQuery.toLowerCase()),
-		);
+		// 1. Filter by search AND Category
+		const filtered = transactions.filter((t) => {
+			const matchesSearch = t.description
+				.toLowerCase()
+				.includes(searchQuery.toLowerCase());
+			const matchesCategory = !categoryFilter || t.category === categoryFilter;
+			return matchesSearch && matchesCategory;
+		});
 
 		// 2. Multi-column Sort
 		const sorted = [...filtered].sort((a, b) => {
@@ -105,7 +111,7 @@ export default function TransactionsPage() {
 			groups[dateKey].push(t);
 		});
 		return groups;
-	}, [transactions, searchQuery, sortPriority]);
+	}, [transactions, searchQuery, sortPriority, categoryFilter]);
 
 	// --- Handlers ---
 	const handleSort = (key: SortKey, e: React.MouseEvent) => {
@@ -228,12 +234,30 @@ export default function TransactionsPage() {
 								sortPriority={sortPriority}
 								onClick={handleSort}
 							/>
-							<SortableHeader
-								label="Category"
-								activeKey="category"
-								sortPriority={sortPriority}
-								onClick={handleSort}
-							/>
+							{/* CATEGORY HEADER WITH FILTER */}
+							<th className="py-4 px-2">
+								<div className="flex items-center gap-2">
+									<CategorySelector
+										variant="filter"
+										currentCategory={categoryFilter || "All"}
+										onSelect={(sub) => {
+											if (sub === "All") {
+												setCategoryFilter(null); // Reset the filter
+											} else {
+												setCategoryFilter(sub); // Apply specific category
+											}
+										}}
+									/>
+									{categoryFilter && (
+										<button
+											onClick={() => setCategoryFilter(null)}
+											className="text-orange-500 hover:text-orange-400"
+										>
+											<X size={12} />
+										</button>
+									)}
+								</div>
+							</th>
 							<SortableHeader
 								label="Amount"
 								activeKey="amount"

@@ -1,5 +1,12 @@
 import { useState, useMemo, memo, useDeferredValue, useRef } from "react";
-import { ChevronRight, Search, Check, X } from "lucide-react";
+import {
+	ChevronRight,
+	Search,
+	Check,
+	X,
+	ChevronDown,
+	LayoutGrid,
+} from "lucide-react";
 import {
 	CATEGORY_HIERARCHY,
 	getCategoryTheme,
@@ -22,6 +29,7 @@ import { CategoryIcon } from "@/components/CategoryIcon";
 interface CategorySelectorProps {
 	currentCategory: string;
 	onSelect: (category: string, parent: string) => void;
+	variant?: "form" | "filter";
 }
 
 interface ParentTabProps {
@@ -87,6 +95,7 @@ SubCategoryRow.displayName = "SubCategoryRow";
 export function CategorySelector({
 	currentCategory,
 	onSelect,
+	variant,
 }: CategorySelectorProps) {
 	const [isOpen, setIsOpen] = useState(false);
 	const [catQuery, setCatQuery] = useState("");
@@ -168,7 +177,7 @@ export function CategorySelector({
 			size({
 				apply({ rects, elements }) {
 					Object.assign(elements.floating.style, {
-						width: `${rects.reference.width}px`,
+						minWidth: `${Math.max(rects.reference.width, 300)}px`,
 					});
 				},
 			}),
@@ -191,14 +200,12 @@ export function CategorySelector({
 	const bestMatch = useMemo(() => searchCategories(catQuery), [catQuery]);
 
 	return (
-		<div
-			// data-category-selector
-			//  ref={containerRef}
-			className="relative"
-		>
-			<label className="text-[10px] uppercase tracking-[0.2em] text-gray-500 font-black">
-				Category
-			</label>
+		<div className="relative">
+			{variant === "form" && (
+				<label className="text-[10px] uppercase tracking-[0.2em] text-gray-500 font-black mb-1 block">
+					Category
+				</label>
+			)}
 
 			{/* --- TRIGGER BUTTON --- */}
 			<button
@@ -206,27 +213,37 @@ export function CategorySelector({
 				{...getReferenceProps()} // ATTACH PROPS HERE
 				type="button"
 				onClick={() => setIsOpen(!isOpen)}
-				className={`w-full p-4 bg-[#F8F9FB] dark:bg-[#0d0d0d] border rounded-xl flex items-center justify-between transition-all ${
-					isOpen
-						? "border-orange-500 ring-1 ring-orange-500/20"
-						: "border-gray-800"
-				}`}
+				className={
+					variant === "filter"
+						? "flex items-center gap-1 text-[10px] font-black text-gray-400 uppercase tracking-widest hover:text-orange-500 transition-colors"
+						: `w-full p-4 bg-[#F8F9FB] dark:bg-[#0d0d0d] border rounded-xl flex items-center justify-between transition-all`
+				}
 			>
-				<div className="flex items-center gap-3">
-					{/* <CategoryIcon name={activeParent} size={18} /> */}
-					<CategoryIcon
-						name={currentCategory}
-						size={18}
-						colorClass={subCategoryColor.text}
-					/>
-					<span className="text-sm text-gray-900 dark:text-white font-medium">
-						{currentCategory}
-					</span>
+				<div className="flex items-center gap-2">
+					{variant === "filter" ? (
+						<>
+							<span>Category</span>
+							<ChevronDown size={10} className={isOpen ? "rotate-180" : ""} />
+						</>
+					) : (
+						<>
+							<CategoryIcon
+								name={currentCategory}
+								size={18}
+								colorClass={subCategoryColor.text}
+							/>
+							<span className="text-sm text-gray-900 dark:text-white font-medium">
+								{currentCategory}
+							</span>
+						</>
+					)}
 				</div>
-				<ChevronRight
-					size={18}
-					className={`transition-transform duration-200 ${isOpen ? "rotate-90 text-orange-500" : ""}`}
-				/>
+				{variant === "form" && (
+					<ChevronRight
+						size={18}
+						className={isOpen ? "rotate-90 text-orange-500" : ""}
+					/>
+				)}
 			</button>
 
 			{/* --- PORTALED DROPDOWN --- */}
@@ -281,6 +298,25 @@ export function CategorySelector({
 								className="w-1/3 border-r border-gray-800 overflow-y-auto p-2 scrollbar-hide"
 								style={{ scrollbarWidth: "none" }}
 							>
+								<button
+									type="button"
+									onClick={() => {
+										onSelect("All", "All"); // Using "All" as both name and parent
+										setIsOpen(false);
+									}}
+									className={`w-full flex items-center gap-2 p-2.5 rounded-lg text-[11px] mb-2 transition-all border ${
+										currentCategory === "All"
+											? "bg-orange-600/10 text-orange-500 font-bold border-orange-500/20"
+											: "text-gray-400 border-transparent hover:bg-white/5"
+									}`}
+								>
+									<div className="w-3.5 h-3.5 flex items-center justify-center">
+										<LayoutGrid size={14} />
+									</div>
+									<span>All Categories</span>
+								</button>
+								<div className="h-px bg-gray-800 my-2 mx-1" />{" "}
+								{/* Visual Divider */}
 								{visibleParents.map((parent) => (
 									<ParentTab
 										key={parent}
