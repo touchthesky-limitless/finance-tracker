@@ -61,14 +61,6 @@ export default function BudgetPage() {
 		maxMonthlyValue,
 	} = useBudgetData(timeFilter);
 
-	const uncategorizedCount = categoryData.find(
-		(c) => c.name === "Uncategorized",
-	)
-		? filteredTransactions.filter(
-				(t) => !t.category || t.category === "Uncategorized",
-			).length
-		: 0;
-
 	const onPieEnter = useCallback(
 		(_: PieSectorDataItem, index: number) => setActiveIndex(index),
 		[],
@@ -369,7 +361,7 @@ export default function BudgetPage() {
 										/>
 									</div>
 									<span className="text-sm font-semibold text-gray-900 dark:text-white">
-										Update {uncategorizedCount > 0 ? uncategorizedCount : ""}{" "}
+										Update {stats.uncategorizedCount > 0 ? stats.uncategorizedCount : ""}{" "}
 										transactions
 									</span>
 								</div>
