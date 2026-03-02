@@ -4,11 +4,7 @@ import { useState, ReactNode, ElementType, useMemo } from "react";
 import {
 	Download,
 	MoreHorizontal,
-	Landmark,
-	TrendingUp,
-	CreditCard,
 	Home,
-	PiggyBank,
 	AlertCircle,
 	ArrowRight,
 	Calendar,
@@ -17,9 +13,26 @@ import {
 } from "lucide-react";
 import { useBudgetData } from "@/hooks/useBudgetData";
 
+// ==========================================
+// GLOBAL CONSTANTS
+// ==========================================
+const CURRENT_YEAR = new Date().getFullYear();
+const DEFAULT_YEAR_FILTER = `Year ${CURRENT_YEAR}`;
+const YEARS = Array.from({ length: 3 }, (_, i) => CURRENT_YEAR - 2 + i);
+
+const TIME_PRESETS = {
+	TODAY: "Today",
+	THIS_WEEK: "This Week",
+	THIS_MONTH: "This Month",
+	THIS_YEAR: "This Year",
+	LAST_MONTH: "Last Month",
+	LAST_12_MONTHS: "Last 12 Months",
+} as const;
+
+
 export default function OverviewPage() {
-	const [timeFilter, setTimeFilter] = useState("Year 2026");
-	const FALL_BACK_DATE = "This Month";
+	const [timeFilter, setTimeFilter] = useState(DEFAULT_YEAR_FILTER);
+	const FALL_BACK_DATE = TIME_PRESETS.THIS_MONTH;
 
 	const {
 		stats,
@@ -48,15 +61,11 @@ export default function OverviewPage() {
 		return `$${Math.round(num)}`;
 	};
 
-	// Inside your OverviewPage component
-	// Update this at the top of your OverviewPage component
 	const activeYear = useMemo(() => {
 		// Look for a 4-digit number in the timeFilter string (e.g., "Year 2025" or "Jan 2025")
 		const match = timeFilter.match(/\d{4}/);
 		if (match) return parseInt(match[0]);
-
-		// Fallback: If it's a preset like "This Month", use the actual current year
-		return new Date().getFullYear();
+		return CURRENT_YEAR;
 	}, [timeFilter]);
 
 	// --- CALCULATIONS ---
@@ -83,10 +92,6 @@ export default function OverviewPage() {
 
 	return (
 		<div className="relative w-full">
-			{/* --- STICKY HEADER --- 
-			    We use sticky top-0 with a backdrop blur. 
-			    -mx-4 and px-4 ensure the background spans the full width of the container padding. 
-			*/}
 			<header className="sticky top-0 z-100 w-full bg-[#F4F6F8]/80 dark:bg-[#0a0a0a]/80 backdrop-blur-md border-b border-gray-200/50 dark:border-gray-800/50 mb-8">
 				<div className="max-w-400 mx-auto flex flex-col lg:flex-row lg:items-end justify-between gap-6 py-6 px-4 md:px-8">
 					<div className="max-w-2xl">
@@ -106,7 +111,6 @@ export default function OverviewPage() {
 						<DateRangeDropdown
 							onApply={(val) => {
 								const selectedDate = val || FALL_BACK_DATE;
-								// 1. Update the Master Filter for the whole page
 								setTimeFilter(selectedDate);
 							}}
 						/>
@@ -118,7 +122,6 @@ export default function OverviewPage() {
 				</div>
 			</header>
 
-			{/* --- CONTENT WRAPPER --- */}
 			<main className="max-w-400 mx-auto px-4 md:px-8 pb-24">
 				{/* --- TOP ROW: Hero Summary --- */}
 				<div className="bg-white dark:bg-[#121212] border border-gray-100 dark:border-gray-800/80 rounded-3xl p-6 shadow-sm mb-6 flex flex-col lg:flex-row items-center gap-8 relative z-10">
@@ -213,20 +216,20 @@ export default function OverviewPage() {
 								{/* Year Toggler (Only show if not drilled down) */}
 								{monthlyData.length <= 12 && (
 									<div className="flex bg-[#121212]-100 dark:bg-[#121212]-800 p-1 rounded-lg">
-										{[2024, 2025, 2026].map((y) => (
+										{YEARS.map((year) => (
 											<button
-												key={y}
+												key={year}
 												onClick={() => {
-													const newYearFilter = `Year ${y}`;
+													const newYearFilter = `Year ${year}`;
 													setTimeFilter(newYearFilter);
 												}}
 												className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${
-													activeYear === y
+													activeYear === year
 														? "bg-white dark:bg-[#121212] text-orange-600 dark:text-orange-500 shadow-sm"
 														: "text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
 												}`}
 											>
-												{y}
+												{year}
 											</button>
 										))}
 									</div>
@@ -265,9 +268,7 @@ export default function OverviewPage() {
 									<div className="w-full h-0"></div>
 								</div>
 								{monthlyData.map((d, i) => {
-									// 1. Check if we are in Yearly view (12 bars) or Daily view (28-31 bars)
 									const isYearlyView = monthlyData.length <= 12;
-									// Check if active (only highlight specific month in year view)
 									const isActive = isYearlyView && timeFilter.includes(d.label);
 									return (
 										<div
@@ -287,13 +288,10 @@ export default function OverviewPage() {
 																}`}
 											style={{ height: `${d.height}%` }}
 										>
-											{/* Tooltip */}
 											<div className="absolute -top-9 left-1/2 -translate-x-1/2 bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-[10px] font-bold py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50 pointer-events-none shadow-lg">
 												{isYearlyView ? d.label : `Day ${d.label}`}:{" "}
 												{formatCurrency(d.value)}
 											</div>
-
-											{/* Active Indicator (Dot) */}
 											{isActive && (
 												<div className="absolute -bottom-6 left-1/2 -translate-x-1/2 w-1 h-1 bg-orange-600 rounded-full" />
 											)}
@@ -305,7 +303,6 @@ export default function OverviewPage() {
 						{/* --- X-AXIS LABELS --- */}
 						<div className="flex justify-between text-[10px] sm:text-xs text-gray-400 font-bold tracking-wider pl-12 pr-2 mt-2">
 							{monthlyData.map((d, i) => {
-								// Handle label density for Daily view vs Monthly view
 								const isDaily = monthlyData.length > 12;
 								const shouldShowLabel = isDaily
 									? i % 5 === 0 || i === monthlyData.length - 1
@@ -365,10 +362,8 @@ export default function OverviewPage() {
 
 				{/* --- BOTTOM ROW: SPENDING INTELLIGENCE --- */}
 				<div className="grid grid-cols-1 xl:grid-cols-2 gap-6 relative z-10">
-					{/* COLUMN 1: TOP MERCHANTS & LARGEST HITS */}
 					<Card title="Merchant Insights">
 						<div className="grid grid-cols-1 sm:grid-cols-2 gap-8 mt-4">
-							{/* Top Merchants List */}
 							<div>
 								<p className="text-[10px] font-black text-gray-400 tracking-widest mb-4">
 									Top Merchants
@@ -377,19 +372,14 @@ export default function OverviewPage() {
 									{topMerchants.slice(0, 5).map((m) => (
 										<div
 											key={m.name}
-											className="flex items-start justify-between group gap-4" // Changed items-center to items-start
+											className="flex items-start justify-between group gap-4"
 										>
-											{/* Left side: Icon + Name Info */}
 											<div className="flex items-start gap-3 min-w-0 flex-1">
-												{/* Icon wrapper */}
 												<div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-xs font-bold text-gray-500 group-hover:bg-orange-100 dark:group-hover:bg-orange-500/20 group-hover:text-orange-600 transition-colors shrink-0">
 													{m.name.charAt(0)}
 												</div>
-
-												{/* Text wrapper */}
 												<div className="min-w-0 pt-0.5">
 													{" "}
-													{/* Added slight padding to align with icon top */}
 													<p className="text-sm font-bold text-gray-900 dark:text-white truncate leading-none mb-1">
 														{m.name}
 													</p>
@@ -398,8 +388,6 @@ export default function OverviewPage() {
 													</p>
 												</div>
 											</div>
-
-											{/* Right side: Currency aligned to the top name */}
 											<span className="text-sm font-black text-gray-900 dark:text-white whitespace-nowrap ">
 												{formatCurrency(m.total)}
 											</span>
@@ -407,8 +395,6 @@ export default function OverviewPage() {
 									))}
 								</div>
 							</div>
-
-							{/* Largest Hits List */}
 							<div className="border-l border-gray-100 dark:border-gray-800 pl-8">
 								<p className="text-[10px] font-black text-gray-400 tracking-widest mb-4">
 									Largest Hits
@@ -437,7 +423,6 @@ export default function OverviewPage() {
 						</div>
 					</Card>
 
-					{/* COLUMN 2: UPCOMING ACTIONS (PREDICTED) */}
 					<Card title="Predicted Bills & Subscriptions">
 						<div className="flex flex-col gap-1 mt-4">
 							{predictedBills.length > 0 ? (
@@ -488,18 +473,13 @@ function DateRangeDropdown({
 	const [isOpen, setIsOpen] = useState(false);
 
 	// Track both Month and Year locally until "Apply" is clicked
-	const [tempYear, setTempYear] = useState(new Date().getFullYear());
+	const [tempYear, setTempYear] = useState<number>(CURRENT_YEAR);
 	const [tempMonth, setTempMonth] = useState<string | null>(null);
-	const [activePreset, setActivePreset] = useState("This Year");
+	const [activePreset, setActivePreset] = useState<string>(
+		TIME_PRESETS.THIS_YEAR,
+	);
 
-	const presets = [
-		"Today",
-		"This Week",
-		"This Month",
-		"Last Month",
-		"Last 12 Months",
-		"Year to Date",
-	];
+	const presets = Object.values(TIME_PRESETS);
 	const months = [
 		"Jan",
 		"Feb",
@@ -514,7 +494,6 @@ function DateRangeDropdown({
 		"Nov",
 		"Dec",
 	];
-	const years = [2024, 2025, 2026];
 
 	const handlePresetClick = (preset: string) => {
 		setActivePreset(preset);
@@ -523,9 +502,11 @@ function DateRangeDropdown({
 
 		let filterValue = preset;
 
-		// If the user clicks "This Year", send "Year 2026" to the hook
-		if (preset === "This Year") {
-			filterValue = `Year ${new Date().getFullYear()}`;
+		// Add Year context to specific presets to prevent "All Years" filtering
+		if (preset === TIME_PRESETS.TODAY || preset === TIME_PRESETS.THIS_WEEK) {
+			filterValue = `${preset}:${CURRENT_YEAR}`;
+		} else if (preset === TIME_PRESETS.THIS_YEAR) {
+			filterValue = DEFAULT_YEAR_FILTER;
 		}
 
 		if (onApply) onApply(filterValue);
@@ -539,7 +520,6 @@ function DateRangeDropdown({
 	const handleApply = () => {
 		setIsOpen(false);
 		if (onApply) {
-			// If a month is selected, send "Jan 2026", else send "Year 2026"
 			const filterValue = tempMonth
 				? `${tempMonth} ${tempYear}`
 				: `Year ${tempYear}`;
@@ -604,16 +584,16 @@ function DateRangeDropdown({
 									Custom Year
 								</span>
 								<div className="flex gap-1.5">
-									{years.map((y) => (
+									{YEARS.map((year) => (
 										<button
-											key={y}
+											key={year}
 											onClick={() => {
-												setTempYear(y);
+												setTempYear(year);
 												setActivePreset("");
 											}}
-											className={`px-2.5 py-1 rounded-md text-[10px] font-black transition-all ${tempYear === y ? "bg-orange-500 text-white shadow-sm" : "bg-gray-100 dark:bg-gray-800 text-gray-500"}`}
+											className={`px-2.5 py-1 rounded-md text-[10px] font-black transition-all ${tempYear === year ? "bg-orange-500 text-white shadow-sm" : "bg-gray-100 dark:bg-gray-800 text-gray-500"}`}
 										>
-											{y}
+											{year}
 										</button>
 									))}
 								</div>
@@ -642,7 +622,7 @@ function DateRangeDropdown({
 								<button
 									onClick={() => {
 										setTempMonth(null);
-										setTempYear(2026);
+										setTempYear(CURRENT_YEAR);
 									}}
 									className="text-[10px] font-bold text-gray-400 hover:text-red-500"
 								>

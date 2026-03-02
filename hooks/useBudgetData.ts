@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import { useBudgetStore } from "@/hooks/useBudgetStore";
 import { ICON_MAP } from "@/constants/icons";
-import { CategoryData, Merchant } from "@/types/budget";
+import { CategoryData } from "@/types/budget";
 import { COLORS_HEX } from "@/data/categories";
 import { getCategoryTheme } from "@/constants/categories";
 
@@ -57,53 +57,96 @@ export function useBudgetData(timeFilter: string) {
 
 	// --- 2. FILTER TRANSACTIONS ---
 	const filteredTransactions = useMemo(() => {
-		const { isSpecificMonth, selectedMonth, selectedYear, now } = filterContext;
+        const { isSpecificMonth, selectedMonth, selectedYear, now } = filterContext;
 
-		return transactions.filter((t) => {
-			const txDate = new Date(t.date);
-			if (isNaN(txDate.getTime())) return false;
+        if (!transactions || !timeFilter) return [];
 
-			const txMonth = txDate.getMonth();
-			const txYear = txDate.getFullYear();
+        // ==========================================
+        // STEP 1: PRE-CALCULATE BOUNDARIES 
+        // ==========================================
+        const currentYear = now.getFullYear();
+        const currentMonth = now.getMonth();
+        const currentDate = now.getDate();
 
-			// Case A: Specific Month + Year (Jan 2026)
-			if (isSpecificMonth) {
-				return txMonth === selectedMonth && txYear === selectedYear;
-			}
+        // Target for Last Month
+        const lastM = new Date(currentYear, currentMonth - 1, 1);
+        
+        // Target for Last 12 Months
+        const twelveMonthsAgo = new Date(currentYear, currentMonth - 12, currentDate, 0, 0, 0, 0);
 
-			// Case B: Preset "This Month"
-			if (timeFilter === "This Month") {
-				return txMonth === now.getMonth() && txYear === now.getFullYear();
-			}
+        // Target for This Week (Monday to Sunday)
+        const dayOfWeek = now.getDay();
+        const diffToMonday = currentDate - (dayOfWeek === 0 ? 6 : dayOfWeek - 1);
+        const monday = new Date(currentYear, currentMonth, diffToMonday, 0, 0, 0, 0);
+        const sunday = new Date(monday);
+        sunday.setDate(monday.getDate() + 6);
+        sunday.setHours(23, 59, 59, 999);
 
-			// Case C: Preset "Last Month"
-			if (timeFilter === "Last Month") {
-				const lastM = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-				return txMonth === lastM.getMonth() && txYear === lastM.getFullYear();
-			}
+        // Target for Year
+        let targetYear = currentYear;
+        if (timeFilter.startsWith("Year")) {
+            targetYear = parseInt(timeFilter.split(" ").pop() || String(currentYear));
+        }
 
-			// Case D: Full Year (Year 2026)
-			// 1. Handle "Year 2025", "Year 2026", etc.
-			if (timeFilter.startsWith("Year")) {
-				const parts = timeFilter.split(" ");
-				const selectedYear = parseInt(parts[parts.length - 1]);
-				return txYear === selectedYear;
-			}
-			// 2. Handle "This Year" (System Default)
-			if (timeFilter === "This Year") {
-				return txYear === new Date().getFullYear();
-			}
+        // ==========================================
+        // STEP 2: FILTER TRANSACTIONS
+        // ==========================================
+        return transactions.filter((t) => {
+            if (!t.date) return false;
 
-			// Case E: Last 12 Months
-			if (timeFilter === "Last 12 Months") {
-				const twelveMonthsAgo = new Date();
-				twelveMonthsAgo.setMonth(now.getMonth() - 12);
-				return txDate >= twelveMonthsAgo;
-			}
+            // RESTORED: Native parsing handles "MM/DD/YYYY", "YYYY-MM-DD", etc.
+            const txDate = new Date(t.date);
+            if (isNaN(txDate.getTime())) return false;
 
-			return true;
-		});
-	}, [transactions, timeFilter, filterContext]);
+            const txYear = txDate.getFullYear();
+            const txMonth = txDate.getMonth();
+            const txDay = txDate.getDate();
+
+            // Case A: Specific Month (e.g., "Jan 2026")
+            if (isSpecificMonth) {
+                return txMonth === selectedMonth && txYear === selectedYear;
+            }
+
+            // Case B: This Month
+            if (timeFilter === "This Month") {
+                return txMonth === currentMonth && txYear === currentYear;
+            }
+
+            // Case C: Last Month
+            if (timeFilter === "Last Month") {
+                return txMonth === lastM.getMonth() && txYear === lastM.getFullYear();
+            }
+
+            // Case D: Full Year (e.g., "Year 2026")
+            if (timeFilter.startsWith("Year")) {
+                return txYear === targetYear;
+            }
+
+            // Case E: This Year
+            if (timeFilter === "This Year") {
+                return txYear === currentYear;
+            }
+
+            // Case F: Last 12 Months
+            if (timeFilter === "Last 12 Months") {
+                return txDate >= twelveMonthsAgo;
+            }
+
+            // Case G: Today (Bulletproof local comparison)
+            if (timeFilter.startsWith("Today")) {
+                return txYear === currentYear && txMonth === currentMonth && txDay === currentDate;
+            }
+
+            // Case H: This Week 
+            if (timeFilter.startsWith("This Week")) {
+                // Create a clean midnight date for the transaction to ensure fair comparison
+                const txMidnight = new Date(txYear, txMonth, txDay);
+                return txMidnight >= monday && txMidnight <= sunday;
+            }
+
+            return true;
+        });
+    }, [transactions, timeFilter, filterContext]);
 
 	// --- 3. DERIVED STATS ---
 	const stats = useMemo(() => {
