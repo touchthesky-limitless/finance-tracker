@@ -133,8 +133,8 @@ export function parseBankCSV(
 				amount,
 				account: baseAccountName,
 				category: finalCategory,
-				needsReview: finalCategory === "Uncategorized",
-				needsSubcat: finalCategory !== "Uncategorized" && finalCategory !== "Debt payments",
+				needs_review: finalCategory === "Uncategorized",
+				needs_subcat: finalCategory !== "Uncategorized" && finalCategory !== "Debt payments",
 			});
 		}
 	}

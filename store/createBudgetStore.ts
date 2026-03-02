@@ -3,18 +3,26 @@ import { persist, createJSONStorage } from "zustand/middleware";
 import { CATEGORY_HIERARCHY } from "@/constants";
 
 export interface Transaction {
-	[key: string]: string | number | boolean | string[] | undefined;
-	id: string;
-	date: string;
-	merchant: string;
-	description?: string;
-	amount: number;
-	category: string;
-	account: string;
-	tags?: string[];
-	note?: string;
-	needsReview?: boolean;
-	needsSubcat?: boolean;
+    [key: string]: string | number | boolean | string[] | undefined;
+    id: string;
+    date: string;         // Matches SQL 'date'
+    merchant: string;     // Matches SQL 'merchant'
+    description?: string; // Matches SQL 'description' (Optional Note)
+    amount: number;       // Matches SQL 'amount'
+    category: string;     // Matches SQL 'category'
+    account: string;      // Matches SQL 'account'
+    
+    // UI State Flags (Aligned with SQL snake_case)
+    needs_review: boolean; 
+    needs_subcat: boolean;
+
+    // Metadata (Optional in TS, handled by DB)
+    user_id?: string;
+    created_at?: string;
+    
+    // App-specific (Not currently in your SQL schema)
+    tags?: string[];
+    note?: string; 
 }
 
 interface BudgetState {
@@ -75,8 +83,8 @@ export const createBudgetStore = (versionKey: string) =>
 							return {
 								...tx,
 								category: matchingRule.category,
-								needsReview: false,
-								needsSubcat: false,
+								needs_review: false,
+								needs_subcat: false,
 							};
 						}
 						return tx;
@@ -129,8 +137,8 @@ export const createBudgetStore = (versionKey: string) =>
 								return {
 									...tx,
 									category: newRule.category,
-									needsSubcat: isGenericParent, // If rule assigns 'Fast Food', this becomes false!
-									needsReview: isGenericParent, // Clears the review flag too
+									needs_subcat: isGenericParent, // If rule assigns 'Fast Food', this becomes false!
+									needs_review: isGenericParent, // Clears the review flag too
 								};
 							}
 							return tx;
@@ -151,7 +159,7 @@ export const createBudgetStore = (versionKey: string) =>
 					set((state) => ({
 						transactions: state.transactions.map((t) =>
 							t.id === id
-								? { ...t, ...updates, needsReview: false, needsSubcat: false }
+								? { ...t, ...updates, needs_review: false, needs_subcat: false }
 								: t,
 						),
 					})),
@@ -173,7 +181,7 @@ export const createBudgetStore = (versionKey: string) =>
 						// We only want to chart "Spending" (Negative numbers)
 						// Skip Income or Debt Payments for a pure Spending Chart
 						if (tx.cat === "Income" || tx.cat === "Debt payments") return;
-						
+
 						const cat = tx.category || "Uncategorized";
 
 						// Use Math.abs to turn -50.00 into 50.00 for the chart

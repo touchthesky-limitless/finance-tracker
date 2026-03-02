@@ -155,7 +155,7 @@ export function useBudgetData(timeFilter: string) {
 		let unreviewedCount = 0;
 
 		filteredTransactions.forEach((t) => {
-			if (t.needsReview) unreviewedCount++;
+			if (t.needs_review) unreviewedCount++;
 			if (t.amount > 0) income += t.amount;
 			else expenses += Math.abs(t.amount);
 		});

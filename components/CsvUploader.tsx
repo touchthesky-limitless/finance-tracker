@@ -70,7 +70,7 @@ export default function CsvUploader({ onComplete }: CsvUploaderProps) {
 					return {
 						...t,
 						category: parent,
-						needsSubcat: isGenericParent, // This triggers your badge
+						needs_subcat: isGenericParent, // This triggers your badge
 					};
 				});
 

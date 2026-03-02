@@ -186,8 +186,8 @@ export default function TransactionsPage() {
 			category: "Uncategorized",
 			date: new Date().toISOString().split("T")[0],
 			account: "",
-			needsReview: false,
-			needsSubcat: false,
+			needs_review: false,
+			needs_subcat: false,
 		};
 
 		setSelectedTransaction(blankTx);

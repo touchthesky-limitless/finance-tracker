@@ -31,9 +31,9 @@ export const TransactionRow = memo(function TransactionRow({
 
 	// A transaction needs review if the flag is true
 	// OR if the category is just a generic Parent name
-	// Ignore the stale `needsSubcat` flag entirely
+	// Ignore the stale `needs_subcat` flag entirely
 	const needsReview =
-		transaction.needsReview || // Keep this only if you have a manual "Mark for Review" button
+		transaction.needs_review || // Keep this only if you have a manual "Mark for Review" button
 		isUncategorized ||
 		isParentCat;
 
