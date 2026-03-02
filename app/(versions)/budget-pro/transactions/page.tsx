@@ -239,7 +239,7 @@ export default function TransactionsPage() {
 								<div className="flex items-center gap-2">
 									<CategorySelector
 										variant="filter"
-										currentCategory={categoryFilter || "All"}
+										currentCategory={categoryFilter || "Category"}
 										onSelect={(sub) => {
 											if (sub === "All") {
 												setCategoryFilter(null); // Reset the filter

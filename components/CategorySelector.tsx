@@ -222,8 +222,7 @@ export function CategorySelector({
 				<div className="flex items-center gap-2">
 					{variant === "filter" ? (
 						<>
-							<span>Category</span>
-							<ChevronDown size={10} className={isOpen ? "rotate-180" : ""} />
+							<span>{currentCategory || "Category"}</span>
 						</>
 					) : (
 						<>
@@ -238,6 +237,12 @@ export function CategorySelector({
 						</>
 					)}
 				</div>
+				<ChevronDown
+					size={variant === "filter" ? 12 : 18}
+					className={`transition-transform duration-200 shrink-0 ${
+						isOpen ? "rotate-180 text-orange-500" : "text-gray-500"
+					}`}
+				/>
 				{variant === "form" && (
 					<ChevronRight
 						size={18}

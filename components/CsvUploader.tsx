@@ -60,7 +60,7 @@ export default function CsvUploader({ onComplete }: CsvUploaderProps) {
 				const parsed = parseBankCSV(text, accountName);
 				// --- NEW TRANSFORMATION START ---
 				const resolvedParsed = parsed.map((t): Transaction => {
-					const parent = resolveToParent(t.category);
+					const parent = resolveToParent(t.category, t.description);
 
 					// A transaction needs review if it's mapped to a generic Parent name
 					const isGenericParent =

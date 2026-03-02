@@ -28,8 +28,7 @@ export function parseBankCSV(
 				v.includes("description") ||
 				v.includes("payee") ||
 				v.includes("merchant") ||
-				v === "name"  // Add this for US Bank
-
+				v === "name", // Add this for US Bank
 		);
 
 		if (hasDate && hasAmount && hasDesc) {
@@ -60,14 +59,14 @@ export function parseBankCSV(
 				? postDateIdx
 				: headers.findIndex((h) => h === "date"); // Fallback for simple "Date" header
 
-// Mapping the description index
-const descIdx = headers.findIndex(
-    (h) => 
-        h === "description" || 
-        h.includes("merchant") || 
-        h.includes("payee") ||
-        h === "name" // us bank
-);
+	// Mapping the description index
+	const descIdx = headers.findIndex(
+		(h) =>
+			h === "description" ||
+			h.includes("merchant") ||
+			h.includes("payee") ||
+			h === "name", // us bank
+	);
 
 	const amountIdx = headers.findIndex((h) => h === "amount");
 	if (dateIdx === -1 || descIdx === -1 || amountIdx === -1) {
@@ -76,16 +75,23 @@ const descIdx = headers.findIndex(
 		);
 	}
 
-	// Category Priority: Merchant Category -> Category -> Any "category"
+	// Category Priority: Merchant Category (BofA) -> Category (Chase) -> Memo (US Bank) / Any "category"
 	let categoryIdx = headers.findIndex((h) => h === "merchant category");
+
+	// BofA
 	if (categoryIdx === -1) {
 		categoryIdx = headers.findIndex((h) => h === "category");
 	}
+
+	// Chase
 	if (categoryIdx === -1) {
 		categoryIdx = headers.findIndex((h) => h.includes("category"));
 	}
 
-	console.log(`Selected Category Column Index: ${categoryIdx}`);
+	// US Bank
+	if (categoryIdx === -1) {
+		categoryIdx = headers.findIndex((h) => h === "memo");
+	}
 
 	// Account Number Column
 	const accNumIdx = headers.findIndex(
@@ -111,7 +117,7 @@ const descIdx = headers.findIndex(
 		if (cols.length < 3) continue;
 
 		const date = cols[dateIdx];
-		const description = cols[descIdx]?.replace(/\s+/g, ' ').trim();
+		const description = cols[descIdx]?.replace(/\s+/g, " ").trim();
 
 		const amountRaw = cols[amountIdx]?.replace(/[$,\s]/g, "");
 		let amount = parseFloat(amountRaw);
