@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
+import { CATEGORY_HIERARCHY } from "@/constants";
 
 export interface Transaction {
 	[key: string]: string | number | boolean | string[] | undefined;
@@ -109,16 +110,24 @@ export const createBudgetStore = (versionKey: string) =>
 						}
 
 						// Retroactive update for transactions
+						// If the transaction matches the rule we just saved
 						const updatedTransactions = state.transactions.map((tx) => {
 							if (
 								tx.description
 									?.toLowerCase()
 									.includes(newRule.keyword.toLowerCase())
 							) {
+								// 1. Check if the rule's new category is a generic parent
+								const isGenericParent =
+									Object.keys(CATEGORY_HIERARCHY).includes(newRule.category) ||
+									newRule.category === "Uncategorized";
+
+								// 2. Apply the category AND update the review flags
 								return {
 									...tx,
 									category: newRule.category,
-									needsReview: false,
+									needsSubcat: isGenericParent, // If rule assigns 'Fast Food', this becomes false!
+									needsReview: isGenericParent, // Clears the review flag too
 								};
 							}
 							return tx;

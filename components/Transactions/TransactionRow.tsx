@@ -24,13 +24,18 @@ export const TransactionRow = memo(function TransactionRow({
 
 	const subCategoryColor = getCategoryTheme(parentName);
 
+	const isParentCat = Object.keys(CATEGORY_HIERARCHY).includes(
+		transaction.category,
+	);
+	const isUncategorized = transaction.category === "Uncategorized";
+
 	// A transaction needs review if the flag is true
 	// OR if the category is just a generic Parent name
+	// Ignore the stale `needsSubcat` flag entirely
 	const needsReview =
-		transaction.needsSubcat ||
-		transaction.needsReview ||
-		transaction.category === "Uncategorized" ||
-		Object.keys(CATEGORY_HIERARCHY).includes(transaction.category);
+		transaction.needsReview || // Keep this only if you have a manual "Mark for Review" button
+		isUncategorized ||
+		isParentCat;
 
 	return (
 		<tr
