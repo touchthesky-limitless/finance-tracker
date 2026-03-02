@@ -1,7 +1,15 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Plus, Search, Filter, Upload, Trash2, X } from "lucide-react";
+import React, { useEffect, useMemo, useState } from "react";
+import {
+	Plus,
+	Filter,
+	Upload,
+	Trash2,
+	X,
+	ChevronLeft,
+	ChevronRight,
+} from "lucide-react";
 import { useBudgetStore } from "@/hooks/useBudgetStore";
 import { formatDateLong } from "@/utils/formatters";
 import CsvUploader from "@/components/CsvUploader";
@@ -18,20 +26,20 @@ const EditTransactionModal = dynamic(
 	() => import("@/components/Budget/EditTransactionModal"),
 	{
 		ssr: false,
-		// Optional: Add a loading placeholder to keep the UI from jumping
 		loading: () => (
 			<div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50" />
 		),
 	},
 );
 
-// --- Types for Sorting ---
 type SortKey = "date" | "category" | "name" | "amount" | "account";
 
 interface SortConfig {
 	key: SortKey;
 	direction: "asc" | "desc";
 }
+
+const ITEMS_PER_PAGE = 12;
 
 export default function TransactionsPage() {
 	const useStore = useBudgetStore();
@@ -43,34 +51,27 @@ export default function TransactionsPage() {
 
 	// --- State ---
 	const [searchQuery, setSearchQuery] = useState("");
-	// const [isAddMenuOpen, setIsAddMenuOpen] = useState(false);
 	const [showClearModal, setShowClearModal] = useState(false);
 	const [showUploader, setShowUploader] = useState(false);
 	const [sortPriority, setSortPriority] = useState<SortConfig[]>([
 		{ key: "date", direction: "desc" },
 	]);
 	const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
-	// const [toast, setToast] = useState<{ message: string; count: number } | null>(null);
-	// const [toast, setToast] = useState<{
-	// 	count: number;
-	// 	snapshot: Transaction[];
-	// } | null>(null);
 	const [, setIsEditModalOpen] = useState(false);
 	const setToast = useStore((state) => state.setToast);
+
+	// --- PAGINATION STATE ---
+	const [currentPage, setCurrentPage] = useState(1);
 
 	const mainSearch = useSearchState(setSearchQuery);
 
 	const handleRuleSaved = (count: number, snapshot: Transaction[]) => {
-		// Set the state
 		setToast({ count, snapshot });
-
-		// Close the modal
 		setSelectedTransaction(null);
 	};
 
-	// --- Sort & Filter Logic ---
-	const filteredAndGrouped = useMemo(() => {
-		// 1. Filter by search AND Category
+	// --- 1. Base Filter & Sort ---
+	const filteredAndSorted = useMemo(() => {
 		const filtered = transactions.filter((t) => {
 			const matchesSearch = t.description
 				.toLowerCase()
@@ -79,8 +80,7 @@ export default function TransactionsPage() {
 			return matchesSearch && matchesCategory;
 		});
 
-		// 2. Multi-column Sort
-		const sorted = [...filtered].sort((a, b) => {
+		return [...filtered].sort((a, b) => {
 			for (const { key, direction } of sortPriority) {
 				const aVal = a[key] ?? "";
 				const bVal = b[key] ?? "";
@@ -102,16 +102,66 @@ export default function TransactionsPage() {
 			}
 			return 0;
 		});
+	}, [transactions, searchQuery, sortPriority, categoryFilter]);
 
-		// 3. Group by Date
+	// --- 2. Auto-Reset Page on Filter Change ---
+	// Instead of useEffect, we use derived state pattern to avoid cascading renders
+	const [prevFilters, setPrevFilters] = useState({
+		searchQuery,
+		categoryFilter,
+		sortPriority,
+	});
+	if (
+		prevFilters.searchQuery !== searchQuery ||
+		prevFilters.categoryFilter !== categoryFilter ||
+		prevFilters.sortPriority !== sortPriority
+	) {
+		setCurrentPage(1);
+		setPrevFilters({ searchQuery, categoryFilter, sortPriority });
+	}
+
+	// --- 3. Slice for Pagination ---
+	const totalPages = Math.max(
+		1,
+		Math.ceil(filteredAndSorted.length / ITEMS_PER_PAGE),
+	);
+	const paginatedTransactions = useMemo(() => {
+		const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+		return filteredAndSorted.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+	}, [filteredAndSorted, currentPage]);
+
+	// Calculate the 5 visible page numbers for the pagination UI
+	const visiblePages = useMemo(() => {
+		if (totalPages <= 5)
+			return Array.from({ length: totalPages }, (_, i) => i + 1);
+		if (currentPage <= 3) return [1, 2, 3, 4, 5];
+		if (currentPage >= totalPages - 2)
+			return [
+				totalPages - 4,
+				totalPages - 3,
+				totalPages - 2,
+				totalPages - 1,
+				totalPages,
+			];
+		return [
+			currentPage - 2,
+			currentPage - 1,
+			currentPage,
+			currentPage + 1,
+			currentPage + 2,
+		];
+	}, [currentPage, totalPages]);
+
+	// --- 4. Group only the active page ---
+	const filteredAndGrouped = useMemo(() => {
 		const groups: Record<string, typeof transactions> = {};
-		sorted.forEach((t) => {
+		paginatedTransactions.forEach((t) => {
 			const dateKey = formatDateLong(t.date);
 			if (!groups[dateKey]) groups[dateKey] = [];
 			groups[dateKey].push(t);
 		});
 		return groups;
-	}, [transactions, searchQuery, sortPriority, categoryFilter]);
+	}, [paginatedTransactions]);
 
 	// --- Handlers ---
 	const handleSort = (key: SortKey, e: React.MouseEvent) => {
@@ -134,7 +184,7 @@ export default function TransactionsPage() {
 			description: "",
 			amount: 0,
 			category: "Uncategorized",
-			date: new Date().toISOString().split("T")[0], // YYYY-MM-DD
+			date: new Date().toISOString().split("T")[0],
 			account: "",
 			needsReview: false,
 			needsSubcat: false,
@@ -149,17 +199,14 @@ export default function TransactionsPage() {
 	}, []);
 
 	useEffect(() => {
-		// Only set the listener if a transaction is currently being edited
 		if (!selectedTransaction) return;
-
 		const handleBeforeUnload = (e: BeforeUnloadEvent) => {
 			e.preventDefault();
 			e.returnValue = "";
 		};
-
 		window.addEventListener("beforeunload", handleBeforeUnload);
 		return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-	}, [selectedTransaction]); // Re-run when selection changes
+	}, [selectedTransaction]);
 
 	return (
 		<div className="flex flex-col h-full bg-white dark:bg-[#0d0d0d] text-slate-900 dark:text-gray-300 transition-colors">
@@ -174,9 +221,7 @@ export default function TransactionsPage() {
 					</span>
 				</div>
 
-				{/* Grouped Search and Actions */}
 				<div className="flex items-center gap-2">
-					{/* Filter Trigger */}
 					<button className="p-2 hover:bg-gray-800 rounded-lg text-gray-400 transition-colors border border-transparent hover:border-gray-700">
 						<Filter size={18} />
 					</button>
@@ -191,8 +236,6 @@ export default function TransactionsPage() {
 							placeholder="Search transactions..."
 						/>
 					</div>
-
-					{/* Add manually */}
 					<button
 						className="flex items-center gap-2 px-3 py-1.5 bg-orange-600 hover:bg-orange-500 text-white rounded-lg text-sm font-medium transition-colors"
 						onClick={handleAddTransaction}
@@ -200,8 +243,6 @@ export default function TransactionsPage() {
 						<Plus size={16} />
 						<span className="hidden sm:inline">Add</span>
 					</button>
-
-					{/* Import data */}
 					<button
 						className="flex items-center gap-2 px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg text-sm font-medium transition-colors border border-gray-700"
 						onClick={() => setShowUploader(true)}
@@ -209,12 +250,8 @@ export default function TransactionsPage() {
 						<Upload size={16} />
 						<span className="hidden sm:inline">Import</span>
 					</button>
-
-					{/* TRASH ICON - Let's make it bright red to find it */}
 					<button
-						onClick={() => {
-							setShowClearModal(true);
-						}}
+						onClick={() => setShowClearModal(true)}
 						className="p-2 bg-red-600 hover:bg-red-500 text-white rounded-lg transition-all shadow-lg shadow-red-600/20"
 						title="Clear all data"
 					>
@@ -223,8 +260,8 @@ export default function TransactionsPage() {
 				</div>
 			</div>
 
-			{/* 2. Data Table */}
-			<div className="flex-1 overflow-auto px-4 md:px-6">
+			{/* 2. Data Table & Pagination Wrapper */}
+			<div className="flex-1 overflow-auto px-4 md:px-6 pb-8 min-h-150 flex flex-col justify-between">
 				<table className="w-full border-collapse">
 					<thead className="sticky top-0 bg-[#F8F9FB] dark:bg-[#0d0d0d] z-20">
 						<tr className="text-[10px] font-bold text-gray-500 uppercase tracking-widest text-left border-b border-gray-800">
@@ -234,18 +271,13 @@ export default function TransactionsPage() {
 								sortPriority={sortPriority}
 								onClick={handleSort}
 							/>
-							{/* CATEGORY HEADER WITH FILTER */}
 							<th className="py-4 px-2">
 								<div className="flex items-center gap-2">
 									<CategorySelector
 										variant="filter"
 										currentCategory={categoryFilter || "Category"}
 										onSelect={(sub) => {
-											if (sub === "All") {
-												setCategoryFilter(null); // Reset the filter
-											} else {
-												setCategoryFilter(sub); // Apply specific category
-											}
+											setCategoryFilter(sub === "All" ? null : sub);
 										}}
 									/>
 									{categoryFilter && (
@@ -273,35 +305,92 @@ export default function TransactionsPage() {
 							/>
 							<th className="py-4 px-2 w-32">Tags</th>
 							<th className="py-4 px-2 w-32">Status</th>
-							<th className="py-4 px-2">Description</th>
-							<th className="py-4 px-2 w-10"></th>
 						</tr>
 					</thead>
 					<tbody className="divide-y divide-gray-800/40 text-sm">
-						{Object.entries(filteredAndGrouped).map(([date, items]) => (
-							<React.Fragment key={date}>
-								<tr className="sticky top-11.25 z-10 bg-[#F8F9FB] dark:bg-[#121212]/95 backdrop-blur-sm border-y border-gray-800/50">
-									<td
-										colSpan={7}
-										className="py-2 px-2 text-[11px] font-bold text-orange-400/80 uppercase"
-									>
-										{date}
-									</td>
-								</tr>
-								{items.map((t) => (
-									<TransactionRow
-										key={t.id}
-										transaction={t}
-										onRowClick={handleRowClick}
-									/>
-								))}
-							</React.Fragment>
-						))}
+						{paginatedTransactions.length === 0 ? (
+							<tr>
+								<td
+									colSpan={6}
+									className="py-12 text-center text-gray-500 italic"
+								>
+									No transactions found.
+								</td>
+							</tr>
+						) : (
+							Object.entries(filteredAndGrouped).map(([date, items]) => (
+								<React.Fragment key={date}>
+									<tr className="sticky top-11.25 z-10 bg-[#F8F9FB] dark:bg-[#121212]/95 backdrop-blur-sm border-y border-gray-800/50">
+										<td
+											colSpan={6}
+											className="py-2 px-2 text-[11px] font-bold text-orange-400/80 uppercase"
+										>
+											{date}
+										</td>
+									</tr>
+									{items.map((t) => (
+										<TransactionRow
+											key={t.id}
+											transaction={t}
+											onRowClick={handleRowClick}
+										/>
+									))}
+								</React.Fragment>
+							))
+						)}
 					</tbody>
 				</table>
+
+				{/* 3. Pagination Controls (Now INSIDE the table container) */}
+				{totalPages > 1 && (
+					<div className="pt-6 mt-auto border-t border-gray-200 dark:border-gray-800 flex items-center justify-between">
+						<span className="text-xs text-gray-500 font-medium hidden sm:inline-block">
+							Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1} to{" "}
+							{Math.min(currentPage * ITEMS_PER_PAGE, filteredAndSorted.length)}{" "}
+							of {filteredAndSorted.length}
+						</span>
+
+						<div className="flex items-center gap-1 sm:gap-2 w-full sm:w-auto justify-center sm:justify-end">
+							<button
+								onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+								disabled={currentPage === 1}
+								className="p-1.5 rounded-lg border border-gray-200 dark:border-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-white/5 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+							>
+								<ChevronLeft size={16} />
+							</button>
+
+							<div className="flex items-center gap-1">
+								{visiblePages.map((page) => (
+									<button
+										key={page}
+										onClick={() => setCurrentPage(page)}
+										className={`min-w-[32px] h-8 px-1 rounded-lg text-xs font-bold transition-all flex items-center justify-center
+                                            ${
+																							currentPage === page
+																								? "bg-orange-600 text-white shadow-md scale-105"
+																								: "text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-white/10"
+																						}`}
+									>
+										{page}
+									</button>
+								))}
+							</div>
+
+							<button
+								onClick={() =>
+									setCurrentPage((p) => Math.min(totalPages, p + 1))
+								}
+								disabled={currentPage === totalPages}
+								className="p-1.5 rounded-lg border border-gray-200 dark:border-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-white/5 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+							>
+								<ChevronRight size={16} />
+							</button>
+						</div>
+					</div>
+				)}
 			</div>
 
-			{/* 3. CSV Uploader Modal */}
+			{/* Modals */}
 			{showUploader && (
 				<div className="fixed inset-0 z-100 flex items-center justify-center p-4">
 					<div
@@ -315,7 +404,7 @@ export default function TransactionsPage() {
 							</h3>
 							<button
 								onClick={() => setShowUploader(false)}
-								className="text-gray-500  hover:text-gray-700"
+								className="text-gray-500 hover:text-gray-700"
 							>
 								✕
 							</button>
@@ -326,7 +415,7 @@ export default function TransactionsPage() {
 					</div>
 				</div>
 			)}
-			{/*Clear Modal */}
+
 			{showClearModal && (
 				<ClearDataModal
 					isOpen={showClearModal}
@@ -334,10 +423,9 @@ export default function TransactionsPage() {
 				/>
 			)}
 
-			{/* Edit Transaction Modal */}
 			{selectedTransaction && (
 				<EditTransactionModal
-					key={selectedTransaction.id} // Prevents the 'cascading render' error
+					key={selectedTransaction.id}
 					transaction={selectedTransaction}
 					isOpen={!!selectedTransaction}
 					onClose={() => setSelectedTransaction(null)}
