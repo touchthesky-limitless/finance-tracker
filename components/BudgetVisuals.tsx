@@ -1,7 +1,7 @@
 "use client";
 import { useMemo } from "react";
 import { PieChart, Pie, ResponsiveContainer, Tooltip } from "recharts";
-import { Transaction } from "@/store/createBudgetStore";
+import { Transaction } from "@/store/useBudgetStore";
 
 // Professional Financial Palette
 const COLORS = [

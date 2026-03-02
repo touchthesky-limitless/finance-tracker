@@ -19,10 +19,10 @@ import {
 	X,
 } from "lucide-react";
 
-import { Transaction } from "@/store/createBudgetStore";
+import { Transaction } from "@/store/useBudgetStore";
 import { CategorySelector } from "@/components/CategorySelector";
 import { CreateRuleModal } from "@/components/Transactions/CreateRuleModal";
-import { useBudgetStore } from "@/hooks/useBudgetStore";
+import { useBudgetStore } from "@/store/useBudgetStore";
 import { formatThousandWithCommas } from "@/utils/formatters";
 import { FeatureGuard } from "@/components/ui/FeatureGuard";
 
@@ -58,16 +58,16 @@ export default function EditTransactionModal({
 		keyword: string;
 		category: string;
 	} | null>(null);
-	const useStore = useBudgetStore();
-	const transactions = useStore((state) => state.transactions);
-	const rules = useStore((state) => state.rules);
-	const deleteRule = useStore((state) => state.deleteRule);
-	const addTransactions = useStore((state) => state.addTransactions);
-	const updateTransaction = useStore((state) => state.updateTransaction);
+
+	const transactions = useBudgetStore((state) => state.transactions);
+	const rules = useBudgetStore((state) => state.rules);
+	const deleteRule = useBudgetStore((state) => state.deleteRule);
+	const addTransactions = useBudgetStore((state) => state.addTransactions);
+	const updateTransaction = useBudgetStore((state) => state.updateTransaction);
 	const [deletingRule, setDeletingRule] = useState<string | null>(null);
 	const inputRef = useRef<HTMLInputElement>(null);
 
-	const isNew = !useStore((state) =>
+	const isNew = !useBudgetStore((state) =>
 		state.transactions.some((t) => t.id === transaction.id),
 	);
 
@@ -508,6 +508,7 @@ export default function EditTransactionModal({
 
 				{/* --- Create Rule Modal update --- */}
 				<CreateRuleModal
+					key={ruleToEdit ? `edit-${ruleToEdit.keyword}` : `new-${editedData.id}`}
 					isOpen={isRuleModalOpen}
 					onClose={() => {
 						setIsRuleModalOpen(false);

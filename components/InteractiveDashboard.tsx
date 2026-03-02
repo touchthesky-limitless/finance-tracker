@@ -1,8 +1,8 @@
 "use client";
 import { useState, useMemo, useEffect } from "react";
 import { PieChart, Pie, ResponsiveContainer, Tooltip } from "recharts";
-import { useBudgetStore } from "@/hooks/useBudgetStore";
-import { Transaction } from "@/store/createBudgetStore";
+import { useBudgetStore } from "@/store/useBudgetStore";
+import { Transaction } from "@/store/useBudgetStore";
 import { DashboardSkeleton } from "./DashboardSkeleton";
 import {
 	ChevronRight,
@@ -229,9 +229,8 @@ function TagPicker({
 	onClose: () => void;
 }) {
 	const [search, setSearch] = useState("");
-	const useStore = useBudgetStore();
-	const transactions = useStore((state) => state.transactions);
-	const updateTransaction = useStore((state) => state.updateTransaction);
+	const transactions = useBudgetStore((state) => state.transactions);
+	const updateTransaction = useBudgetStore((state) => state.updateTransaction);
 
 	const allAvailableTags = useMemo(() => {
 		const historyTags = new Set<string>();
@@ -332,9 +331,8 @@ function TransactionModal({
 	transactionId: string | null;
 	onClose: () => void;
 }) {
-	const useStore = useBudgetStore();
-	const updateTransaction = useStore((state) => state.updateTransaction);
-	const transactions = useStore((state) => state.transactions);
+	const updateTransaction = useBudgetStore((state) => state.updateTransaction);
+	const transactions = useBudgetStore((state) => state.transactions);
 	const transaction = useMemo(
 		() => transactions.find((t) => t.id === transactionId),
 		[transactions, transactionId],
@@ -575,9 +573,7 @@ export default function InteractiveDashboard({
 }: {
 	transactions: Transaction[];
 }) {
-	// 1. Get the store hook specific to the current version (free or premium or pro)
-    const useStore = useBudgetStore();
-	const isLoading = useStore((state) => state.isLoading);
+	const isLoading = useBudgetStore((state) => state.isLoading);
 	// Inside InteractiveDashboard component
 
 	const [selectedMonthKey, setSelectedMonthKey] = useState<string>("");

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useEffect } from "react";
+import React, { useState, useMemo, useRef } from "react";
 import {
 	X,
 	Search,
@@ -10,9 +10,9 @@ import {
 	Check,
 	AlertCircle,
 } from "lucide-react";
-import { useBudgetStore } from "@/hooks/useBudgetStore";
+import { useBudgetStore } from "@/store/useBudgetStore";
 import { CategorySelector } from "@/components/CategorySelector";
-import { Transaction } from "@/store/createBudgetStore";
+import { Transaction } from "@/store/useBudgetStore";
 import { formatThousandWithCommas } from "@/utils/formatters";
 
 interface CreateRuleModalProps {
@@ -31,18 +31,18 @@ export function CreateRuleModal({
 	onSaveSuccess,
 }: CreateRuleModalProps) {
 	const [step, setStep] = useState(1);
-	const useStore = useBudgetStore();
-	const transactions = useStore((state) => state.transactions);
-	const saveRule = useStore((state) => state.saveRule);
-	const updateTransaction = useStore((state) => state.updateTransaction);
 
-	const rules = useStore((state) => state.rules);
+	const transactions = useBudgetStore((state) => state.transactions);
+	const saveRule = useBudgetStore((state) => state.saveRule);
+	const updateTransaction = useBudgetStore((state) => state.updateTransaction);
+
+	const rules = useBudgetStore((state) => state.rules);
 
 	// Criteria State (Step 1)
 	const [matchName, setMatchName] = useState(initialName || "");
 
 	// Action State (Step 2)
-	const [targetCategory, setTargetCategory] = useState("");
+	const [targetCategory, setTargetCategory] = useState(initialCategory || "");
 	const [newName, setNewName] = useState("");
 
 	const [useAmount, setUseAmount] = useState(false);
@@ -99,9 +99,7 @@ export function CreateRuleModal({
 						? t.merchant.toLowerCase().includes(matchName.toLowerCase())
 						: nameLogic === "Exactly matches"
 							? t.merchant.toLowerCase() === matchName.toLowerCase()
-							: t.merchant
-									.toLowerCase()
-									.startsWith(matchName.toLowerCase()));
+							: t.merchant.toLowerCase().startsWith(matchName.toLowerCase()));
 
 				// Category Matching
 				const categoryMatch = !useCategory || t.category === matchCategory;
@@ -191,20 +189,6 @@ export function CreateRuleModal({
 
 		setAmountValue(rawValue);
 	};
-
-	// 2. Focus logic inside your existing useEffect
-	useEffect(() => {
-		if (isOpen) {
-			setMatchName(initialName || "");
-			setTargetCategory(initialCategory || "");
-			setStep(1);
-
-			// Focus the input automatically
-			setTimeout(() => {
-				inputRef.current?.focus();
-			}, 100);
-		}
-	}, [isOpen, initialName, initialCategory]);
 
 	if (!isOpen) return null;
 

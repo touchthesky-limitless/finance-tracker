@@ -8,7 +8,7 @@ import {
 import { Search, Plus, Check, ChevronDown } from "lucide-react";
 import { createPortal } from "react-dom";
 import { DEFAULT_TAGS } from "@/data/categories";
-import { useBudgetStore } from "@/hooks/useBudgetStore";
+import { useBudgetStore } from "@/store/useBudgetStore";
 import { useVersion } from "@/app/context/VersionContext";
 import { useOutsideClick } from "@/hooks/useOutsideClick";
 
@@ -26,10 +26,8 @@ export default function CategoryDropdown({ currentCategory, onSelect, width = "w
 	// 1. VERSION DETECTION  "free" vs "premium vs pro"
 	const version = useVersion();
 
-	// 2. STORE INITIALIZATION (The "Smart Hook" fix)
-	const useStore = useBudgetStore();
-	const customTags = useStore((state) => state.customTags);
-	const addCustomTag = useStore((state) => state.addCustomTag);
+	const customTags = useBudgetStore((state) => state.customTags);
+	const addCustomTag = useBudgetStore((state) => state.addCustomTag);
 
 	const triggerRef = useRef<HTMLButtonElement>(null);
 

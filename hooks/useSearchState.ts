@@ -1,3 +1,4 @@
+// @/hooks/useSearchState.ts
 import { useRef, useCallback } from "react";
 
 export function useSearchState(setter: (val: string) => void) {
@@ -5,12 +6,12 @@ export function useSearchState(setter: (val: string) => void) {
 
     const handleClear = useCallback(() => {
         setter("");
-        // Ensure the state update processes before focusing
+        // Standard focus logic
         setTimeout(() => inputRef.current?.focus(), 0);
     }, [setter]);
 
     return {
-        inputRef,
+        inputRef, // Return the clean ref object
         handleClear,
     };
 }

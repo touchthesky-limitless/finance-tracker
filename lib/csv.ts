@@ -1,4 +1,4 @@
-import { Transaction } from "@/store/createBudgetStore";
+import { Transaction } from "@/store/useBudgetStore";
 import { resolveToParent } from "@/lib/categoryMapper";
 
 export function parseBankCSV(
@@ -84,29 +84,29 @@ export function parseBankCSV(
 		let amount = parseFloat(amountRaw);
 
 		// --- GLOBAL SIGN LOGIC (BofA, Chase, US Bank) ---
-        const type = typeIdx !== -1 ? cols[typeIdx].toUpperCase() : "";
-        const merchantLower = merchantValue.toLowerCase();
+		const type = typeIdx !== -1 ? cols[typeIdx].toUpperCase() : "";
+		const merchantLower = merchantValue.toLowerCase();
 
-        // 1. If it's a known 'Payment' or 'Credit', it's money leaving your bank to the card.
-        // We force it to be NEGATIVE so it shows as an outflow.
-        if (
-            type === "PAYMENT" || 
-            type === "CREDIT" || 
-            type === "C" ||
-            merchantLower.includes("payment thank you") ||
-            merchantLower.includes("automatic payment")
-        ) {
-            amount = -Math.abs(amount);
-        } 
-        
-        // 2. If it's a 'Debit' or 'Sale', it's a standard expense.
-        // We force it to be NEGATIVE.
-        else if (type === "DEBIT" || type === "D" || type === "SALE") {
-            amount = -Math.abs(amount);
-        }
+		// 1. If it's a known 'Payment' or 'Credit', it's money leaving your bank to the card.
+		// We force it to be NEGATIVE so it shows as an outflow.
+		if (
+			type === "PAYMENT" ||
+			type === "CREDIT" ||
+			type === "C" ||
+			merchantLower.includes("payment thank you") ||
+			merchantLower.includes("automatic payment")
+		) {
+			amount = -Math.abs(amount);
+		}
 
-        // 3. Fallback: If no type is found, we assume the CSV sign is correct.
-        // ------------------------------------------------
+		// 2. If it's a 'Debit' or 'Sale', it's a standard expense.
+		// We force it to be NEGATIVE.
+		else if (type === "DEBIT" || type === "D" || type === "SALE") {
+			amount = -Math.abs(amount);
+		}
+
+		// 3. Fallback: If no type is found, we assume the CSV sign is correct.
+		// ------------------------------------------------
 
 		const date = cols[dateIdx] || "";
 
@@ -122,7 +122,11 @@ export function parseBankCSV(
 		const combinedCategoryInput =
 			`${rawCatInput} ${rawMcc}`.trim() || "Uncategorized";
 
-		const finalCategory = resolveToParent(combinedCategoryInput, merchantValue, rawType);
+		const finalCategory = resolveToParent(
+			combinedCategoryInput,
+			merchantValue,
+			rawType,
+		);
 
 		if (date && !isNaN(amount)) {
 			transactions.push({
@@ -134,7 +138,9 @@ export function parseBankCSV(
 				account: baseAccountName,
 				category: finalCategory,
 				needs_review: finalCategory === "Uncategorized",
-				needs_subcat: finalCategory !== "Uncategorized" && finalCategory !== "Debt payments",
+				needs_subcat:
+					finalCategory !== "Uncategorized" &&
+					finalCategory !== "Debt payments",
 			});
 		}
 	}

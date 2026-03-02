@@ -1,5 +1,5 @@
 import { LucideIcon } from "lucide-react";
-import { Transaction } from "@/store/createBudgetStore";
+import { Transaction } from "@/store/useBudgetStore";
 
 export interface Merchant {
 	name: string;

@@ -1,15 +1,14 @@
 "use client";
 import { useState, useMemo } from "react";
-import { useBudgetStore } from "@/hooks/useBudgetStore";
+import { useBudgetStore } from "@/store/useBudgetStore";
 import CsvUploader from "@/components/CsvUploader";
-import { Search, Filter, X, Trash2 } from "lucide-react";
+import { Search, Trash2 } from "lucide-react";
 import InteractiveDashboard from "@/components/InteractiveDashboard";
 import ClearDataModal from "@/components/ClearDataModal";
 
 
 export default function BudgetPage() {
-	const useStore = useBudgetStore();
-	const { transactions } = useStore();
+	const { transactions } = useBudgetStore();
 
 	// 1. STATE: SelectedBanks is now an Array
 	const [selectedBanks, setSelectedBanks] = useState<string[]>([]);
@@ -147,60 +146,6 @@ export default function BudgetPage() {
 							onChange={(e) => setSearchQuery(e.target.value)}
 						/>
 					</div>
-
-					{/*
-					 MULTI-SELECT BANK FILTERS
-					{transactions.length > 0 && (
-						<div className="flex flex-wrap items-center gap-2">
-							<span className="text-sm font-semibold text-gray-500 mr-2 flex items-center gap-1">
-								<Filter size={14} /> Filter:
-							</span>
-
-							 "ALL" BUTTON
-							<button
-								onClick={() => setSelectedBanks([])} // Clear array = All
-								className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-all ${
-									selectedBanks.length === 0
-										? "bg-gray-900 dark:bg-white text-white dark:text-gray-900 border-transparent shadow-sm"
-										: "bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800 text-gray-600 dark:text-gray-400 hover:border-gray-300"
-								}`}
-							>
-								All Accounts
-							</button>
-
-							 INDIVIDUAL BANK BUTTONS
-							{bankNames.map((name) => {
-								const isSelected = selectedBanks.includes(name);
-								return (
-									<button
-										key={name}
-										onClick={() => toggleBank(name)}
-										className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-all ${
-											isSelected
-												? "bg-blue-600 border-blue-600 text-white shadow-sm"
-												: "bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800 text-gray-600 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-700"
-										}`}
-									>
-										{name}
-									</button>
-								);
-							})}
-
-							 CLEAR FILTERS BUTTON (Only shows if filters are active)
-							{(selectedBanks.length > 0 || searchQuery) && (
-								<button
-									onClick={() => {
-										setSelectedBanks([]);
-										setSearchQuery("");
-									}}
-									className="ml-auto text-sm text-red-500 hover:text-red-600 font-medium flex items-center gap-1 transition-colors px-2"
-								>
-									<X size={14} /> Clear filters
-								</button>
-							)}
-						</div>
-					)}
-					*/}
 
 					{/* BANK GROUPS */}
 					{bankGroups.map((group) => {

@@ -1,8 +1,8 @@
 "use client";
 import React, { useState, useRef } from "react";
 import { AlertCircle, CheckCircle2, Upload } from "lucide-react";
-import { useBudgetStore } from "@/hooks/useBudgetStore";
-import { Transaction } from "@/store/createBudgetStore";
+import { useBudgetStore } from "@/store/useBudgetStore";
+import { Transaction } from "@/store/useBudgetStore";
 import { parseBankCSV } from "@/lib/csv";
 import { DEFAULT_TAGS } from "@/data/categories";
 import { resolveToParent } from "@/lib/categoryMapper";
@@ -13,10 +13,8 @@ interface CsvUploaderProps {
 }
 
 export default function CsvUploader({ onComplete }: CsvUploaderProps) {
-	// 1. Get the hook for the current version (free or premium or pro)
-	const useStore = useBudgetStore();
 	// 2. Select actions/state
-	const addTransactions = useStore((state) => state.addTransactions);
+	const addTransactions = useBudgetStore((state) => state.addTransactions);
 	const [isDragging, setIsDragging] = useState(false);
 	const [isProcessing, setIsProcessing] = useState(false);
 	const [uploadProgress, setUploadProgress] = useState({
@@ -38,7 +36,7 @@ export default function CsvUploader({ onComplete }: CsvUploaderProps) {
 		setUploadProgress({ current: 0, total: files.length });
 
 		// 1. Get existing transactions from the store to compare
-		const existingTransactions = useStore.getState().transactions;
+		const existingTransactions = useBudgetStore.getState().transactions;
 
 		// Create a Set of "fingerprints" for O(1) lookups
 		// We combine Date + Amount + Merchant to identify a unique transaction
@@ -78,8 +76,8 @@ export default function CsvUploader({ onComplete }: CsvUploaderProps) {
 
 				// --- AUTO-ADOPT CATEGORIES START ---
 				// Access state and actions separately
-				const customTags = useStore.getState().customTags;
-				const addCustomTag = useStore.getState().addCustomTag;
+				const customTags = useBudgetStore.getState().customTags;
+				const addCustomTag = useBudgetStore.getState().addCustomTag;
 
 				// Identify unique categories in the file
 				const incomingCategories = Array.from(

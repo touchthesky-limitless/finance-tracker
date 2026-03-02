@@ -5,7 +5,7 @@ import { Menu, X } from "lucide-react";
 import { VersionProvider } from "@/app/context/VersionContext";
 import ProSidebar from "@/components/Sidebar/ProSidebar";
 import { usePathname } from "next/navigation";
-import { useBudgetStore } from "@/hooks/useBudgetStore";
+import { useBudgetStore } from "@/store/useBudgetStore";
 import { UndoToast } from "@/components/ui/UndoToast";
 
 function ProLayoutShell({ children }: { children: React.ReactNode }) {
@@ -24,11 +24,10 @@ function ProLayoutShell({ children }: { children: React.ReactNode }) {
 	const pathname = usePathname();
 
 	// 3. Connect to the global toast state
-	const useStore = useBudgetStore();
-	const toast = useStore((state) => state.toast);
-	const setToast = useStore((state) => state.setToast);
+	const toast = useBudgetStore((state) => state.toast);
+	const setToast = useBudgetStore((state) => state.setToast);
 
-	const undoBulkUpdate = useStore((state) => state.undoBulkUpdate);
+	const undoBulkUpdate = useBudgetStore((state) => state.undoBulkUpdate);
 
 	// 2. Determine the current title
 	const currentTitle = PAGE_TITLES[pathname] || "Budget Pro Tracker";

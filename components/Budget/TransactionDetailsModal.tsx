@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { formatMoney, formatDateLong } from "@/utils/formatters";
 import { DEFAULT_TAGS } from "@/data/categories";
-import { Transaction } from "@/store/createBudgetStore";
+import { Transaction } from "@/store/useBudgetStore";
 import { ActionItemProps } from "@/types/budget";
 import { useOutsideClick } from "@/hooks/useOutsideClick";
 

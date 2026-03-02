@@ -10,10 +10,10 @@ import {
 	ChevronLeft,
 	ChevronRight,
 } from "lucide-react";
-import { useBudgetStore } from "@/hooks/useBudgetStore";
+import { useBudgetStore } from "@/store/useBudgetStore";
 import { formatDateLong } from "@/utils/formatters";
 import CsvUploader from "@/components/CsvUploader";
-import { Transaction } from "@/store/createBudgetStore";
+import { Transaction } from "@/store/useBudgetStore";
 import ClearDataModal from "@/components/ClearDataModal";
 import { TransactionRow } from "@/components/Transactions/TransactionRow";
 import { SortableHeader } from "@/components/Transactions/SortableHeader";
@@ -42,9 +42,9 @@ interface SortConfig {
 const ITEMS_PER_PAGE = 12;
 
 export default function TransactionsPage() {
-	const useStore = useBudgetStore();
-	const transactions = useStore((state) => state.transactions);
-	const updateTransaction = useStore((state) => state.updateTransaction);
+	const setToast = useBudgetStore((state) => state.setToast);
+	const transactions = useBudgetStore((state) => state.transactions);
+	const updateTransaction = useBudgetStore((state) => state.updateTransaction);
 
 	const [selectedTransaction, setSelectedTransaction] =
 		useState<Transaction | null>(null);
@@ -58,12 +58,11 @@ export default function TransactionsPage() {
 	]);
 	const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
 	const [, setIsEditModalOpen] = useState(false);
-	const setToast = useStore((state) => state.setToast);
 
 	// --- PAGINATION STATE ---
 	const [currentPage, setCurrentPage] = useState(1);
 
-	const mainSearch = useSearchState(setSearchQuery);
+	const { inputRef, handleClear } = useSearchState(setSearchQuery);
 
 	const handleRuleSaved = (count: number, snapshot: Transaction[]) => {
 		setToast({ count, snapshot });
@@ -74,8 +73,7 @@ export default function TransactionsPage() {
 	const filteredAndSorted = useMemo(() => {
 		const filtered = transactions.filter((t) => {
 			const merchantName = t.merchant?.toLowerCase() || "";
-			const matchesSearch = merchantName
-				.includes(searchQuery.toLowerCase());
+			const matchesSearch = merchantName.includes(searchQuery.toLowerCase());
 			const matchesCategory = !categoryFilter || t.category === categoryFilter;
 			return matchesSearch && matchesCategory;
 		});
@@ -227,11 +225,11 @@ export default function TransactionsPage() {
 					</button>
 					<div className="relative">
 						<SearchInput
-							ref={mainSearch.inputRef}
+							ref={inputRef}
 							searchIconClassName="text-gray-500"
 							inputClassName="dark:bg-gray-900 border border-gray-400 dark:border-gray-800 rounded-lg py-1.5 pl-9 pr-4 text-sm focus:ring-1 focus:ring-orange-500 outline-none w-40 md:w-64"
 							value={searchQuery}
-							onClear={mainSearch.handleClear}
+							onClear={handleClear}
 							onChange={(e) => setSearchQuery(e.target.value)}
 							placeholder="Search transactions..."
 						/>

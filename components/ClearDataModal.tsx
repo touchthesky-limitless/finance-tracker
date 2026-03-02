@@ -1,5 +1,5 @@
 import { AlertTriangle, Trash2 } from "lucide-react";
-import { useBudgetStore } from "@/hooks/useBudgetStore";
+import { useBudgetStore } from "@/store/useBudgetStore";
 import { createPortal } from "react-dom";
 
 interface ClearDataModalProps {
@@ -11,8 +11,7 @@ export default function ClearDataModal({
 	isOpen,
 	onClose,
 }: ClearDataModalProps) {
-	const useStore = useBudgetStore();
-	const clearData = useStore((state) => state.clearData);
+	const clearData = useBudgetStore((state) => state.clearData);
 
 	if (!isOpen) return null;
 

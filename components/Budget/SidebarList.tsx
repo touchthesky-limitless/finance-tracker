@@ -1,7 +1,7 @@
 "use client";
 
 import { ShoppingBag } from "lucide-react";
-import { Transaction } from "@/store/createBudgetStore";
+import { Transaction } from "@/store/useBudgetStore";
 import { SidebarListProps, Merchant } from "@/types/budget";
 import { formatMoney } from "@/utils/formatters";
 import { ChevronUp, ChevronDown } from "lucide-react";

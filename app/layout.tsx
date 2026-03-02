@@ -4,6 +4,7 @@ import "./globals.css";
 import Navbar from "@/components/Navbar";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import Footer from "@/components/Footer";
+import StoreInitializer from "@/components/StoreInitializer";
 
 const geistSans = Geist({
 	variable: "--font-geist-sans",
@@ -16,9 +17,9 @@ const geistMono = Geist_Mono({
 });
 
 const robotoMono = Roboto_Mono({
-  subsets: ['latin'],
-  variable: '--font-mono', // Ensure this variable name exists
-})
+	subsets: ["latin"],
+	variable: "--font-mono", // Ensure this variable name exists
+});
 
 export const metadata: Metadata = {
 	title: "Finance Tracker",
@@ -41,6 +42,8 @@ export default function RootLayout({
 					enableSystem
 					disableTransitionOnChange
 				>
+					<StoreInitializer />
+
 					<div className="flex flex-col min-h-screen">
 						<Navbar />
 						<main className="grow">{children}</main>

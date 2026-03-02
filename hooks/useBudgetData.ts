@@ -1,15 +1,14 @@
 "use client";
 
 import { useMemo } from "react";
-import { useBudgetStore } from "@/hooks/useBudgetStore";
+import { useBudgetStore } from "@/store/useBudgetStore";
 import { ICON_MAP } from "@/constants/icons";
 import { CategoryData } from "@/types/budget";
 import { COLORS_HEX } from "@/data/categories";
 import { getCategoryTheme } from "@/constants/categories";
 
 export function useBudgetData(timeFilter: string) {
-	const useStore = useBudgetStore();
-	const transactions = useStore((state) => state.transactions);
+	const transactions = useBudgetStore((state) => state.transactions);
 
 	// --- 1. UNIFIED PARSER ---
 	// Extract Month and Year from strings like "Jan 2026", "Year 2025", or "This Month"

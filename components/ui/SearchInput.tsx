@@ -13,33 +13,32 @@ interface SearchInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
 export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
 	({ value, onClear, searchIconClassName, inputClassName, ...props }, ref) => {
 		useEffect(() => {
-			if (props.autoFocus && ref && "current" in ref) {
-				// Use a requestAnimationFrame or a 0ms timeout to ensure
-				// the FloatingPortal has finished its entry animation.
-				const timeout = setTimeout(() => ref.current?.focus(), 0);
-				return () => clearTimeout(timeout);
+			// This is safe because it's inside an effect, not render
+			if (props.autoFocus && ref && typeof ref !== "function") {
+				ref.current?.focus();
 			}
 		}, [ref, props.autoFocus]);
 
 		return (
-			<>
-				{/* Structure: Centered Absolute Left */}
+			<div className="relative group">
+				{" "}
+				{/* Added group for the icon focus effect */}
 				<Search
 					size={14}
 					className={cn(
 						"absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-orange-500 transition-colors pointer-events-none",
-						searchIconClassName, // Only pass color/hover/etc. here
+						searchIconClassName,
 					)}
 				/>
-
 				<input
 					ref={ref}
 					value={value}
 					{...props}
-					className={cn("w-full outline-none transition-all", inputClassName)}
+					className={cn(
+						"w-full outline-none transition-all pl-9 pr-8", // Added padding to prevent text overlap
+						inputClassName,
+					)}
 				/>
-
-				{/* Structure: Centered Absolute Right */}
 				{value && (
 					<button
 						type="button"
@@ -52,7 +51,7 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
 						/>
 					</button>
 				)}
-			</>
+			</div>
 		);
 	},
 );

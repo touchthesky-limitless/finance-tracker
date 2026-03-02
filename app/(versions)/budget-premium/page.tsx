@@ -11,7 +11,7 @@ import {
 	PiggyBank,
 	Trash2,
 } from "lucide-react";
-import { Transaction } from "@/store/createBudgetStore";
+import { Transaction } from "@/store/useBudgetStore";
 import {
 	PieChart,
 	Pie,
@@ -27,15 +27,12 @@ import TransactionDetailsModal from "@/components/Budget/TransactionDetailsModal
 import CategoryDetailsModal from "@/components/Budget/CategoryDetailsModal";
 import SidebarList from "@/components/Budget/SidebarList";
 import SummaryRow from "@/components/Budget/SummaryRow";
-import { useBudgetStore } from "@/hooks/useBudgetStore";
+import { useBudgetStore } from "@/store/useBudgetStore";
 
 export default function BudgetPage() {
-	// Get the versioned hook (This will automatically point to "premium")
-	const useStore = useBudgetStore();
-
 	// USE SELECTORS instead of destructuring for reactive updates
-	const transactions = useStore((state) => state.transactions);
-	const updateTransaction = useStore((state) => state.updateTransaction);
+	const transactions = useBudgetStore((state) => state.transactions);
+	const updateTransaction = useBudgetStore((state) => state.updateTransaction);
 
 	const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
@@ -361,7 +358,10 @@ export default function BudgetPage() {
 										/>
 									</div>
 									<span className="text-sm font-semibold text-gray-900 dark:text-white">
-										Update {stats.uncategorizedCount > 0 ? stats.uncategorizedCount : ""}{" "}
+										Update{" "}
+										{stats.uncategorizedCount > 0
+											? stats.uncategorizedCount
+											: ""}{" "}
 										transactions
 									</span>
 								</div>
@@ -389,7 +389,7 @@ export default function BudgetPage() {
 								iconColor="text-green-500"
 								valueColor="text-green-600"
 								transactions={transactions}
-								/>
+							/>
 							<SummaryRow
 								label="Spending"
 								value={formatMoney(stats.expenses)}

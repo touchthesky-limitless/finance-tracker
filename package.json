@@ -12,6 +12,7 @@
     "@floating-ui/react": "^0.27.17",
     "@headlessui/react": "^2.2.9",
     "@heroicons/react": "^2.2.0",
+    "@supabase/supabase-js": "^2.98.0",
     "@types/uuid": "^11.0.0",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",

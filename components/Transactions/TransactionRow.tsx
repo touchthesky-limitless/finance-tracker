@@ -1,6 +1,6 @@
 import { memo } from "react";
 import { CATEGORY_HIERARCHY, getCategoryTheme } from "@/constants/categories";
-import { Transaction } from "@/store/createBudgetStore";
+import { Transaction } from "@/store/useBudgetStore";
 import { NeedsReviewBadge } from "@/components/ui/NeedsReviewBadge";
 import { CategoryIcon } from "@/components/CategoryIcon";
 
