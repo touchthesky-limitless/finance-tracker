@@ -362,7 +362,7 @@ export default function TransactionsPage() {
 									<button
 										key={page}
 										onClick={() => setCurrentPage(page)}
-										className={`min-w-[32px] h-8 px-1 rounded-lg text-xs font-bold transition-all flex items-center justify-center
+										className={`min-w-8 h-8 px-1 rounded-lg text-xs font-bold transition-all flex items-center justify-center
                                             ${
 																							currentPage === page
 																								? "bg-orange-600 text-white shadow-md scale-105"

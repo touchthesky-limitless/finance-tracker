@@ -402,7 +402,7 @@ export default function OverviewPage() {
 									{largestPurchases.slice(0, 5).map((t, i) => (
 										<div key={i} className="flex flex-col gap-1">
 											<div className="flex justify-between items-center">
-												<span className="text-sm font-bold text-gray-900 dark:text-white truncate max-w-[100px]">
+												<span className="text-sm font-bold text-gray-900 dark:text-white truncate max-w-25">
 													{t.merchant}
 												</span>
 												<span className="text-sm font-black text-white-600 dark:text-white-400">
@@ -806,49 +806,6 @@ function BudgetProgress({
 					className={`h-full rounded-full transition-all duration-500 ${isWarning ? "bg-red-500" : color}`}
 					style={{ width: `${percentage}%` }}
 				></div>
-			</div>
-		</div>
-	);
-}
-
-interface AccountBoxProps {
-	icon: ElementType;
-	bg: string;
-	type: string;
-	name: string;
-	balance: string;
-	isDebt?: boolean;
-}
-
-function AccountBox({
-	icon: Icon,
-	bg,
-	type,
-	name,
-	balance,
-	isDebt = false,
-}: AccountBoxProps) {
-	return (
-		<div className="p-4 border border-gray-100 dark:border-gray-800 rounded-2xl hover:border-orange-500/30 transition-colors cursor-pointer group">
-			<div className="flex items-center gap-3 mb-4">
-				<div
-					className={`w-8 h-8 rounded-lg flex items-center justify-center text-white shadow-sm ${bg}`}
-				>
-					<Icon size={14} />
-				</div>
-				<div>
-					<p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">
-						{type}
-					</p>
-					<h4 className="text-sm font-bold text-gray-900 dark:text-white">
-						{name}
-					</h4>
-				</div>
-			</div>
-			<div
-				className={`text-lg font-bold ${isDebt ? "text-gray-900 dark:text-white" : "text-green-600 dark:text-green-400"}`}
-			>
-				{balance}
 			</div>
 		</div>
 	);
