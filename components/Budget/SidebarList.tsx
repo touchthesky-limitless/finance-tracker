@@ -38,7 +38,7 @@ export default function SidebarList({
 								</div>
 								<div>
 									<p className="text-sm font-bold text-gray-900 dark:text-white truncate max-w-25">
-										{isPurchaseList ? tx.description : merchant.name}
+										{isPurchaseList ? tx.merchant : merchant.name}
 									</p>
 									<p className="text-[10px] text-gray-400">
 										{isPurchaseList

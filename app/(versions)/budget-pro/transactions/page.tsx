@@ -73,8 +73,8 @@ export default function TransactionsPage() {
 	// --- 1. Base Filter & Sort ---
 	const filteredAndSorted = useMemo(() => {
 		const filtered = transactions.filter((t) => {
-			const matchesSearch = t.description
-				.toLowerCase()
+			const merchantName = t.merchant?.toLowerCase() || "";
+			const matchesSearch = merchantName
 				.includes(searchQuery.toLowerCase());
 			const matchesCategory = !categoryFilter || t.category === categoryFilter;
 			return matchesSearch && matchesCategory;
@@ -181,7 +181,7 @@ export default function TransactionsPage() {
 	const handleAddTransaction = () => {
 		const blankTx: Transaction = {
 			id: crypto.randomUUID(),
-			description: "",
+			merchant: "",
 			amount: 0,
 			category: "Uncategorized",
 			date: new Date().toISOString().split("T")[0],

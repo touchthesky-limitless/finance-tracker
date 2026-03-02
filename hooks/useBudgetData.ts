@@ -273,9 +273,9 @@ export function useBudgetData(timeFilter: string) {
 		filteredTransactions
 			.filter((t) => t.amount < 0)
 			.forEach((t) => {
-				// Clean description: Remove "SQ *" or "TST*" and take the first word
+				// Clean merchant: Remove "SQ *" or "TST*" and take the first word
 				const cleanName =
-					t.description
+					t.merchant
 						.replace(/^(SQ\s\*|TST\s\*|PY\s\*|Check\s#\d+\s-\s)/i, "") // Clean prefix
 						.split(" ") // Split into words
 						.filter((word) => word.length > 0) // Remove empty spaces
@@ -313,7 +313,7 @@ export function useBudgetData(timeFilter: string) {
 		// 1. Group transaction dates by merchant
 		transactions.forEach((t) => {
 			if (t.amount < 0) {
-				const name = t.description
+				const name = t.merchant
 					.replace(/^(SQ\s\*|TST\s\*|PY\s\*)/i, "")
 					.split(" ")
 					.slice(0, 2)

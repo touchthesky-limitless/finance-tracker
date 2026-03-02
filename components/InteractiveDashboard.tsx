@@ -369,10 +369,10 @@ function TransactionModal({
 			// Update just this one
 			updateTransaction(transaction.id, { category: newCategory });
 		} else {
-			// Update ALL transactions with the same description/merchant
+			// Update ALL transactions with the same merchant
 			// (Assuming you have access to the full list, otherwise you might need a store action)
 			const transactionsToUpdate = transactions.filter(
-				(t) => t.description === transaction.description,
+				(t) => t.merchant === transaction.merchant,
 			);
 
 			// Batch update (You might need to add a batchUpdate action to your store for performance)
@@ -438,7 +438,7 @@ function TransactionModal({
 							})}
 						</div>
 						<div className="text-gray-500 font-medium px-8 text-sm leading-relaxed max-w-xs mx-auto">
-							{transaction.description}
+							{transaction.merchant}
 						</div>
 					</div>
 
@@ -518,7 +518,7 @@ function TransactionModal({
 								On statement as
 							</span>
 							<span className="text-sm font-medium text-gray-900 dark:text-white bg-gray-50 dark:bg-gray-800/50 p-3 rounded-xl border border-dashed border-gray-200 dark:border-gray-700">
-								{transaction.description}
+								{transaction.merchant}
 							</span>
 						</div>
 
@@ -942,7 +942,7 @@ export default function InteractiveDashboard({
 												</div>
 												<div className="flex-1 min-w-0">
 													<div className="font-semibold text-gray-900 dark:text-white truncate capitalize">
-														{t.description.toLowerCase()}
+														{t.merchant.toLowerCase()}
 													</div>
 													<div className="text-xs text-gray-500 mt-0.5 flex items-center gap-1 truncate">
 														<span className="truncate">{t.account}</span>

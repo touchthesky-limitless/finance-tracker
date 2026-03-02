@@ -83,7 +83,7 @@ export function CreateRuleModal({
 
 	// Calculate how many transactions match the current keyword
 	const matchCount = transactions.filter((tx) =>
-		tx.description?.toLowerCase().includes(matchName.toLowerCase().trim()),
+		tx.merchant?.toLowerCase().includes(matchName.toLowerCase().trim()),
 	).length;
 
 	const matchedTransactions = useMemo(() => {
@@ -96,10 +96,10 @@ export function CreateRuleModal({
 				const nameMatch =
 					!useName ||
 					(nameLogic === "Contains"
-						? t.description.toLowerCase().includes(matchName.toLowerCase())
+						? t.merchant.toLowerCase().includes(matchName.toLowerCase())
 						: nameLogic === "Exactly matches"
-							? t.description.toLowerCase() === matchName.toLowerCase()
-							: t.description
+							? t.merchant.toLowerCase() === matchName.toLowerCase()
+							: t.merchant
 									.toLowerCase()
 									.startsWith(matchName.toLowerCase()));
 
@@ -157,12 +157,12 @@ export function CreateRuleModal({
 			);
 		}
 
-		// 3. Handle CUSTOM DESCRIPTIONS (Only if you are renaming the transactions themselves)
+		// 3. Handle CUSTOM Merchants (Only if you are renaming the transactions themselves)
 		// Note: saveRule already updates the Category retroactively.
-		// You only need this loop if 'newName' is actually a NEW description for the bank line.
+		// You only need this loop if 'newName' is actually a NEW merchant for the bank line.
 		if (newName && newName.trim() !== "") {
 			matchedTransactions.forEach((t) => {
-				updateTransaction(t.id, { description: newName });
+				updateTransaction(t.id, { merchant: newName });
 			});
 		}
 
@@ -460,7 +460,7 @@ export function CreateRuleModal({
 										<div className="flex flex-col">
 											<span className="text-xs text-slate-400">{t.date}</span>
 											<span className="text-sm font-medium dark:text-white">
-												{t.description}
+												{t.merchant}
 											</span>
 										</div>
 										<div className="flex items-center gap-2 text-slate-500">

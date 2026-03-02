@@ -206,39 +206,8 @@ export default function CategoryDetailsModal({
 													{formatDate(t.date)}
 												</td>
 												<td className="px-6 py-4 text-sm font-bold text-gray-900 dark:text-white max-w-50 truncate">
-													{t.description}
+													{t.merchant}
 												</td>
-												{/* <td className="px-6 py-4">
-													<div
-														className="relative"
-														onClick={(e) => e.stopPropagation()}
-													>
-														<select
-															value={t.category || "Uncategorized"}
-															onChange={(e) =>
-																onUpdateCategory(t.id, e.target.value)
-															}
-															className="appearance-none bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 text-xs font-semibold rounded-lg px-3 py-1.5 pr-8 hover:border-blue-500 transition-colors cursor-pointer"
-														>
-															
-															{!DEFAULT_TAGS.includes(t.category) &&
-																t.category && (
-																	<option value={t.category}>
-																		{t.category}
-																	</option>
-																)}
-															{DEFAULT_TAGS.map((opt) => (
-																<option key={opt} value={opt}>
-																	{opt}
-																</option>
-															))}
-														</select>
-														<ChevronDown
-															size={12}
-															className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"
-														/>
-													</div>
-												</td> */}
 												<td className="px-6 py-4">
 													<div onClick={(e) => e.stopPropagation()}>
 														<CategoryDropdown

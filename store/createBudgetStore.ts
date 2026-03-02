@@ -6,7 +6,8 @@ export interface Transaction {
 	[key: string]: string | number | boolean | string[] | undefined;
 	id: string;
 	date: string;
-	description: string;
+	merchant: string;
+	description?: string;
 	amount: number;
 	category: string;
 	account: string;
@@ -60,12 +61,14 @@ export const createBudgetStore = (versionKey: string) =>
 					);
 
 					const processedTxs = newTxs.map((tx) => {
-						// Ensure description exists before calling toLowerCase
-						const desc = tx.description?.toLowerCase() || "";
+						// Ensure merchant exists before calling toLowerCase
+						const nameToMatch = (tx.merchant || tx.description || "")
+							.toString()
+							.toLowerCase();
 
 						// Because we sorted by length, "Starbucks Coffee" will match before "Starbucks"
 						const matchingRule = currentRules.find((rule) =>
-							desc.includes(rule.keyword.toLowerCase()),
+							nameToMatch.includes(rule.keyword.toLowerCase()),
 						);
 
 						if (matchingRule) {
@@ -113,7 +116,7 @@ export const createBudgetStore = (versionKey: string) =>
 						// If the transaction matches the rule we just saved
 						const updatedTransactions = state.transactions.map((tx) => {
 							if (
-								tx.description
+								tx.merchant
 									?.toLowerCase()
 									.includes(newRule.keyword.toLowerCase())
 							) {
@@ -164,14 +167,26 @@ export const createBudgetStore = (versionKey: string) =>
 
 				getCategoryTotals: () => {
 					const { transactions } = get();
-					return transactions.reduce(
-						(acc, tx) => {
-							const cat = tx.category || "Uncategorized";
-							acc[cat] = (acc[cat] || 0) + tx.amount;
-							return acc;
-						},
-						{} as Record<string, number>,
-					);
+					const totals: Record<string, number> = {};
+
+					transactions.forEach((tx) => {
+						// We only want to chart "Spending" (Negative numbers)
+						// Skip Income or Debt Payments for a pure Spending Chart
+						if (tx.cat === "Income" || tx.cat === "Debt payments") return;
+						
+						const cat = tx.category || "Uncategorized";
+
+						// Use Math.abs to turn -50.00 into 50.00 for the chart
+						const amount = Math.abs(tx.amount || 0);
+
+						totals[cat] = (totals[cat] || 0) + amount;
+					});
+					return totals;
+				},
+
+				getNetCashFlow: () => {
+					const { transactions } = get();
+					return transactions.reduce((sum, tx) => sum + (tx.amount || 0), 0);
 				},
 
 				addCustomTag: (tag) =>

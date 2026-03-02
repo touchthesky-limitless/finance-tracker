@@ -475,11 +475,11 @@ export default function EditTransactionModal({
 									</label>
 									<textarea
 										className="w-full bg-[#F8F9FB] dark:bg-[#0d0d0d] border border-gray-800 rounded-xl p-4 text-gray-300 focus:border-orange-500/50 outline-none min-h-1 resize-none"
-										value={editedData.description}
+										value={editedData.merchant}
 										onChange={(e) =>
 											setEditedData({
 												...editedData,
-												description: e.target.value,
+												merchant: e.target.value,
 											})
 										}
 									/>
@@ -519,7 +519,7 @@ export default function EditTransactionModal({
 							? ruleToEdit.keyword
 							: activeTab === "Rules"
 								? ""
-								: editedData.description
+								: editedData.merchant
 					}
 					initialCategory={
 						ruleToEdit

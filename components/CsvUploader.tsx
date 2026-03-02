@@ -41,9 +41,9 @@ export default function CsvUploader({ onComplete }: CsvUploaderProps) {
 		const existingTransactions = useStore.getState().transactions;
 
 		// Create a Set of "fingerprints" for O(1) lookups
-		// We combine Date + Amount + Description to identify a unique transaction
+		// We combine Date + Amount + Merchant to identify a unique transaction
 		const existingHashes = new Set(
-			existingTransactions.map((t) => `${t.date}-${t.amount}-${t.description}`),
+			existingTransactions.map((t) => `${t.date}-${t.amount}-${t.merchant}`),
 		);
 
 		const successfulTransactions: Transaction[] = [];
@@ -60,7 +60,7 @@ export default function CsvUploader({ onComplete }: CsvUploaderProps) {
 				const parsed = parseBankCSV(text, accountName);
 				// --- NEW TRANSFORMATION START ---
 				const resolvedParsed = parsed.map((t): Transaction => {
-					const parent = resolveToParent(t.category, t.description);
+					const parent = resolveToParent(t.category, t.merchant);
 
 					// A transaction needs review if it's mapped to a generic Parent name
 					const isGenericParent =
@@ -98,7 +98,7 @@ export default function CsvUploader({ onComplete }: CsvUploaderProps) {
 				// 2. Filter out duplicates before adding to the list
 				// const uniqueParsed = parsed.filter((t) => {
 				const uniqueParsed = resolvedParsed.filter((t) => {
-					const hash = `${t.date}-${t.amount}-${t.description}`;
+					const hash = `${t.date}-${t.amount}-${t.merchant}`;
 					if (existingHashes.has(hash)) {
 						duplicateCount++;
 						return false;

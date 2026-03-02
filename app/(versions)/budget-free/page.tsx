@@ -56,7 +56,7 @@ export default function BudgetPage() {
 			const q = searchQuery.toLowerCase();
 			result = result.filter(
 				(t) =>
-					t.description.toLowerCase().includes(q) ||
+					t.merchant.toLowerCase().includes(q) ||
 					t.category.toLowerCase().includes(q) ||
 					t.amount.toString().includes(q),
 			);

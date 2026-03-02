@@ -42,11 +42,11 @@ export const TransactionRow = memo(function TransactionRow({
 			onClick={() => onRowClick(transaction)}
 			className="hover:bg-gray-100 dark:hover:bg-gray-800/40 cursor-pointer transition-colors group border-b border-gray-800/30 text-sm"
 		>
-			{/* 1. DESCRIPTION */}
+			{/* 1. Merchant */}
 			<td className="py-4 px-2">
 				<div className="flex flex-col">
 					<span className="font-medium text-gray-900 dark:text-gray-200 uppercase tracking-tight truncate max-w-75">
-						{transaction.description}
+						{transaction.merchant}
 					</span>
 
 					{transaction.note && (

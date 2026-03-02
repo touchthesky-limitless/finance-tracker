@@ -98,7 +98,7 @@ export default function TransactionDetailsModal({
 					{/* Left: Info & Note */}
 					<div className="flex-1 p-8 border-r border-gray-100 dark:border-gray-800">
 						<h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
-							{transaction.description}
+							{transaction.merchant}
 						</h2>
 						<div className="text-4xl font-extrabold text-gray-900 dark:text-white mb-6">
 							{formatMoney(Math.abs(transaction.amount))}
@@ -177,7 +177,7 @@ export default function TransactionDetailsModal({
 				<div className="bg-gray-50 dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800 p-4 text-center">
 					<p className="text-[10px] font-mono font-medium text-gray-400 uppercase tracking-wider">
 						Account: {transaction.account?.toUpperCase() || "Account"} |{" "}
-						{transaction.description.toUpperCase()}
+						{transaction.merchant.toUpperCase()}
 					</p>
 				</div>
 			</div>

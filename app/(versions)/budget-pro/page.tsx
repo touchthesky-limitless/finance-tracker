@@ -29,7 +29,6 @@ const TIME_PRESETS = {
 	LAST_12_MONTHS: "Last 12 Months",
 } as const;
 
-
 export default function OverviewPage() {
 	const [timeFilter, setTimeFilter] = useState(DEFAULT_YEAR_FILTER);
 	const FALL_BACK_DATE = TIME_PRESETS.THIS_MONTH;
@@ -404,7 +403,7 @@ export default function OverviewPage() {
 										<div key={i} className="flex flex-col gap-1">
 											<div className="flex justify-between items-center">
 												<span className="text-sm font-bold text-gray-900 dark:text-white truncate max-w-[100px]">
-													{t.description}
+													{t.merchant}
 												</span>
 												<span className="text-sm font-black text-white-600 dark:text-white-400">
 													-{formatCurrency(Math.abs(t.amount))}
