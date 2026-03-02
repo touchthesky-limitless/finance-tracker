@@ -29,7 +29,7 @@ export default function PulseOverviewPage() {
                     </h1>
                     
                     <p className="text-lg md:text-xl text-gray-500 dark:text-gray-400 max-w-2xl leading-relaxed">
-                        Your auto insurance hits tomorrow, but you still have a comfortable <strong className="text-gray-900 dark:text-white font-bold">$425.50</strong> safe to spend before Friday's paycheck.
+                        Your auto insurance hits tomorrow, but you still have a comfortable <strong className="text-gray-900 dark:text-white font-bold">$425.50</strong> safe to spend before Friday&quot;s paycheck.
                     </p>
                 </header>
 
@@ -104,7 +104,7 @@ export default function PulseOverviewPage() {
                                     </div>
                                     <div className="flex-1">
                                         <h4 className="text-sm font-bold text-gray-900 dark:text-white mb-1">Coffee budget exceeded</h4>
-                                        <p className="text-xs text-gray-500 leading-relaxed">You hit your $50 limit for the month. Would you like to pull $15 from "Dining Out" to cover the overage?</p>
+                                        <p className="text-xs text-gray-500 leading-relaxed">You hit your $50 limit for the month. Would you like to pull $15 from &quot;Dining Out&quot; to cover the overage?</p>
                                         <div className="flex gap-2 mt-3">
                                             <button className="text-xs font-bold px-3 py-1.5 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-lg">Rebalance</button>
                                             <button className="text-xs font-bold px-3 py-1.5 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg">Ignore</button>
