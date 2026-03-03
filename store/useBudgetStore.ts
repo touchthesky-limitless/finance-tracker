@@ -30,8 +30,10 @@ interface BudgetState {
 	transactions: Transaction[];
 	isLoading: boolean;
 	customTags: string[];
+	hasHydrated: boolean;
 	rules: { keyword: string; category: string }[];
 	toast: { count: number; snapshot: Transaction[] } | null;
+	setHasHydrated: (state: boolean) => void;
 	setToast: (toast: { count: number; snapshot: Transaction[] } | null) => void;
 	saveRule: (
 		rule: { keyword: string; category: string },
@@ -57,12 +59,15 @@ export const useBudgetStore = create<BudgetState>()(
 			customTags: [],
 			rules: [],
 			isLoading: false,
+			hasHydrated: false,
 			toast: null,
 			// setToast: (toast) => set({ toast }),
 			setToast: (toastValue) => {
 				// console.log("🚀 Store is receiving toast data:", toastValue);
 				set({ toast: toastValue });
 			},
+
+			setHasHydrated: (state: boolean) => set({ hasHydrated: state }),
 
 			addTransactions: async (newTxs: Transaction[]) => {
 				// 1. Get the current user
@@ -108,29 +113,45 @@ export const useBudgetStore = create<BudgetState>()(
 			setTransactions: (txs) => set({ transactions: txs }),
 
 			fetchTransactions: async () => {
+				// 1. SILENT ABORT: Check state BEFORE calling set({ isLoading: true })
+				// This prevents a wasted re-render when navigating between pages.
+				const { transactions, isLoading } = get();
+				if (transactions.length > 0 || isLoading) return;
+
+				// 2. START FETCH: Now we notify the UI to show the Shimmer
 				set({ isLoading: true });
-				const {
-					data: { user },
-				} = await supabase.auth.getUser();
-				if (!user) {
-					set({ isLoading: false });
-					return;
+
+				try {
+					// Use getSession() instead of getUser() if you want it even faster (reads from cookie)
+					const {
+						data: { user },
+					} = await supabase.auth.getUser();
+
+					if (!user) {
+						set({ isLoading: false, hasHydrated: true });
+						return;
+					}
+
+					// 3. PARALLEL FETCH: Keep your Promise.all, it's efficient.
+					const [txResponse, rulesResponse] = await Promise.all([
+						supabase
+							.from("transactions")
+							.select("*")
+							.order("date", { ascending: false }),
+						supabase.from("rules").select("keyword, category"),
+					]);
+
+					// 4. BATCHED UPDATE: Final state change
+					set({
+						transactions: (txResponse.data as Transaction[]) || [],
+						rules: rulesResponse.data || [],
+						isLoading: false,
+						hasHydrated: true, // Mark as finished for the Global Shimmer
+					});
+				} catch (error) {
+					console.error("Fetch Error:", error);
+					set({ isLoading: false, hasHydrated: true });
 				}
-
-				// Fetch both tables at once
-				const [txResponse, rulesResponse] = await Promise.all([
-					supabase
-						.from("transactions")
-						.select("*")
-						.order("date", { ascending: false }),
-					supabase.from("rules").select("keyword, category"),
-				]);
-
-				set({
-					transactions: (txResponse.data as Transaction[]) || [],
-					rules: rulesResponse.data || [],
-					isLoading: false,
-				});
 			},
 
 			saveRule: async (newRule, oldKeyword) => {
@@ -232,8 +253,8 @@ export const useBudgetStore = create<BudgetState>()(
 					.eq("id", id);
 
 				if (error) {
-					console.error("Failed to sync update:", error.message);
-					// Optional: Revert local state if DB fails
+					// Optional: Re-fetch on error to sync state
+					get().fetchTransactions();
 				}
 			},
 
@@ -293,6 +314,10 @@ export const useBudgetStore = create<BudgetState>()(
 		}),
 		{
 			name: `budget-storage`,
+			onRehydrateStorage: () => (state) => {
+                // This runs as soon as localStorage is read
+                state?.setHasHydrated(true);
+            },
 			storage: createJSONStorage(() => localStorage),
 			// 3. Optional: Only persist rules and tags, let Supabase handle transactions
 			partialize: (state) => ({

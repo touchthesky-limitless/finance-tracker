@@ -325,6 +325,7 @@ export function useBudgetData(timeFilter: string) {
 
 		// 2. Identify patterns (occurring ~once a month)
 		return Object.entries(merchants)
+			// eslint-disable-next-line @typescript-eslint/no-unused-vars
 			.filter(([_, data]) => data.dates.length >= 2) // Need at least 2 occurrences
 			.map(([name, data]) => {
 				const lastDate = new Date(Math.max(...data.dates));

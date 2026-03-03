@@ -11,12 +11,12 @@ import { UndoToast } from "@/components/ui/UndoToast";
 function ProLayoutShell({ children }: { children: React.ReactNode }) {
 	// 1. Create a title map
 	const PAGE_TITLES: Record<string, string> = {
-		"/budget-pro": "Overview",
-		"/budget-pro/transactions": "Transaction Details",
-		"/budget-pro/accounts": "Accounts",
-		"/budget-pro/categories": "Categories",
-		"/budget-pro/stats": "Statistics & Analysis",
-		"/budget-pro/insights": "Insights Explorer",
+		"/budget": "Dashboard",
+		"/budget/transactions": "Transaction Details",
+		"/budget/accounts": "Accounts",
+		"/budget/categories": "Categories",
+		"/budget/stats": "Statistics & Analysis",
+		"/budget/insights": "Insights Explorer",
 	};
 
 	const [isMobileOpen, setIsMobileOpen] = useState(false);
@@ -30,7 +30,7 @@ function ProLayoutShell({ children }: { children: React.ReactNode }) {
 	const undoBulkUpdate = useBudgetStore((state) => state.undoBulkUpdate);
 
 	// 2. Determine the current title
-	const currentTitle = PAGE_TITLES[pathname] || "Budget Pro Tracker";
+	const currentTitle = PAGE_TITLES[pathname] || "Budget Tracker";
 
 	return (
 		<div className="flex h-screen overflow-hidden bg-[#F8F9FB] dark:bg-[#0d0d0d]">

@@ -1,105 +1,52 @@
-import { getMortgageData } from "@/lib/mortgage";
-import { getStockData } from "@/lib/stock";
-import { LENDER_TEMPLATES } from "@/lib/lenders";
-import { calculateMonthlyPayment } from "@/lib/monthlypayment";
-// import { StockData } from "@/lib/types";
-import FinancialCard from "@/components/FinancialCard";
-import MortgageCard from "@/components/MortgageCard";
 
-const HERO_SYMBOL = "MSFT";
-const WATCHLIST_SYMBOLS = ["GOOGL", "AMZN"];
+import Link from 'next/link';
+import { Zap, ShieldCheck, BarChart3, ArrowRight } from 'lucide-react';
+import Footer from "@/components/Footer";
 
-export default async function Home() {
-	// 1. Parallel fetching
-	const [mortgage, featuredStock, rawWatchlist] = await Promise.all([
-		getMortgageData(),
-		getStockData(HERO_SYMBOL),
-		Promise.all(WATCHLIST_SYMBOLS.map((sym) => getStockData(sym))),
-	]);
+export default function LandingPage() {
+  return (
+    <div className="min-h-screen bg-black text-white selection:bg-orange-500/30">
+      {/* Hero Section */}
+      <nav className="flex justify-between items-center p-6 max-w-7xl mx-auto">
+        <div className="flex items-center gap-2 font-black text-xl tracking-tighter">
+          <Zap className="text-orange-600 fill-orange-600" size={24} />
+          BUDGET PRO
+        </div>
+        <Link href="/login" className="px-5 py-2 rounded-full border border-white/10 hover:bg-white/5 transition-all text-sm font-bold">
+          Sign In
+        </Link>
+      </nav>
 
-	// eslint-disable-next-line @typescript-eslint/no-unused-vars
-	const validWatchlist = rawWatchlist.filter((stock) => {
-		if (!stock) {
-			return false;
-		}
-		return stock.symbol !== HERO_SYMBOL;
-	});
+      <main className="max-w-4xl mx-auto pt-24 px-6 text-center">
+        <h1 className="text-6xl md:text-8xl font-black tracking-tight mb-6 bg-linear-to-b from-white to-gray-500 bg-clip-text text-transparent">
+          Wealth tracking <br /> for the 1%.
+        </h1>
+        <p className="text-gray-400 text-lg md:text-xl mb-10 max-w-2xl mx-auto font-medium">
+          A high-performance interface for managing complex transactions, automation rules, and real-time cash flow.
+        </p>
+        
+        <Link href="/login" className="inline-flex items-center gap-2 bg-orange-600 hover:bg-orange-500 text-white px-8 py-4 rounded-2xl font-black text-lg transition-all shadow-2xl shadow-orange-600/20 hover:scale-105 active:scale-95">
+          Get Started Now <ArrowRight size={20} />
+        </Link>
 
-	// 2. Define Baseline Constants
-	const LOAN_AMOUNT = 350000; // Standard baseline for comparison
-	const marketRate30Years = mortgage?.frm30.rate || 6.5;
+        {/* Feature Grid */}
+        <div className="grid md:grid-cols-3 gap-6 mt-32 text-left">
+          <FeatureCard icon={<ShieldCheck className="text-orange-500" />} title="Bank-Level Security" desc="Encrypted data sync powered by Supabase Auth." />
+          <FeatureCard icon={<Zap className="text-orange-500" />} title="Smart Automation" desc="Custom keyword rules for instant categorization." />
+          <FeatureCard icon={<BarChart3 className="text-orange-500" />} title="Deep Analytics" desc="Visual totals and cash flow reporting built-in." />
+        </div>
+      </main>
+      <Footer />
+    </div>
+  );
+}
 
-	// 3. Calculate Average Payment across all LENDER_TEMPLATES
-	const lenderPayments = LENDER_TEMPLATES.map((lender) => {
-		return calculateMonthlyPayment(
-			LOAN_AMOUNT,
-			marketRate30Years + lender.rateOffset,
-			30,
-		);
-	});
-
-	// Sum total payments and divide by count
-	const totalPayment = lenderPayments.reduce((sum, p) => sum + p, 0);
-	const avgPaymentValue = totalPayment / lenderPayments.length;
-	const avgPaymentDisplay = Math.round(avgPaymentValue).toLocaleString("en-US");
-
-	return (
-		<main className="min-h-screen bg-gray-50 dark:bg-gray-950 p-8">
-			<div className="max-w-6xl mx-auto">
-				<h1 className="text-3xl font-bold mb-8">Market Pulse</h1>
-				{/* MORTGAGE CARD */}
-				<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-					<MortgageCard
-						program="30-Year Fixed"
-						rate={marketRate30Years}
-						change={mortgage?.frm30.change || 0}
-						payment={avgPaymentDisplay}
-						date={mortgage?.date}
-					/>
-
-					{/* STOCK CARD */}
-					{featuredStock ? (
-						<FinancialCard
-							symbol={featuredStock.symbol}
-							name={featuredStock.name}
-							price={featuredStock.price}
-							change={featuredStock.change}
-							changePercent={featuredStock.changePercent}
-							currency={featuredStock.currency}
-							exchange={featuredStock.exchange}
-							logo={featuredStock.logo}
-							showFooter={true}
-						/>
-					) : (
-						<div className="p-10 text-center bg-white rounded-xl shadow-sm">
-							Loading Market Data...
-						</div>
-					)}
-				</div>
-
-					{/* WATCHLIST GRID */}
-					{/* <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-					{watchlist.map((stock) => {
-						if (!stock) return null;
-						return (
-							<FinancialCard
-								key={stock.symbol}
-								symbol={stock.symbol}
-								name={stock.name}
-								price={stock.price}
-								change={stock.change}
-								changePercent={stock.changePercent}
-								currency={stock.currency}
-								exchange={stock.exchange}
-								logo={stock.logo}
-							/>
-						);
-					})}
-				</div> */}
-				</div>
-			
-
-
-		</main>
-	);
+function FeatureCard({ icon, title, desc }: { icon: React.ReactNode; title: string; desc: string }) {
+  return (
+    <div className="p-8 rounded-3xl bg-[#0d0d0d] border border-white/5 hover:border-orange-500/20 transition-all">
+      <div className="mb-4">{icon}</div>
+      <h3 className="font-bold text-lg mb-2">{title}</h3>
+      <p className="text-gray-500 text-sm leading-relaxed">{desc}</p>
+    </div>
+  );
 }

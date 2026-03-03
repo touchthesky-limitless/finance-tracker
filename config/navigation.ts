@@ -28,7 +28,7 @@ export interface NavGroupType {
 
 export const FEATURE_LOCKS = {
 	MAP_INTEGRATION: true, // Generic for any map-related feature
-    MEDIA_UPLOADS: true,
+	MEDIA_UPLOADS: true,
 	TRANSACTION_TEMPLATES: true,
 	RECURRING_ITEMS: true, // Generic for scheduled/recurring logic
 	ADVANCED_ANALYTICS: true,
@@ -39,25 +39,25 @@ export type FeatureKey = keyof typeof FEATURE_LOCKS;
 export const NAV_GROUPS: NavGroupType[] = [
 	{
 		label: "",
-		items: [{ name: "Overview", href: "/budget-pro", icon: LayoutDashboard }],
+		items: [{ name: "Dashboard", href: "/budget", icon: LayoutDashboard }],
 	},
 	{
 		label: "Transaction Data",
 		items: [
 			{
 				name: "Transaction Details",
-				href: "/budget-pro/transactions",
+				href: "/budget/transactions",
 				icon: Receipt,
 				hasAdd: true,
 			},
 			{
 				name: "Statistics & Analysis",
-				href: "/budget-pro/stats",
+				href: "/budget/stats",
 				icon: BarChart3,
 			},
 			{
 				name: "Insights Explorer",
-				href: "/budget-pro/insights",
+				href: "/budget/insights",
 				icon: Compass,
 			},
 		],
@@ -65,22 +65,22 @@ export const NAV_GROUPS: NavGroupType[] = [
 	{
 		label: "Basis Data",
 		items: [
-			{ name: "Accounts", href: "/budget-pro/accounts", icon: Wallet },
+			{ name: "Accounts", href: "/budget/accounts", icon: Wallet },
 			{
 				name: "Transaction Categories",
-				href: "/budget-pro/categories",
+				href: "/budget/categories",
 				icon: LayoutDashboard,
 			},
-			{ name: "Transaction Tags", href: "/budget-pro/tags", icon: Tags },
+			{ name: "Transaction Tags", href: "/budget/tags", icon: Tags },
 			{
 				name: "Transaction Templates",
-				href: "/budget-pro/templates",
+				href: "/budget/templates",
 				icon: Calendar,
 				isLocked: true,
 			},
 			{
 				name: "Scheduled Transactions",
-				href: "/budget-pro/scheduled",
+				href: "/budget/scheduled",
 				icon: Repeat,
 				isLocked: true,
 			},
@@ -91,16 +91,16 @@ export const NAV_GROUPS: NavGroupType[] = [
 		items: [
 			{
 				name: "Exchange Rates Data",
-				href: "/budget-pro/exchange",
+				href: "/budget/exchange",
 				icon: RefreshCcw,
 				isLocked: true,
 			},
 			{
 				name: "Use on Mobile Device",
-				href: "/budget-pro/mobile",
+				href: "/budget/mobile",
 				icon: Smartphone,
 			},
-			{ name: "About", href: "/budget-pro/about", icon: Info },
+			{ name: "About", href: "/budget/about", icon: Info },
 		],
 	},
 ];

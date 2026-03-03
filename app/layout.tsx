@@ -1,10 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Roboto_Mono } from "next/font/google";
 import "./globals.css";
-import Navbar from "@/components/Navbar";
 import { ThemeProvider } from "@/components/ThemeProvider";
-import Footer from "@/components/Footer";
-import StoreInitializer from "@/components/StoreInitializer";
 
 const geistSans = Geist({
 	variable: "--font-geist-sans",
@@ -34,7 +31,7 @@ export default function RootLayout({
 	return (
 		<html lang="en" className="dark" suppressHydrationWarning>
 			<body
-				className={`${geistSans.variable} ${geistMono.variable} ${robotoMono.variable} antialiased`}
+				className={`${geistSans.variable} ${geistMono.variable} ${robotoMono.variable} antialiased bg-black`}
 			>
 				<ThemeProvider
 					attribute="class"
@@ -42,12 +39,8 @@ export default function RootLayout({
 					enableSystem
 					disableTransitionOnChange
 				>
-					<StoreInitializer />
-
 					<div className="flex flex-col min-h-screen">
-						<Navbar />
 						<main className="grow">{children}</main>
-						<Footer />
 					</div>
 				</ThemeProvider>
 			</body>

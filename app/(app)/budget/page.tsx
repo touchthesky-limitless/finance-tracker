@@ -90,16 +90,17 @@ export default function OverviewPage() {
 	}, [maxMonthlyValue]);
 
 	return (
-		<div className="relative w-full">
-			<header className="sticky top-0 z-100 w-full bg-[#F4F6F8]/80 dark:bg-[#0a0a0a]/80 backdrop-blur-md border-b border-gray-200/50 dark:border-gray-800/50 mb-8">
-				<div className="max-w-400 mx-auto flex flex-col lg:flex-row lg:items-end justify-between gap-6 py-6 px-4 md:px-8">
+		<div className="flex flex-col min-h-screen">
+			{/* Changed z-100 to z-40 and updated colors to match your Pro theme */}
+			<header className="sticky top-0 z-30 w-full bg-white/80 dark:bg-[#050505]/80 backdrop-blur-md border-b border-gray-200/50 dark:border-white/5">
+				<div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 py-6 px-4 md:px-8">
 					<div className="max-w-2xl">
-						<h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white tracking-tight mb-2">
-							Financial Overview
+						<h1 className="text-2xl md:text-3xl font-black text-gray-900 dark:text-white tracking-tighter mb-2 uppercase">
+							Financial <span className="text-orange-600">Dashboard</span>
 						</h1>
-						<p className="text-sm text-gray-500 dark:text-gray-400">
+						<p className="text-sm font-medium text-gray-500 dark:text-gray-400">
 							You have{" "}
-							<strong className="text-gray-900 dark:text-white font-medium">
+							<strong className="text-gray-900 dark:text-white font-black">
 								{formatCurrency(stats.remaining)}
 							</strong>{" "}
 							safe to spend before your next payday.
@@ -113,15 +114,15 @@ export default function OverviewPage() {
 								setTimeFilter(selectedDate);
 							}}
 						/>
-						<button className="flex items-center gap-2 px-4 py-2.5 bg-orange-600 hover:bg-orange-700 text-white rounded-xl text-sm font-semibold transition-colors shadow-sm shadow-orange-600/20">
-							<Download size={16} />
+						<button className="flex items-center gap-2 px-6 py-2.5 bg-orange-600 hover:bg-orange-500 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-orange-600/20 active:scale-95">
+							<Download size={16} strokeWidth={2.5} />
 							<span className="hidden sm:inline">Export</span>
 						</button>
 					</div>
 				</div>
 			</header>
 
-			<main className="max-w-400 mx-auto px-4 md:px-8 pb-24">
+			<main className="flex-1 max-w-400 w-full mx-auto px-4 md:px-8 py-8 pb-24">
 				{/* --- TOP ROW: Hero Summary --- */}
 				<div className="bg-white dark:bg-[#121212] border border-gray-100 dark:border-gray-800/80 rounded-3xl p-6 shadow-sm mb-6 flex flex-col lg:flex-row items-center gap-8 relative z-10">
 					<div className="flex items-center gap-6 w-full lg:w-[35%] lg:border-r border-gray-100 dark:border-gray-800 lg:pr-8 shrink-0">

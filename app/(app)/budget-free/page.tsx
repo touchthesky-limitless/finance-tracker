@@ -8,7 +8,7 @@ import ClearDataModal from "@/components/ClearDataModal";
 
 
 export default function BudgetPage() {
-	const { transactions } = useBudgetStore();
+	const transactions = useBudgetStore((state) => state.transactions);
 
 	// 1. STATE: SelectedBanks is now an Array
 	const [selectedBanks, setSelectedBanks] = useState<string[]>([]);
@@ -108,7 +108,7 @@ export default function BudgetPage() {
 				<div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
 					<div>
 						<h1 className="text-4xl font-extrabold text-gray-900 dark:text-white tracking-tight mb-2">
-							Financial Overview
+							Financial Dashboard
 						</h1>
 						<p className="text-gray-500 dark:text-gray-400 text-lg">
 							Track your spending across all accounts.

@@ -64,6 +64,9 @@ html {
 }
 
 @layer base {
+	body {
+		@apply antialiased selection:bg-orange-500/30;
+	}
 	/* Force cursor pointer on all interactive elements */
 	button,
 	select,

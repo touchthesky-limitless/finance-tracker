@@ -1,160 +1,152 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { RefiCalculator } from "@/lib/refi-calculator";
-import { LenderOffer } from "@/lib/types";
+import { ChevronRight, ShieldCheck } from "lucide-react";
 
 interface RefinanceCalculatorProps {
-	nationalRate: number;
+    nationalRate: number;
 }
 
 export default function RefinanceCalculator({
-	nationalRate,
+    nationalRate,
 }: RefinanceCalculatorProps) {
-	const [zip, setZip] = useState("75202");
-	const [propertyValue, setPropertyValue] = useState(474000);
-	const [mortgageBalance, setMortgageBalance] = useState(350000);
-	const [creditScore, setCreditScore] = useState(780);
+    const [zip, setZip] = useState("75202");
+    const [propertyValue, setPropertyValue] = useState(474000);
+    const [mortgageBalance, setMortgageBalance] = useState(350000);
+    const [creditScore, setCreditScore] = useState(780);
 
-	const [offers, setOffers] = useState<LenderOffer[]>([]);
+    // 2. Calculate offers directly. React is fast enough to do this every render.
+    const offers = RefiCalculator({
+        loanAmount: Number(mortgageBalance) || 0,
+        creditScore,
+        nationalRate,
+    });
 
-	useMemo(() => {
-		const newOffers = RefiCalculator({
-			loanAmount: Number(mortgageBalance) || 0,
-			creditScore,
-			nationalRate,
-		});
-		setOffers(newOffers);
-	}, [mortgageBalance, creditScore, nationalRate]);
+    return (
+        <div className="w-full space-y-12">
+            {/* INPUT PANEL - THE "COCKPIT" */}
+            <div className="bg-[#121212] border border-white/10 p-8 rounded-4xl shadow-2xl">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+                    <InputGroup label="Zip Code">
+                        <input
+                            type="text"
+                            value={zip}
+                            onChange={(e) => setZip(e.target.value)}
+                            className="w-full bg-black border border-white/10 rounded-xl p-3 text-white font-black focus:border-orange-600 outline-none transition-all"
+                        />
+                    </InputGroup>
 
-	return (
-		<div className="dark:bg-gray-800 dark:border-gray-700 w-full max-w-5xl mx-auto bg-gray-50 p-6 rounded-xl border border-gray-200">
-			{/* INPUTS */}
-			<div className="bg-primary-900 p-6 rounded-lg shadow-lg mb-8 text-white">
-				<div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-					<div>
-						<label className="text-xs font-semibold opacity-80 uppercase">
-							Zip Code
-						</label>
-						<input
-							type="text"
-							value={zip}
-							onChange={(e) => setZip(e.target.value)}
-							className="w-full bg-primary-800 border-none rounded p-2 text-white font-bold mt-1"
-						/>
-					</div>
-					<div>
-						<label className="text-xs font-semibold opacity-80 uppercase">
-							Property Value
-						</label>
-						<input
-							type="number"
-							value={propertyValue}
-							onChange={(e) => setPropertyValue(Number(e.target.value))}
-							className="w-full bg-primary-800 border-none rounded p-2 text-white font-bold mt-1"
-						/>
-					</div>
-					<div>
-						<label className="text-xs font-semibold opacity-80 uppercase">
-							Balance
-						</label>
-						<input
-							type="number"
-							value={mortgageBalance}
-							onChange={(e) => setMortgageBalance(Number(e.target.value))}
-							className="w-full bg-primary-800 border-none rounded p-2 text-white font-bold mt-1"
-						/>
-					</div>
-					<div className="md:col-span-2">
-						<label className="text-xs font-semibold opacity-80 uppercase">
-							Credit Score
-						</label>
-						<select
-							value={creditScore}
-							onChange={(e) => setCreditScore(Number(e.target.value))}
-							className="w-full bg-primary-800 border-none rounded p-2 text-white font-bold mt-1 cursor-pointer"
-						>
-							<option value={780}>Excellent (780-850)</option>
-							<option value={760}>Very Good (760-779)</option>
-							<option value={720}>Good (720-759)</option>
-							<option value={680}>Fair (680-719)</option>
-							<option value={620}>Poor (620-679)</option>
-						</select>
-					</div>
-				</div>
-			</div>
+                    <InputGroup label="Property Value">
+                        <div className="relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-bold">$</span>
+                            <input
+                                type="number"
+                                value={propertyValue}
+                                onChange={(e) => setPropertyValue(Number(e.target.value))}
+                                className="w-full bg-black border border-white/10 rounded-xl p-3 pl-8 text-white font-black focus:border-orange-600 outline-none transition-all"
+                            />
+                        </div>
+                    </InputGroup>
 
-			{/* DYNAMIC RESULTS */}
-			<div className="space-y-4">
-				{offers.map((offer, index) => (
-					<div
-						key={index}
-						className="bg-white text-gray-900 dark:bg-gray-800 dark:border-gray-700  p-6 rounded-lg flex flex-col md:flex-row items-center justify-between shadow-sm border border-gray-200"
-					>
-						<div className="w-full md:w-1/4 mb-4 md:mb-0">
-							<h3 className="text-2xl font-bold text-primary-700">
-								{offer.name}
-							</h3>
-							<p className="text-xs text-gray-400 font-mono">
-								NMLS #{offer.nmls}
-							</p>
-							{/* <button className="text-primary-600 text-sm font-semibold mt-1 hover:underline">
-								Show details ⌄
-							</button> */}
-						</div>
+                    <InputGroup label="Loan Balance">
+                        <div className="relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-bold">$</span>
+                            <input
+                                type="number"
+                                value={mortgageBalance}
+                                onChange={(e) => setMortgageBalance(Number(e.target.value))}
+                                className="w-full bg-black border border-white/10 rounded-xl p-3 pl-8 text-white font-black focus:border-orange-600 outline-none transition-all"
+                            />
+                        </div>
+                    </InputGroup>
 
-						<div className="grid grid-cols-2 md:grid-cols-4 gap-6 w-full md:w-3/4 items-center">
-							<div className="text-left">
-								<div className="flex items-center gap-1 group relative">
-									<p className="text-xs text-gray-500 uppercase font-semibold border-b border-dotted border-gray-400 cursor-help">
-										APR
-									</p>
-									{/* Tooltip on Hover */}
-									<div className="absolute bottom-full mb-2 hidden w-40 p-2 bg-gray-800 text-white text-xs rounded shadow-lg group-hover:block">
-										Includes fees & closing costs.
-									</div>
-								</div>
-								<p className="text-3xl font-extrabold text-gray-900 dark:text-white">
-									{offer.apr}%
-								</p>
-							</div>
+                    <InputGroup label="Credit Tier">
+                        <select
+                            value={creditScore}
+                            onChange={(e) => setCreditScore(Number(e.target.value))}
+                            className="w-full bg-black border border-white/10 rounded-xl p-3 text-white font-black focus:border-orange-600 outline-none transition-all cursor-pointer appearance-none"
+                        >
+                            <option value={780}>EXCELLENT (780+)</option>
+                            <option value={720}>GOOD (720-779)</option>
+                            <option value={620}>FAIR (620-719)</option>
+                        </select>
+                    </InputGroup>
+                </div>
+            </div>
 
-							<div className="text-left">
-								<p className="text-xs text-gray-500 uppercase font-semibold">
-									Interest Rate
-								</p>
-								<p className="text-3xl font-extrabold text-gray-900 dark:text-white">
-									{offer.rate}%
-								</p>
-							</div>
+            {/* OFFERS LIST */}
+            <div className="space-y-6">
+                <div className="flex items-center justify-between px-4">
+                    <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-500">
+                        Available Re-structure Options
+                    </h3>
+                    <div className="flex items-center gap-2 text-[10px] font-black text-orange-600 uppercase tracking-widest">
+                        <ShieldCheck size={14} /> Verified Lenders
+                    </div>
+                </div>
 
-							<div className="text-left">
-								<p className="text-xs text-gray-500 uppercase font-semibold">
-									Mo. Payment
-								</p>
-								<p className="text-2xl font-bold text-gray-900 dark:text-white">
-									${offer.payment}
-									<span className="text-sm font-normal text-gray-400">/mo</span>
-								</p>
-							</div>
+                {offers.map((offer, index) => (
+                    <div
+                        key={index}
+                        className="bg-[#0d0d0d] border border-white/5 p-8 rounded-4xl flex flex-col lg:flex-row items-center justify-between group hover:border-orange-600/30 transition-all"
+                    >
+                        {/* Lender Info */}
+                        <div className="w-full lg:w-1/4 mb-6 lg:mb-0">
+                            <div className="flex items-center gap-3 mb-1">
+                                <div className="w-2 h-2 rounded-full bg-orange-600 shadow-[0_0_8px_rgba(234,88,12,0.6)]" />
+                                <h3 className="text-xl font-black text-white uppercase tracking-tighter">
+                                    {offer.name}
+                                </h3>
+                            </div>
+                            <p className="text-[10px] text-gray-600 font-black tracking-widest uppercase">
+                                NMLS ID: {offer.nmls}
+                            </p>
+                        </div>
 
-							<div className="flex flex-col items-end">
-								<p className="text-xs text-gray-500 uppercase font-semibold mb-1">
-									Total Fees: ${offer.fees}
-								</p>
-								<button className="bg-primary-600 hover:bg-primary-700 text-white font-bold py-3 px-6 rounded-md shadow-md transition w-full md:w-auto">
-									GET MY RATE
-								</button>
-							</div>
-						</div>
-					</div>
-				))}
-			</div>
+                        {/* Stats Grid */}
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-12 w-full lg:w-2/3 items-center">
+                            <Stat label="APR" value={`${offer.apr}%`} highlight />
+                            <Stat label="Rate" value={`${offer.rate}%`} />
+                            <div className="hidden md:block">
+                                <Stat label="Monthly Est." value={`$${offer.payment}`} sub="/mo" />
+                            </div>
+                        </div>
 
-			<p className="text-xs text-gray-400 mt-6 text-center">
-				*Rates estimated using National Avg ({nationalRate}%) adjusted for
-				credit & lender fees.
-			</p>
-		</div>
-	);
+                        {/* CTA */}
+                        <div className="w-full lg:w-auto mt-8 lg:mt-0">
+                            <button className="w-full lg:w-auto bg-white text-black hover:bg-orange-600 hover:text-white font-black py-4 px-8 rounded-2xl transition-all flex items-center justify-center gap-2 group/btn">
+                                LOCK RATE
+                                <ChevronRight size={18} className="group-hover/btn:translate-x-1 transition-transform" />
+                            </button>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
+
+/* UI Sub-components for cleaner code */
+function InputGroup({ label, children }: { label: string; children: React.ReactNode }) {
+    return (
+        <div className="space-y-2">
+            <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">
+                {label}
+            </label>
+            {children}
+        </div>
+    );
+}
+
+function Stat({ label, value, sub, highlight }: { label: string; value: string; sub?: string; highlight?: boolean }) {
+    return (
+        <div className="text-left">
+            <p className="text-[10px] font-black text-gray-600 uppercase tracking-widest mb-1">{label}</p>
+            <p className={`text-4xl font-black tracking-tighter ${highlight ? 'text-orange-600' : 'text-white'}`}>
+                {value}
+                {sub && <span className="text-xs font-bold text-gray-600 ml-1">{sub}</span>}
+            </p>
+        </div>
+    );
 }

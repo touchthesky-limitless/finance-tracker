@@ -1,72 +1,82 @@
-import {Percent, Home } from "lucide-react";
+import { Percent, Home, ArrowUpRight, ArrowDownRight } from "lucide-react";
 import { getTrendProps } from "@/lib/utils";
 
 interface MortgageCardProps {
-	program: string; // e.g. "30-Year Fixed"
-	rate: number; // e.g. 6.875
-	change: number; // e.g. -0.05
-	payment?: string; // e.g. "$2,000" (Optional)
-	date?: string; // e.g. "Feb 14, 2026"
+  program: string;
+  rate: number;
+  change: number;
+  payment?: string;
+  date?: string;
 }
 
 export default function MortgageCard({
-	program,
-	rate,
-	change,
-	payment,
-	date,
+  program,
+  rate,
+  change,
+  payment,
+  date,
 }: MortgageCardProps) {
-	const { color, Icon } = getTrendProps(change, "liability");
+  // We'll keep the logic but override the visual output for the "Pro" theme
+  const { color } = getTrendProps(change, "liability");
+  const isPositive = change > 0;
 
-	return (
-		<div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6 shadow-sm flex flex-col justify-between h-full hover:shadow-md transition-shadow">
-			{/* HEADER */}
-			<div className="flex items-start gap-4 mb-4">
-				<div className="w-12 h-12 rounded-full bg-indigo-100 dark:bg-indigo-900 flex items-center justify-center text-indigo-600 dark:text-indigo-300">
-					<Home size={24} />
-				</div>
-				<div>
-					<h2 className="text-xl font-medium text-gray-900 dark:text-white">
-						{program}
-					</h2>
-					<div className="text-sm text-gray-500">National Average</div>
-				</div>
-			</div>
+  return (
+    <div className="bg-[#0d0d0d] border border-white/5 rounded-3xl p-8 flex flex-col justify-between h-full hover:border-orange-500/30 transition-all group">
+      <div>
+        {/* HEADER */}
+        <div className="flex justify-between items-start mb-8">
+          <div className="w-12 h-12 rounded-2xl bg-orange-600/10 flex items-center justify-center text-orange-600 group-hover:bg-orange-600 group-hover:text-white transition-all">
+            <Home size={22} strokeWidth={2.5} />
+          </div>
+          <div className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 bg-white/5 px-3 py-1 rounded-full">
+            Market Live
+          </div>
+        </div>
 
-			{/* RATE SECTION */}
-			<div className="mt-2">
-				<div className="flex items-baseline gap-1">
-					<span className="text-5xl font-normal tracking-tight text-gray-900 dark:text-white">
-						{rate?.toFixed(2) ?? "0.00"}
-					</span>
-					{/* Percent Icon adjusted for visual balance */}
-					<span className="text-gray-400">
-						<Percent size={24} strokeWidth={2.5} />
-					</span>
-				</div>
+        <div className="space-y-1">
+          <h2 className="text-sm font-black text-gray-400 uppercase tracking-widest">
+            {program}
+          </h2>
+          <div className="flex items-baseline gap-2">
+            <span className="text-6xl font-black tracking-tighter text-white">
+              {rate?.toFixed(2) ?? "0.00"}
+            </span>
+            <span className="text-orange-600 font-bold text-2xl"><Percent/></span>
+          </div>
+        </div>
 
-				{/* Monthly Payment Estimate (Conditional) */}
-				{payment && (
-					<div className="text-sm font-medium text-gray-500 mt-1 ml-1">
-						Est.{" "}
-						<span className="text-gray-900 dark:text-gray-300">${payment}</span>
-						/mo
-					</div>
-				)}
-			</div>
+        {/* PAYMENT ESTIMATE */}
+        {payment && (
+          <div className="mt-4 flex items-center gap-2">
+            <span className="text-xs font-bold text-gray-500 uppercase tracking-tight">
+              Monthly Est.
+            </span>
+            <span className="text-lg font-black text-white">
+              ${payment}
+            </span>
+          </div>
+        )}
+      </div>
 
-			{/* CHANGE INDICATOR */}
-			<div
-				className={`flex items-center gap-2 mt-4 font-medium text-lg ${color}`}
-			>
-				<span>{Math.abs(change || 0).toFixed(2)}%</span>
-				<Icon size={20} />
-			</div>
+      <div>
+        {/* CHANGE INDICATOR */}
+        <div className={`mt-8 flex items-center gap-2 ${color} font-black text-sm uppercase tracking-wider`}>
+          <div className={`p-1 rounded-md ${isPositive ? 'bg-red-500/10' : 'bg-green-500/10'}`}>
+            {isPositive ? <ArrowUpRight size={16} /> : <ArrowDownRight size={16} />}
+          </div>
+          <span>{Math.abs(change || 0).toFixed(3)} Points</span>
+        </div>
 
-			{/* FOOTER */}
-			<div className="mt-6 pt-4 border-t border-gray-100 dark:border-gray-800 text-xs text-gray-400">
-				Updated: {date || "Today"}
-			</div>
-		</div>
-	);
+        {/* FOOTER */}
+        <div className="mt-6 pt-6 border-t border-white/5 flex justify-between items-center">
+          <span className="text-[10px] font-bold text-gray-600 uppercase tracking-widest">
+            Last Updated
+          </span>
+          <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+            {date || "Today"}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
 }
