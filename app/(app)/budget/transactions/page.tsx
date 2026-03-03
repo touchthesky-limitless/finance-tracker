@@ -56,11 +56,11 @@ export default function TransactionsPage() {
 	const bulkDeleteTransactions = useBudgetStore(
 		(state) => state.bulkDeleteTransactions,
 	);
+	const undoDelete = useBudgetStore((state) => state.undoDelete);
 	const toast = useBudgetStore((state) => state.toast);
 
 	const [selectedTransaction, setSelectedTransaction] =
 		useState<Transaction | null>(null);
-
 	const [searchQuery, setSearchQuery] = useState("");
 	const [showClearModal, setShowClearModal] = useState(false);
 	const [showUploader, setShowUploader] = useState(false);
@@ -73,11 +73,12 @@ export default function TransactionsPage() {
 	const [currentPage, setCurrentPage] = useState(1);
 	const [selectedIds, setSelectedIds] = useState<string[]>([]);
 	const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
-	const undoDelete = useBudgetStore((state) => state.undoDelete);
+
 	const [deleteToast, setDeleteToast] = useState<{
 		count: number;
 		snapshot: Transaction[];
 	} | null>(null);
+
 	const { inputRef, handleClear } = useSearchState(setSearchQuery);
 
 	const handleRuleSaved = (count: number, snapshot: Transaction[]) => {
@@ -122,6 +123,7 @@ export default function TransactionsPage() {
 		categoryFilter,
 		sortPriority,
 	});
+
 	if (
 		prevFilters.searchQuery !== searchQuery ||
 		prevFilters.categoryFilter !== categoryFilter ||
@@ -205,7 +207,6 @@ export default function TransactionsPage() {
 		setSelectedTransaction(t);
 	}, []);
 
-	// Toggle a single row
 	const handleSelectRow = React.useCallback(
 		(id: string, e: React.MouseEvent) => {
 			e.stopPropagation();
@@ -216,34 +217,23 @@ export default function TransactionsPage() {
 		[],
 	);
 
-	// Toggle all visible rows
 	const handleSelectAllVisible = () => {
 		const visibleIds = paginatedTransactions.map((t) => t.id);
 		const allSelected = visibleIds.every((id) => selectedIds.includes(id));
 
 		if (allSelected) {
-			// Deselect all visible
 			setSelectedIds((prev) => prev.filter((id) => !visibleIds.includes(id)));
 		} else {
-			// Select all visible
 			setSelectedIds((prev) => Array.from(new Set([...prev, ...visibleIds])));
 		}
 	};
 
-	// The Bulk Delete Action
 	const handleBulkDelete = async () => {
-		// Capture the exact items we are about to delete
 		const snapshotBackup = transactions.filter((t) =>
 			selectedIds.includes(t.id),
 		);
-
-		// Execute the real deletion
 		await bulkDeleteTransactions(selectedIds);
-
-		// Trigger the LOCAL delete toast
 		setDeleteToast({ count: selectedIds.length, snapshot: snapshotBackup });
-
-		// Reset UI state
 		setSelectedIds([]);
 		setShowBulkDeleteConfirm(false);
 	};
@@ -299,8 +289,6 @@ export default function TransactionsPage() {
 					</button>
 					<button
 						disabled
-						onClick={() => setShowClearModal(true)}
-						// className="p-2 ml-1 bg-red-50 hover:bg-red-100 dark:bg-red-500/10 dark:hover:bg-red-500/20 text-red-600 dark:text-red-500 rounded-xl transition-all"
 						className="p-2 ml-1 bg-gray-100 dark:bg-white/5 text-gray-400 dark:text-gray-600 rounded-xl cursor-not-allowed opacity-50"
 						title="Clear all data"
 					>
@@ -310,12 +298,26 @@ export default function TransactionsPage() {
 			</div>
 
 			{/* 2. Data Table & Pagination Wrapper */}
-			<div className="flex-1 overflow-auto px-4 md:px-6 pb-8 min-h-37.5 flex flex-col justify-between">
-				<table className="w-full border-collapse">
+			<div className="flex-1 overflow-x-auto overflow-y-auto px-4 md:px-6 pb-8 min-h-37.5 flex flex-col justify-between">
+				{/* UI FIX: table-fixed forces the widths defined in <colgroup>
+                    min-w-[900px] ensures the table scrolls horizontally on mobile instead of squishing
+                    [&_th:nth-child(5)]:pl-8 pushes the Account column away from the Amount column
+                */}
+				<table className="w-full min-w-225 border-collapse table-fixed text-sm [&_th:nth-child(5)]:pl-8 [&_td:nth-child(5)]:pl-8 [&_th:nth-child(4)]:pr-4 [&_td:nth-child(4)]:pr-4">
+					<colgroup>
+						<col className="w-12" /> {/* 1. Checkbox */}
+						<col className="w-[28%]" /> {/* 2. Name */}
+						<col className="w-[18%]" /> {/* 3. Category */}
+						<col className="w-[12%]" /> {/* 4. Amount */}
+						<col className="w-[18%]" /> {/* 5. Account */}
+						<col className="w-[12%]" /> {/* 6. Tags */}
+						<col className="w-[12%]" /> {/* 7. Status */}
+					</colgroup>
+
 					<thead className="sticky top-0 bg-[#F8F9FB] dark:bg-[#050505] z-20">
 						<tr className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest text-left border-b border-gray-200/50 dark:border-white/5">
 							{/* --- MASTER CHECKBOX --- */}
-							<th className="py-4 px-3 w-10">
+							<th className="py-4 px-3">
 								<div
 									onClick={handleSelectAllVisible}
 									className={`w-4 h-4 rounded border flex items-center justify-center transition-all cursor-pointer ${
@@ -385,14 +387,16 @@ export default function TransactionsPage() {
 								sortPriority={sortPriority}
 								onClick={handleSort}
 							/>
-							<th className="py-4 px-2 w-32">Tags</th>
-							<th className="py-4 px-2 w-32">Status</th>
+							<th className="py-4 px-2">Tags</th>
+							<th className="py-4 px-2">Status</th>
 						</tr>
 					</thead>
+
 					<tbody className="divide-y divide-gray-100 dark:divide-white/5 text-sm">
 						{!isMounted ? (
 							<tr>
-								<td colSpan={6} className="py-16">
+								{/* colSpan updated to 7 to account for Checkbox column */}
+								<td colSpan={7} className="py-16">
 									<div className="flex justify-center w-full">
 										<div className="w-6 h-6 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
 									</div>
@@ -401,7 +405,7 @@ export default function TransactionsPage() {
 						) : paginatedTransactions.length === 0 ? (
 							<tr>
 								<td
-									colSpan={6}
+									colSpan={7}
 									className="py-16 text-center text-gray-500 font-medium"
 								>
 									No transactions found.
@@ -413,7 +417,7 @@ export default function TransactionsPage() {
 									{/* Date Group Header */}
 									<tr className="sticky top-11.25 z-10 bg-gray-50/95 dark:bg-[#0a0a0a]/95 backdrop-blur-md transform-gpu border-y border-gray-200/50 dark:border-white/5">
 										<td
-											colSpan={6}
+											colSpan={7}
 											className="py-2.5 px-3 text-[10px] font-black text-orange-600 dark:text-orange-500 uppercase tracking-widest"
 										>
 											{date}
@@ -436,7 +440,7 @@ export default function TransactionsPage() {
 
 				{/* 3. Pagination Controls */}
 				{totalPages > 1 && (
-					<div className="pt-6 mt-auto border-t border-gray-200/50 dark:border-white/5 flex items-center justify-between">
+					<div className="pt-6 mt-auto border-t border-gray-200/50 dark:border-white/5 flex items-center justify-between sticky left-0">
 						<span className="text-xs text-gray-500 font-medium hidden sm:inline-block">
 							Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1} to{" "}
 							{Math.min(currentPage * ITEMS_PER_PAGE, filteredAndSorted.length)}{" "}
@@ -570,16 +574,14 @@ export default function TransactionsPage() {
 					</div>
 				</div>
 			)}
+
 			{/* Bulk Delete Confirmation Modal */}
 			{showBulkDeleteConfirm && (
 				<div className="fixed inset-0 z-100 flex items-center justify-center p-4">
-					{/* Backdrop */}
 					<div
 						className="absolute inset-0 bg-black/60 backdrop-blur-md transform-gpu animate-in fade-in duration-200"
 						onClick={() => setShowBulkDeleteConfirm(false)}
 					/>
-
-					{/* Modal Dialog */}
 					<div className="relative bg-white dark:bg-[#121212] border border-gray-200 dark:border-white/10 w-full max-w-sm rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
 						<div className="p-6 text-center">
 							<div className="w-16 h-16 rounded-full bg-red-50 dark:bg-red-500/10 flex items-center justify-center mx-auto mb-4">
@@ -617,6 +619,7 @@ export default function TransactionsPage() {
 					</div>
 				</div>
 			)}
+
 			{/* 1. THE DELETE TOAST (Uses Merge Math) */}
 			{deleteToast && (
 				<UndoToast

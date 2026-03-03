@@ -64,6 +64,22 @@ html {
 }
 
 @layer base {
+	html,
+	body {
+		font-variant-numeric: tabular-nums;
+		-webkit-font-feature-settings: "tnum";
+		font-feature-settings: "tnum";
+	}
+
+	table,
+	span,
+	td,
+	th,
+	h1,
+	h2,
+	h3 {
+		font-feature-settings: "tnum", "lnum"; /* Tabular + Lining figures */
+	}
 	body {
 		@apply antialiased selection:bg-orange-500/30;
 	}
