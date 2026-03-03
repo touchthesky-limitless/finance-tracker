@@ -483,9 +483,30 @@ export default function EditTransactionModal({
 									<textarea
 										className="w-full bg-[#F8F9FB] dark:bg-[#0d0d0d] border border-gray-800 rounded-xl p-4 text-gray-300 focus:border-orange-500/50 outline-none min-h-20 resize-none"
 										value={editedData.merchant}
-										onChange={(e) =>
-											setEditedData({ ...editedData, merchant: e.target.value })
-										}
+										onChange={(e) => {
+											const newName = e.target.value;
+
+											// 1. Check for matching rules as the user types
+											// Only auto-suggest if it's a new transaction to avoid overwriting intentional edits
+											let suggestedCategory = editedData.category;
+
+											if (isNew && newName.length > 2) {
+												const matchingRule = rules.find((r) =>
+													newName
+														.toLowerCase()
+														.includes(r.keyword.toLowerCase()),
+												);
+												if (matchingRule) {
+													suggestedCategory = matchingRule.category;
+												}
+											}
+											// 2. Update state in one single call
+											setEditedData({
+												...editedData,
+												merchant: newName,
+												category: suggestedCategory,
+											});
+										}}
 									/>
 								</div>
 							</div>

@@ -54,6 +54,35 @@ interface BudgetState {
 	undoDelete: (restoredTxs: Transaction[]) => Promise<void>;
 }
 
+const applyRulesToTransaction = (
+	tx: Transaction,
+	rules: Rule[],
+): Transaction => {
+	const updatedTx = { ...tx };
+
+	// Sort rules by keyword length (descending) so "Amazon Prime" matches before "Amazon"
+	const sortedRules = [...rules].sort(
+		(a, b) => b.keyword.length - a.keyword.length,
+	);
+
+	for (const rule of sortedRules) {
+		const nameMatch = updatedTx.merchant
+			?.toLowerCase()
+			.includes(rule.keyword.toLowerCase());
+		const categoryMatch =
+			!rule.matchCategory || updatedTx.category === rule.matchCategory;
+
+		if (nameMatch && categoryMatch) {
+			updatedTx.category = rule.category;
+			updatedTx.needs_review = false;
+			updatedTx.needs_subcat = false;
+			break; // Stop after first match
+		}
+	}
+
+	return updatedTx;
+};
+
 export const useBudgetStore = create<BudgetState>()(
 	persist(
 		(set, get) => ({
@@ -69,23 +98,30 @@ export const useBudgetStore = create<BudgetState>()(
 			setTransactions: (txs) => set({ transactions: txs }),
 			setLoading: (loading) => set({ isLoading: loading }),
 
-			addTransactions: async (newTxs) => {
+			addTransactions: async (newTxs: Transaction[]) => {
 				const {
 					data: { user },
 				} = await supabase.auth.getUser();
 				if (!user) return;
 
-				const txsToInsert = newTxs.map((tx) => ({
-					user_id: user.id,
-					date: tx.date,
-					merchant: tx.merchant,
-					amount: tx.amount,
-					category: tx.category || "Uncategorized",
-					account: tx.account,
-					description: tx.description || "",
-					needs_review: tx.needs_review ?? true,
-					needs_subcat: tx.needs_subcat ?? true,
-				}));
+				const { rules } = get(); // Get existing rules from the store
+
+				const txsToInsert = newTxs.map((tx) => {
+					// --- THE FIX: Apply rules here before sending to DB ---
+					const processedTx = applyRulesToTransaction(tx, rules);
+
+					return {
+						user_id: user.id,
+						date: processedTx.date,
+						merchant: processedTx.merchant,
+						amount: processedTx.amount,
+						category: processedTx.category || "Uncategorized",
+						account: processedTx.account,
+						description: processedTx.description || "",
+						needs_review: processedTx.needs_review ?? true,
+						needs_subcat: processedTx.needs_subcat ?? true,
+					};
+				});
 
 				const { data, error } = await supabase
 					.from("transactions")
