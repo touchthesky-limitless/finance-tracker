@@ -44,7 +44,7 @@ export default function WelcomeNotification() {
                     System Auth
                 </h4>
                 <p className="text-sm font-bold text-white tracking-tight">
-                    Welcome back, <span className="text-gray-400 font-medium italic">Verified User</span>
+                    Welcome back, <span className="text-gray-400 font-medium italic">My broke friend</span>
                 </p>
             </div>
 

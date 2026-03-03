@@ -3,7 +3,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
 	Plus,
-	Filter,
 	Upload,
 	Trash2,
 	X,
@@ -42,19 +41,13 @@ interface SortConfig {
 const ITEMS_PER_PAGE = 12;
 
 export default function TransactionsPage() {
-	// 1. THE MICRO-DEFERRAL FIX
-	// This allows the Next.js router to navigate instantly without waiting for the table to build
 	const [isMounted, setIsMounted] = useState(false);
 	useEffect(() => {
-        // By wrapping this in a setTimeout, we push the state update to the 
-        // end of the execution queue. This satisfies the linter AND guarantees 
-        // the browser has time to close the sidebar before rendering the rows.
-        const timer = setTimeout(() => {
-            setIsMounted(true);
-        }, 0); // 0ms still pushes it to the next event loop tick
-
-        return () => clearTimeout(timer);
-    }, []);
+		const timer = setTimeout(() => {
+			setIsMounted(true);
+		}, 0);
+		return () => clearTimeout(timer);
+	}, []);
 
 	const setToast = useBudgetStore((state) => state.setToast);
 	const transactions = useBudgetStore((state) => state.transactions);
@@ -63,7 +56,6 @@ export default function TransactionsPage() {
 	const [selectedTransaction, setSelectedTransaction] =
 		useState<Transaction | null>(null);
 
-	// --- State ---
 	const [searchQuery, setSearchQuery] = useState("");
 	const [showClearModal, setShowClearModal] = useState(false);
 	const [showUploader, setShowUploader] = useState(false);
@@ -73,7 +65,6 @@ export default function TransactionsPage() {
 	const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
 	const [, setIsEditModalOpen] = useState(false);
 
-	// --- PAGINATION STATE ---
 	const [currentPage, setCurrentPage] = useState(1);
 	const { inputRef, handleClear } = useSearchState(setSearchQuery);
 
@@ -82,7 +73,6 @@ export default function TransactionsPage() {
 		setSelectedTransaction(null);
 	};
 
-	// --- 1. Base Filter & Sort ---
 	const filteredAndSorted = useMemo(() => {
 		const filtered = transactions.filter((t) => {
 			const merchantName = t.merchant?.toLowerCase() || "";
@@ -115,7 +105,6 @@ export default function TransactionsPage() {
 		});
 	}, [transactions, searchQuery, sortPriority, categoryFilter]);
 
-	// --- 2. Auto-Reset Page on Filter Change ---
 	const [prevFilters, setPrevFilters] = useState({
 		searchQuery,
 		categoryFilter,
@@ -130,7 +119,6 @@ export default function TransactionsPage() {
 		setPrevFilters({ searchQuery, categoryFilter, sortPriority });
 	}
 
-	// --- 3. Slice for Pagination ---
 	const totalPages = Math.max(
 		1,
 		Math.ceil(filteredAndSorted.length / ITEMS_PER_PAGE),
@@ -161,7 +149,6 @@ export default function TransactionsPage() {
 		];
 	}, [currentPage, totalPages]);
 
-	// --- 4. Group only the active page ---
 	const filteredAndGrouped = useMemo(() => {
 		const groups: Record<string, typeof transactions> = {};
 		paginatedTransactions.forEach((t) => {
@@ -172,7 +159,6 @@ export default function TransactionsPage() {
 		return groups;
 	}, [paginatedTransactions]);
 
-	// --- Handlers ---
 	const handleSort = (key: SortKey, e: React.MouseEvent) => {
 		const isShiftKey = e.shiftKey;
 		setSortPriority((prev) => {
@@ -218,27 +204,24 @@ export default function TransactionsPage() {
 	}, [selectedTransaction]);
 
 	return (
-		<div className="flex flex-col h-full bg-white dark:bg-[#0d0d0d] text-slate-900 dark:text-gray-300 transition-colors animate-in fade-in duration-300">
+		<div className="flex flex-col h-full bg-transparent text-slate-900 dark:text-gray-300 transition-colors animate-in fade-in duration-300">
 			{/* 1. Action Bar */}
-			<div className="p-4 md:p-6 border-b border-gray-800 flex flex-wrap items-center justify-between gap-4 bg-[#F8F9FB] dark:bg-[#0d0d0d]/80 backdrop-blur-md transform-gpu sticky top-0 z-30">
+			<div className="p-4 md:p-6 border-b border-gray-200/50 dark:border-white/5 flex flex-wrap items-center justify-between gap-4 bg-white/80 dark:bg-[#050505]/80 backdrop-blur-md transform-gpu sticky top-0 z-30">
 				<div className="flex items-center gap-3">
-					<h2 className="text-xl font-bold text-gray-900 dark:text-white">
+					<h2 className="text-xl font-black tracking-tight text-gray-900 dark:text-white">
 						Transactions
 					</h2>
-					<span className="text-xs bg-gray-300 dark:bg-gray-800 px-2 py-0.5 rounded-full text-gray-400">
+					<span className="text-xs bg-gray-100 dark:bg-white/5 px-2.5 py-1 rounded-full text-gray-500 dark:text-gray-400 font-bold">
 						{transactions.length} total
 					</span>
 				</div>
 
 				<div className="flex items-center gap-2">
-					<button className="p-2 hover:bg-gray-800 rounded-lg text-gray-400 transition-colors border border-transparent hover:border-gray-700">
-						<Filter size={18} />
-					</button>
 					<div className="relative">
 						<SearchInput
 							ref={inputRef}
-							searchIconClassName="text-gray-500"
-							inputClassName="dark:bg-gray-900 border border-gray-400 dark:border-gray-800 rounded-lg py-1.5 pl-9 pr-4 text-sm focus:ring-1 focus:ring-orange-500 outline-none w-40 md:w-64"
+							searchIconClassName="text-gray-400"
+							inputClassName="bg-white dark:bg-[#121212] border border-gray-200 dark:border-white/10 rounded-xl py-2 pl-10 pr-4 text-sm focus:ring-1 focus:ring-orange-500 outline-none w-40 md:w-64 transition-all placeholder:text-gray-400"
 							value={searchQuery}
 							onClear={handleClear}
 							onChange={(e) => setSearchQuery(e.target.value)}
@@ -246,22 +229,24 @@ export default function TransactionsPage() {
 						/>
 					</div>
 					<button
-						className="flex items-center gap-2 px-3 py-1.5 bg-orange-600 hover:bg-orange-500 text-white rounded-lg text-sm font-medium transition-colors"
+						className="flex items-center gap-2 px-4 py-2 bg-orange-600 hover:bg-orange-500 text-white rounded-xl text-sm font-bold transition-all shadow-lg shadow-orange-600/20 active:scale-95"
 						onClick={handleAddTransaction}
 					>
-						<Plus size={16} />
+						<Plus size={16} strokeWidth={2.5} />
 						<span className="hidden sm:inline">Add</span>
 					</button>
 					<button
-						className="flex items-center gap-2 px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg text-sm font-medium transition-colors border border-gray-700"
+						className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-[#121212] border border-gray-200 dark:border-white/10 hover:bg-gray-50 dark:hover:bg-white/5 text-gray-700 dark:text-gray-300 rounded-xl text-sm font-bold transition-all active:scale-95"
 						onClick={() => setShowUploader(true)}
 					>
 						<Upload size={16} />
 						<span className="hidden sm:inline">Import</span>
 					</button>
 					<button
+						disabled
 						onClick={() => setShowClearModal(true)}
-						className="p-2 bg-red-600 hover:bg-red-500 text-white rounded-lg transition-all shadow-lg shadow-red-600/20"
+						// className="p-2 ml-1 bg-red-50 hover:bg-red-100 dark:bg-red-500/10 dark:hover:bg-red-500/20 text-red-600 dark:text-red-500 rounded-xl transition-all"
+						className="p-2 ml-1 bg-gray-100 dark:bg-white/5 text-gray-400 dark:text-gray-600 rounded-xl cursor-not-allowed opacity-50"
 						title="Clear all data"
 					>
 						<Trash2 size={18} />
@@ -270,10 +255,10 @@ export default function TransactionsPage() {
 			</div>
 
 			{/* 2. Data Table & Pagination Wrapper */}
-			<div className="flex-1 overflow-auto px-4 md:px-6 pb-8 min-h-150 flex flex-col justify-between">
+			<div className="flex-1 overflow-auto px-4 md:px-6 pb-8 min-h-37.5 flex flex-col justify-between">
 				<table className="w-full border-collapse">
-					<thead className="sticky top-0 bg-[#F8F9FB] dark:bg-[#0d0d0d] z-20">
-						<tr className="text-[10px] font-bold text-gray-500 uppercase tracking-widest text-left border-b border-gray-800">
+					<thead className="sticky top-0 bg-[#F8F9FB] dark:bg-[#050505] z-20">
+						<tr className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest text-left border-b border-gray-200/50 dark:border-white/5">
 							<SortableHeader
 								label="Name"
 								activeKey="name"
@@ -292,9 +277,9 @@ export default function TransactionsPage() {
 									{categoryFilter && (
 										<button
 											onClick={() => setCategoryFilter(null)}
-											className="text-orange-500 hover:text-orange-400"
+											className="text-orange-500 hover:text-orange-400 p-1 bg-orange-50 dark:bg-orange-500/10 rounded-full"
 										>
-											<X size={12} />
+											<X size={12} strokeWidth={3} />
 										</button>
 									)}
 								</div>
@@ -316,11 +301,10 @@ export default function TransactionsPage() {
 							<th className="py-4 px-2 w-32">Status</th>
 						</tr>
 					</thead>
-					<tbody className="divide-y divide-gray-800/40 text-sm">
-						{/* 2. THE RENDER GATE */}
+					<tbody className="divide-y divide-gray-100 dark:divide-white/5 text-sm">
 						{!isMounted ? (
 							<tr>
-								<td colSpan={6} className="py-12">
+								<td colSpan={6} className="py-16">
 									<div className="flex justify-center w-full">
 										<div className="w-6 h-6 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
 									</div>
@@ -330,7 +314,7 @@ export default function TransactionsPage() {
 							<tr>
 								<td
 									colSpan={6}
-									className="py-12 text-center text-gray-500 italic"
+									className="py-16 text-center text-gray-500 font-medium"
 								>
 									No transactions found.
 								</td>
@@ -338,10 +322,11 @@ export default function TransactionsPage() {
 						) : (
 							Object.entries(filteredAndGrouped).map(([date, items]) => (
 								<React.Fragment key={date}>
-									<tr className="sticky top-11.25 z-10 bg-[#F8F9FB] dark:bg-[#121212]/95 backdrop-blur-sm transform-gpu border-y border-gray-800/50">
+									{/* Date Group Header */}
+									<tr className="sticky top-11.25 z-10 bg-gray-50/95 dark:bg-[#0a0a0a]/95 backdrop-blur-md transform-gpu border-y border-gray-200/50 dark:border-white/5">
 										<td
 											colSpan={6}
-											className="py-2 px-2 text-[11px] font-bold text-orange-400/80 uppercase"
+											className="py-2.5 px-3 text-[10px] font-black text-orange-600 dark:text-orange-500 uppercase tracking-widest"
 										>
 											{date}
 										</td>
@@ -361,18 +346,21 @@ export default function TransactionsPage() {
 
 				{/* 3. Pagination Controls */}
 				{totalPages > 1 && (
-					<div className="pt-6 mt-auto border-t border-gray-200 dark:border-gray-800 flex items-center justify-between">
+					<div className="pt-6 mt-auto border-t border-gray-200/50 dark:border-white/5 flex items-center justify-between">
 						<span className="text-xs text-gray-500 font-medium hidden sm:inline-block">
 							Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1} to{" "}
 							{Math.min(currentPage * ITEMS_PER_PAGE, filteredAndSorted.length)}{" "}
-							of {filteredAndSorted.length}
+							of{" "}
+							<span className="font-bold text-gray-900 dark:text-white">
+								{filteredAndSorted.length}
+							</span>
 						</span>
 
 						<div className="flex items-center gap-1 sm:gap-2 w-full sm:w-auto justify-center sm:justify-end">
 							<button
 								onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
 								disabled={currentPage === 1}
-								className="p-1.5 rounded-lg border border-gray-200 dark:border-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-white/5 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+								className="p-2 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#121212] text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-white/5 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-sm"
 							>
 								<ChevronLeft size={16} />
 							</button>
@@ -382,11 +370,11 @@ export default function TransactionsPage() {
 									<button
 										key={page}
 										onClick={() => setCurrentPage(page)}
-										className={`min-w-8 h-8 px-1 rounded-lg text-xs font-bold transition-all flex items-center justify-center
+										className={`min-w-9 h-9 px-1 rounded-xl text-xs font-bold transition-all flex items-center justify-center
                                             ${
 																							currentPage === page
-																								? "bg-orange-600 text-white shadow-md scale-105"
-																								: "text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-white/10"
+																								? "bg-orange-600 text-white shadow-lg shadow-orange-600/20 scale-105"
+																								: "text-gray-600 dark:text-gray-400 bg-white dark:bg-[#121212] border border-gray-200 dark:border-white/10 hover:bg-gray-50 dark:hover:bg-white/5"
 																						}`}
 									>
 										{page}
@@ -399,7 +387,7 @@ export default function TransactionsPage() {
 									setCurrentPage((p) => Math.min(totalPages, p + 1))
 								}
 								disabled={currentPage === totalPages}
-								className="p-1.5 rounded-lg border border-gray-200 dark:border-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-white/5 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+								className="p-2 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#121212] text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-white/5 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-sm"
 							>
 								<ChevronRight size={16} />
 							</button>
@@ -412,19 +400,19 @@ export default function TransactionsPage() {
 			{showUploader && (
 				<div className="fixed inset-0 z-100 flex items-center justify-center p-4">
 					<div
-						className="absolute inset-0 bg-black/80 backdrop-blur-md transform-gpu"
+						className="absolute inset-0 bg-black/60 backdrop-blur-md transform-gpu"
 						onClick={() => setShowUploader(false)}
 					/>
-					<div className="relative bg-[#F8F9FB] dark:bg-[#1a1a1a] border border-gray-800 w-full max-w-xl rounded-2xl shadow-2xl overflow-hidden">
-						<div className="p-6 border-b border-gray-800 flex justify-between items-center">
-							<h3 className="text-lg font-bold text-gray-500 dark:text-white">
+					<div className="relative bg-white dark:bg-[#121212] border border-gray-200 dark:border-white/10 w-full max-w-xl rounded-3xl shadow-2xl overflow-hidden">
+						<div className="p-6 border-b border-gray-200 dark:border-white/5 flex justify-between items-center">
+							<h3 className="text-lg font-black tracking-tight text-gray-900 dark:text-white">
 								Import CSV Statement
 							</h3>
 							<button
 								onClick={() => setShowUploader(false)}
-								className="text-gray-500 hover:text-gray-700"
+								className="p-2 text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5 rounded-full transition-colors"
 							>
-								✕
+								<X size={20} />
 							</button>
 						</div>
 						<div className="p-8">
