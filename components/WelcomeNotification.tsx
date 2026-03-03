@@ -31,7 +31,7 @@ export default function WelcomeNotification() {
           exit={{ y: -20, opacity: 0 }}
           className="fixed top-20 right-8 z-100 max-w-sm w-full"
         >
-          <div className="bg-[#0d0d0d]/80 backdrop-blur-xl border border-white/10 rounded-2xl p-4 shadow-[0_20px_50px_rgba(0,0,0,0.5)] flex items-center gap-4 relative overflow-hidden group">
+          <div className="bg-[#0d0d0d]/80 backdrop-blur-xl transform-gpu border border-white/10 rounded-2xl p-4 shadow-[0_20px_50px_rgba(0,0,0,0.5)] flex items-center gap-4 relative overflow-hidden group">
             {/* Ambient Orange Glow */}
             <div className="absolute -left-4 -top-4 w-12 h-12 bg-orange-600/20 blur-2xl rounded-full group-hover:bg-orange-600/40 transition-all" />
             

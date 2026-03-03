@@ -5,36 +5,35 @@ import { useBudgetStore } from "@/store/useBudgetStore";
 import { supabase } from "@/lib/supabase";
 
 export default function StoreInitializer() {
-    // 1. Use selective selectors to prevent the component from 
-    // re-rendering when 'transactions' or 'isLoading' change.
     const fetchTransactions = useBudgetStore((state) => state.fetchTransactions);
     const setTransactions = useBudgetStore((state) => state.setTransactions);
     
-    // 2. A ref ensures we don't double-fetch during React StrictMode 
-    // or rapid navigation.
+    // 1. Add this selector! 
+    // This is the signal that Zustand has finished loading the local cache.
+    const isHydrated = useBudgetStore((state) => state.hasHydrated);
+    
     const initialized = useRef(false);
 
     useEffect(() => {
-        if (!initialized.current) {
+        // 2. Only attempt the initial fetch once the store IS hydrated.
+        if (isHydrated && !initialized.current) {
             fetchTransactions();
             initialized.current = true;
         }
 
-        // 3. Listen for Auth events. This only runs once on mount.
         const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
             if (event === 'SIGNED_IN') {
                 fetchTransactions();
             }
             if (event === 'SIGNED_OUT') {
                 setTransactions([]); 
+                initialized.current = false; // Allow re-fetch on next login
             }
         });
 
         return () => subscription.unsubscribe();
         
-        // Including these satisfies the linter. Because they are 
-        // from a Zustand store, they are stable and won't trigger re-runs.
-    }, [fetchTransactions, setTransactions]);
+    }, [fetchTransactions, setTransactions, isHydrated]); // Add isHydrated to deps
 
     return null;
 }

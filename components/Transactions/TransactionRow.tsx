@@ -4,38 +4,54 @@ import { Transaction } from "@/store/useBudgetStore";
 import { NeedsReviewBadge } from "@/components/ui/NeedsReviewBadge";
 import { CategoryIcon } from "@/components/CategoryIcon";
 
+// ==========================================
+// 1. GLOBAL CACHE & STATIC HELPERS
+// ==========================================
+// Move expensive calculations OUTSIDE the component so they don't run 500x per render.
+const PARENT_KEYS = Object.keys(CATEGORY_HIERARCHY);
+const PARENT_KEY_SET = new Set(PARENT_KEYS); // Set.has() is O(1), much faster than Array.includes()
+
+const categoryCache = new Map<string, string>();
+
+const getParentCategory = (category: string) => {
+	// Return cached result instantly if we've seen this category before
+	if (categoryCache.has(category)) return categoryCache.get(category)!;
+
+	const parentName =
+		PARENT_KEYS.find(
+			(parent) =>
+				CATEGORY_HIERARCHY[parent].includes(category) || parent === category,
+		) || "Uncategorized";
+
+	// Save for next time
+	categoryCache.set(category, parentName);
+	return parentName;
+};
+
+// Instantiating this once is ~10x faster than calling .toLocaleString() in a loop
+const numberFormatter = new Intl.NumberFormat("en-US");
+
 interface TransactionRowProps {
 	transaction: Transaction;
-	onUpdate?: () => void;
 	onRowClick: (transaction: Transaction) => void;
 }
 
+// ==========================================
+// 2. THE COMPONENT
+// ==========================================
 export const TransactionRow = memo(function TransactionRow({
 	transaction,
 	onRowClick,
 }: TransactionRowProps) {
-	// Helper to find parent for the color
-	const parentName =
-		Object.keys(CATEGORY_HIERARCHY).find(
-			(parent) =>
-				CATEGORY_HIERARCHY[parent].includes(transaction.category) ||
-				parent === transaction.category,
-		) || "Uncategorized";
-
+	// Now these lookups are basically instant O(1) reads
+	const parentName = getParentCategory(transaction.category);
 	const subCategoryColor = getCategoryTheme(parentName);
 
-	const isParentCat = Object.keys(CATEGORY_HIERARCHY).includes(
-		transaction.category,
-	);
+	const isParentCat = PARENT_KEY_SET.has(transaction.category);
 	const isUncategorized = transaction.category === "Uncategorized";
 
-	// A transaction needs review if the flag is true
-	// OR if the category is just a generic Parent name
-	// Ignore the stale `needs_subcat` flag entirely
 	const needsReview =
-		transaction.needs_review || // Keep this only if you have a manual "Mark for Review" button
-		isUncategorized ||
-		isParentCat;
+		transaction.needs_review || isUncategorized || isParentCat;
 
 	return (
 		<tr
@@ -48,7 +64,6 @@ export const TransactionRow = memo(function TransactionRow({
 					<span className="font-medium text-gray-900 dark:text-gray-200 uppercase tracking-tight truncate max-w-75">
 						{transaction.merchant}
 					</span>
-
 					{transaction.note && (
 						<span className="text-[10px] text-gray-900 dark:text-gray-500 italic truncate max-w-50">
 							{transaction.note}
@@ -80,7 +95,7 @@ export const TransactionRow = memo(function TransactionRow({
 				}`}
 			>
 				{transaction.amount < 0 ? "-" : ""}$
-				{Math.abs(transaction.amount).toLocaleString()}
+				{numberFormatter.format(Math.abs(transaction.amount))}
 			</td>
 
 			{/* 4. ACCOUNT */}

@@ -1,6 +1,6 @@
 import { 
-    AlertCircle, ShoppingBag, ShoppingCart, DollarSign, 
-    Utensils, CreditCard, PiggyBank, Edit3, 
+    AlertCircle, ShoppingCart, DollarSign, 
+    Utensils, Edit3, 
     Plane, Car, Fuel, Info, Hotel, Briefcase, Home, Gift 
 } from "lucide-react";
 

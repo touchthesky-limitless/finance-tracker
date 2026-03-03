@@ -55,97 +55,82 @@ export function useBudgetData(timeFilter: string) {
 	}, [timeFilter]);
 
 	// --- 2. FILTER TRANSACTIONS ---
-	const filteredTransactions = useMemo(() => {
-        const { isSpecificMonth, selectedMonth, selectedYear, now } = filterContext;
+const filteredTransactions = useMemo(() => {
+    // 1. START THE CLOCK
+    // const start = performance.now();
+    // console.log("🚀 DATA ENGINE CHECKING...");
 
-        if (!transactions || !timeFilter) return [];
+    // 2. Safety Gate
+    if (!transactions || transactions.length === 0) {
+        // const end = performance.now();
+        // console.log(`%c ⚡ Engine (Empty State): ${(end - start).toFixed(3)}ms`, "color: #6b7280;");
+        return [];
+    }
 
-        // ==========================================
-        // STEP 1: PRE-CALCULATE BOUNDARIES 
-        // ==========================================
-        const currentYear = now.getFullYear();
-        const currentMonth = now.getMonth();
-        const currentDate = now.getDate();
+    if (!timeFilter) {
+        console.warn("⚠️ Data Engine Aborted: No timeFilter provided.");
+        return [];
+    }
 
-        // Target for Last Month
-        const lastM = new Date(currentYear, currentMonth - 1, 1);
-        
-        // Target for Last 12 Months
-        const twelveMonthsAgo = new Date(currentYear, currentMonth - 12, currentDate, 0, 0, 0, 0);
+    // console.log(`✅ Processing ${transactions.length} transactions...`);
 
-        // Target for This Week (Monday to Sunday)
-        const dayOfWeek = now.getDay();
-        const diffToMonday = currentDate - (dayOfWeek === 0 ? 6 : dayOfWeek - 1);
-        const monday = new Date(currentYear, currentMonth, diffToMonday, 0, 0, 0, 0);
-        const sunday = new Date(monday);
-        sunday.setDate(monday.getDate() + 6);
-        sunday.setHours(23, 59, 59, 999);
+    const { isSpecificMonth, selectedMonth, selectedYear, now } = filterContext;
 
-        // Target for Year
-        let targetYear = currentYear;
-        if (timeFilter.startsWith("Year")) {
-            targetYear = parseInt(timeFilter.split(" ").pop() || String(currentYear));
+    // STEP 1: PRE-CALCULATE BOUNDARIES
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth();
+    const currentDate = now.getDate();
+
+    const lastM = new Date(currentYear, currentMonth - 1, 1);
+    const twelveMonthsAgo = new Date(currentYear, currentMonth - 12, currentDate);
+
+    const dayOfWeek = now.getDay();
+    const diffToMonday = currentDate - (dayOfWeek === 0 ? 6 : dayOfWeek - 1);
+    const monday = new Date(currentYear, currentMonth, diffToMonday);
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    sunday.setHours(23, 59, 59, 999);
+
+    let targetYear = currentYear;
+    if (timeFilter.startsWith("Year")) {
+        targetYear = parseInt(timeFilter.split(" ").pop() || String(currentYear));
+    }
+
+    // STEP 2: FILTER TRANSACTIONS
+    const result = transactions.filter((t) => {
+        if (!t.date) return false;
+
+        const txDate = new Date(t.date);
+        if (isNaN(txDate.getTime())) return false;
+
+        const txYear = txDate.getFullYear();
+        const txMonth = txDate.getMonth();
+        const txDay = txDate.getDate();
+
+        if (isSpecificMonth) return txMonth === selectedMonth && txYear === selectedYear;
+        if (timeFilter === "This Month") return txMonth === currentMonth && txYear === currentYear;
+        if (timeFilter === "Last Month") return txMonth === lastM.getMonth() && txYear === lastM.getFullYear();
+        if (timeFilter.startsWith("Year")) return txYear === targetYear;
+        if (timeFilter === "This Year") return txYear === currentYear;
+        if (timeFilter === "Last 12 Months") return txDate >= twelveMonthsAgo;
+        if (timeFilter.startsWith("Today")) return txYear === currentYear && txMonth === currentMonth && txDay === currentDate;
+        if (timeFilter.startsWith("This Week")) {
+            const txMidnight = new Date(txYear, txMonth, txDay);
+            return txMidnight >= monday && txMidnight <= sunday;
         }
 
-        // ==========================================
-        // STEP 2: FILTER TRANSACTIONS
-        // ==========================================
-        return transactions.filter((t) => {
-            if (!t.date) return false;
+        return true;
+    });
 
-            // RESTORED: Native parsing handles "MM/DD/YYYY", "YYYY-MM-DD", etc.
-            const txDate = new Date(t.date);
-            if (isNaN(txDate.getTime())) return false;
+    // 3. LOG THE SUCCESSFUL RUN (Outside the filter loop)
+    // const end = performance.now();
+    // console.log(
+    //     `%c ⚡ Engine Speed: ${(end - start).toFixed(3)}ms`,
+    //     "color: #f97316; font-weight: bold; font-size: 12px;"
+    // );
 
-            const txYear = txDate.getFullYear();
-            const txMonth = txDate.getMonth();
-            const txDay = txDate.getDate();
-
-            // Case A: Specific Month (e.g., "Jan 2026")
-            if (isSpecificMonth) {
-                return txMonth === selectedMonth && txYear === selectedYear;
-            }
-
-            // Case B: This Month
-            if (timeFilter === "This Month") {
-                return txMonth === currentMonth && txYear === currentYear;
-            }
-
-            // Case C: Last Month
-            if (timeFilter === "Last Month") {
-                return txMonth === lastM.getMonth() && txYear === lastM.getFullYear();
-            }
-
-            // Case D: Full Year (e.g., "Year 2026")
-            if (timeFilter.startsWith("Year")) {
-                return txYear === targetYear;
-            }
-
-            // Case E: This Year
-            if (timeFilter === "This Year") {
-                return txYear === currentYear;
-            }
-
-            // Case F: Last 12 Months
-            if (timeFilter === "Last 12 Months") {
-                return txDate >= twelveMonthsAgo;
-            }
-
-            // Case G: Today (Bulletproof local comparison)
-            if (timeFilter.startsWith("Today")) {
-                return txYear === currentYear && txMonth === currentMonth && txDay === currentDate;
-            }
-
-            // Case H: This Week 
-            if (timeFilter.startsWith("This Week")) {
-                // Create a clean midnight date for the transaction to ensure fair comparison
-                const txMidnight = new Date(txYear, txMonth, txDay);
-                return txMidnight >= monday && txMidnight <= sunday;
-            }
-
-            return true;
-        });
-    }, [transactions, timeFilter, filterContext]);
+    return result;
+}, [transactions, timeFilter, filterContext]);
 
 	// --- 3. DERIVED STATS ---
 	const stats = useMemo(() => {
@@ -324,28 +309,30 @@ export function useBudgetData(timeFilter: string) {
 		});
 
 		// 2. Identify patterns (occurring ~once a month)
-		return Object.entries(merchants)
-			// eslint-disable-next-line @typescript-eslint/no-unused-vars
-			.filter(([_, data]) => data.dates.length >= 2) // Need at least 2 occurrences
-			.map(([name, data]) => {
-				const lastDate = new Date(Math.max(...data.dates));
-				const avgAmount =
-					data.amounts.reduce((a, b) => a + b, 0) / data.amounts.length;
+		return (
+			Object.entries(merchants)
+				// eslint-disable-next-line @typescript-eslint/no-unused-vars
+				.filter(([_, data]) => data.dates.length >= 2) // Need at least 2 occurrences
+				.map(([name, data]) => {
+					const lastDate = new Date(Math.max(...data.dates));
+					const avgAmount =
+						data.amounts.reduce((a, b) => a + b, 0) / data.amounts.length;
 
-				// Project the next date (30 days after the last one)
-				const nextDate = new Date(lastDate);
-				nextDate.setDate(lastDate.getDate() + 30);
+					// Project the next date (30 days after the last one)
+					const nextDate = new Date(lastDate);
+					nextDate.setDate(lastDate.getDate() + 30);
 
-				return {
-					name,
-					avgAmount,
-					dueDate: nextDate,
-					frequency: data.dates.length >= 12 ? "Yearly" : "Monthly",
-				};
-			})
-			.filter((bill) => bill.dueDate > new Date()) // Only show future ones
-			.sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime())
-			.slice(0, 4); // Top 4 upcoming
+					return {
+						name,
+						avgAmount,
+						dueDate: nextDate,
+						frequency: data.dates.length >= 12 ? "Yearly" : "Monthly",
+					};
+				})
+				.filter((bill) => bill.dueDate > new Date()) // Only show future ones
+				.sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime())
+				.slice(0, 4)
+		); // Top 4 upcoming
 	}, [transactions]);
 
 	return {

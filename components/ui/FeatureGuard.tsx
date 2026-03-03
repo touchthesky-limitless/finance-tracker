@@ -24,7 +24,7 @@ export function FeatureGuard({ feature,isLocked:manualLock, children, className 
 
             {/* 2. Lock Icon Overlay */}
             <div className="absolute inset-0 flex items-center justify-end px-3 pointer-events-none">
-                <div className="bg-white/80 dark:bg-black/40 backdrop-blur-sm p-1 rounded-full shadow-sm">
+                <div className="bg-white/80 dark:bg-black/40 backdrop-blur-sm p-1 transform-gpu rounded-full shadow-sm">
                     <Lock size={12} className="text-slate-500 dark:text-slate-400" />
                 </div>
             </div>

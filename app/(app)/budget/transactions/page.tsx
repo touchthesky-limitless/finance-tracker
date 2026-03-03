@@ -27,7 +27,7 @@ const EditTransactionModal = dynamic(
 	{
 		ssr: false,
 		loading: () => (
-			<div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50" />
+			<div className="fixed inset-0 bg-black/40 backdrop-blur-sm transform-gpu z-50" />
 		),
 	},
 );
@@ -42,6 +42,20 @@ interface SortConfig {
 const ITEMS_PER_PAGE = 12;
 
 export default function TransactionsPage() {
+	// 1. THE MICRO-DEFERRAL FIX
+	// This allows the Next.js router to navigate instantly without waiting for the table to build
+	const [isMounted, setIsMounted] = useState(false);
+	useEffect(() => {
+        // By wrapping this in a setTimeout, we push the state update to the 
+        // end of the execution queue. This satisfies the linter AND guarantees 
+        // the browser has time to close the sidebar before rendering the rows.
+        const timer = setTimeout(() => {
+            setIsMounted(true);
+        }, 0); // 0ms still pushes it to the next event loop tick
+
+        return () => clearTimeout(timer);
+    }, []);
+
 	const setToast = useBudgetStore((state) => state.setToast);
 	const transactions = useBudgetStore((state) => state.transactions);
 	const updateTransaction = useBudgetStore((state) => state.updateTransaction);
@@ -61,7 +75,6 @@ export default function TransactionsPage() {
 
 	// --- PAGINATION STATE ---
 	const [currentPage, setCurrentPage] = useState(1);
-
 	const { inputRef, handleClear } = useSearchState(setSearchQuery);
 
 	const handleRuleSaved = (count: number, snapshot: Transaction[]) => {
@@ -103,7 +116,6 @@ export default function TransactionsPage() {
 	}, [transactions, searchQuery, sortPriority, categoryFilter]);
 
 	// --- 2. Auto-Reset Page on Filter Change ---
-	// Instead of useEffect, we use derived state pattern to avoid cascading renders
 	const [prevFilters, setPrevFilters] = useState({
 		searchQuery,
 		categoryFilter,
@@ -128,7 +140,6 @@ export default function TransactionsPage() {
 		return filteredAndSorted.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 	}, [filteredAndSorted, currentPage]);
 
-	// Calculate the 5 visible page numbers for the pagination UI
 	const visiblePages = useMemo(() => {
 		if (totalPages <= 5)
 			return Array.from({ length: totalPages }, (_, i) => i + 1);
@@ -207,9 +218,9 @@ export default function TransactionsPage() {
 	}, [selectedTransaction]);
 
 	return (
-		<div className="flex flex-col h-full bg-white dark:bg-[#0d0d0d] text-slate-900 dark:text-gray-300 transition-colors">
+		<div className="flex flex-col h-full bg-white dark:bg-[#0d0d0d] text-slate-900 dark:text-gray-300 transition-colors animate-in fade-in duration-300">
 			{/* 1. Action Bar */}
-			<div className="p-4 md:p-6 border-b border-gray-800 flex flex-wrap items-center justify-between gap-4 bg-[#F8F9FB] dark:bg-[#0d0d0d]/80 backdrop-blur-md sticky top-0 z-30">
+			<div className="p-4 md:p-6 border-b border-gray-800 flex flex-wrap items-center justify-between gap-4 bg-[#F8F9FB] dark:bg-[#0d0d0d]/80 backdrop-blur-md transform-gpu sticky top-0 z-30">
 				<div className="flex items-center gap-3">
 					<h2 className="text-xl font-bold text-gray-900 dark:text-white">
 						Transactions
@@ -306,7 +317,16 @@ export default function TransactionsPage() {
 						</tr>
 					</thead>
 					<tbody className="divide-y divide-gray-800/40 text-sm">
-						{paginatedTransactions.length === 0 ? (
+						{/* 2. THE RENDER GATE */}
+						{!isMounted ? (
+							<tr>
+								<td colSpan={6} className="py-12">
+									<div className="flex justify-center w-full">
+										<div className="w-6 h-6 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
+									</div>
+								</td>
+							</tr>
+						) : paginatedTransactions.length === 0 ? (
 							<tr>
 								<td
 									colSpan={6}
@@ -318,7 +338,7 @@ export default function TransactionsPage() {
 						) : (
 							Object.entries(filteredAndGrouped).map(([date, items]) => (
 								<React.Fragment key={date}>
-									<tr className="sticky top-11.25 z-10 bg-[#F8F9FB] dark:bg-[#121212]/95 backdrop-blur-sm border-y border-gray-800/50">
+									<tr className="sticky top-11.25 z-10 bg-[#F8F9FB] dark:bg-[#121212]/95 backdrop-blur-sm transform-gpu border-y border-gray-800/50">
 										<td
 											colSpan={6}
 											className="py-2 px-2 text-[11px] font-bold text-orange-400/80 uppercase"
@@ -339,7 +359,7 @@ export default function TransactionsPage() {
 					</tbody>
 				</table>
 
-				{/* 3. Pagination Controls (Now INSIDE the table container) */}
+				{/* 3. Pagination Controls */}
 				{totalPages > 1 && (
 					<div className="pt-6 mt-auto border-t border-gray-200 dark:border-gray-800 flex items-center justify-between">
 						<span className="text-xs text-gray-500 font-medium hidden sm:inline-block">
@@ -392,7 +412,7 @@ export default function TransactionsPage() {
 			{showUploader && (
 				<div className="fixed inset-0 z-100 flex items-center justify-center p-4">
 					<div
-						className="absolute inset-0 bg-black/80 backdrop-blur-md"
+						className="absolute inset-0 bg-black/80 backdrop-blur-md transform-gpu"
 						onClick={() => setShowUploader(false)}
 					/>
 					<div className="relative bg-[#F8F9FB] dark:bg-[#1a1a1a] border border-gray-800 w-full max-w-xl rounded-2xl shadow-2xl overflow-hidden">

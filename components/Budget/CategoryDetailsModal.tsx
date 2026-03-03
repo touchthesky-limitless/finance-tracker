@@ -2,12 +2,10 @@
 
 import { useEffect, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
-import { X, Download, ShoppingBag, ChevronDown } from "lucide-react";
+import { X, Download, ShoppingBag } from "lucide-react";
 import { formatMoney, formatDate } from "@/utils/formatters";
-import { DEFAULT_TAGS } from "@/data/categories";
 import { CategoryDetailsModalProps } from "@/types/budget";
 import CategoryDropdown from "@/components/Budget/CategoryDropdown";
-import { useOutsideClick } from "@/hooks/useOutsideClick";
 
 export default function CategoryDetailsModal({
 	isOpen,
@@ -71,7 +69,7 @@ export default function CategoryDetailsModal({
 			data-category-details-modal
 			ref={containerRef}
 			tabIndex={-1}
-			className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm transition-opacity"
+			className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm transform-gpu transition-opacity"
 			onClick={onClose}
 		>
 			<div

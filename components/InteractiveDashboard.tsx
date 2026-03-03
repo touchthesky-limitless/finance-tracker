@@ -390,7 +390,7 @@ function TransactionModal({
 	};
 
 	return (
-		<div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+		<div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm transform-gpu animate-in fade-in duration-200">
 			<div className="absolute inset-0" onClick={onClose} />
 			<div className="relative w-full max-w-md bg-white dark:bg-gray-900 rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 h-[80vh] flex flex-col">
 				{view === "picker" && (

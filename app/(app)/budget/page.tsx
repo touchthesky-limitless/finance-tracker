@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, ReactNode, ElementType, useMemo } from "react";
+import { useState, ReactNode, ElementType, useMemo, memo } from "react";
 import {
 	Download,
 	MoreHorizontal,
@@ -12,6 +12,25 @@ import {
 	ChevronLeft,
 } from "lucide-react";
 import { useBudgetData } from "@/hooks/useBudgetData";
+
+// ==========================================
+// STATIC HELPERS (Moved outside to prevent re-allocation)
+// ==========================================
+const formatCurrency = (num: number) => {
+	if (isNaN(num) || num === undefined) return "$0.00";
+	return `$${num.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+};
+
+const formatCompact = (num: number) => {
+	if (isNaN(num) || num === undefined) return "$0k";
+	return `$${(num / 1000).toFixed(1)}k`;
+};
+
+const formatYAxis = (num: number) => {
+	if (num === 0) return "0";
+	if (num >= 1000) return `$${Math.round(num / 1000)}k`;
+	return `$${Math.round(num)}`;
+};
 
 // ==========================================
 // GLOBAL CONSTANTS
@@ -43,41 +62,25 @@ export default function OverviewPage() {
 		predictedBills,
 	} = useBudgetData(timeFilter);
 
-	// --- HELPERS ---
-	const formatCurrency = (num: number) => {
-		if (isNaN(num) || num === undefined) return "$0.00";
-		return `$${num.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-	};
-
-	const formatCompact = (num: number) => {
-		if (isNaN(num) || num === undefined) return "$0k";
-		return `$${(num / 1000).toFixed(1)}k`;
-	};
-
-	const formatYAxis = (num: number) => {
-		if (num === 0) return "0";
-		if (num >= 1000) return `$${Math.round(num / 1000)}k`;
-		return `$${Math.round(num)}`;
-	};
-
+	// --- MEMOIZED CALCULATIONS ---
 	const activeYear = useMemo(() => {
-		// Look for a 4-digit number in the timeFilter string (e.g., "Year 2025" or "Jan 2025")
 		const match = timeFilter.match(/\d{4}/);
-		if (match) return parseInt(match[0]);
-		return CURRENT_YEAR;
+		return match ? parseInt(match[0]) : CURRENT_YEAR;
 	}, [timeFilter]);
 
 	// --- CALCULATIONS ---
-	const remainingPct =
-		stats.income > 0
-			? Math.min(
-					Math.round((Math.max(stats.remaining, 0) / stats.income) * 100),
-					100,
-				)
-			: 0;
-	const spentPct =
-		stats.income > 0 ? Math.round((stats.expenses / stats.income) * 100) : 0;
-	const renderSpent = Math.min(spentPct, 100);
+	const budgetMetrics = useMemo(() => {
+		const remaining =
+			stats.income > 0
+				? Math.min(
+						Math.round((Math.max(stats.remaining, 0) / stats.income) * 100),
+						100,
+					)
+				: 0;
+		const spent =
+			stats.income > 0 ? Math.round((stats.expenses / stats.income) * 100) : 0;
+		return { remaining, spent: Math.min(spent, 100) };
+	}, [stats.income, stats.remaining, stats.expenses]);
 
 	const yAxisLabels = useMemo(() => {
 		const topScale = Math.ceil((maxMonthlyValue || 1000) / 1000) * 1000;
@@ -92,7 +95,7 @@ export default function OverviewPage() {
 	return (
 		<div className="flex flex-col min-h-screen">
 			{/* Changed z-100 to z-40 and updated colors to match your Pro theme */}
-			<header className="sticky top-0 z-30 w-full bg-white/80 dark:bg-[#050505]/80 backdrop-blur-md border-b border-gray-200/50 dark:border-white/5">
+			<header className="sticky top-0 z-30 w-full bg-white/80 dark:bg-[#050505]/80 backdrop-blur-md transform-gpu border-b border-gray-200/50 dark:border-white/5">
 				<div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 py-6 px-4 md:px-8">
 					<div className="max-w-2xl">
 						<h1 className="text-2xl md:text-3xl font-black text-gray-900 dark:text-white tracking-tighter mb-2 uppercase">
@@ -129,7 +132,7 @@ export default function OverviewPage() {
 						<div
 							className="relative w-28 h-28 shrink-0 rounded-full flex items-center justify-center drop-shadow-sm"
 							style={{
-								background: `conic-gradient(#10b981 0% ${remainingPct}%, #8b5cf6 ${remainingPct}% ${remainingPct + renderSpent}%, #f59e0b ${remainingPct + renderSpent}% 100%)`,
+								background: `conic-gradient(#10b981 0% ${budgetMetrics.remaining}%, #8b5cf6 ${budgetMetrics.remaining}% ${budgetMetrics.remaining + budgetMetrics.spent}%, #f59e0b ${budgetMetrics.remaining + budgetMetrics.spent}% 100%)`,
 							}}
 						>
 							<div className="w-20 h-20 bg-white dark:bg-[#121212] rounded-full flex flex-col items-center justify-center shadow-[inset_0_2px_4px_rgba(0,0,0,0.05)]">
@@ -145,13 +148,13 @@ export default function OverviewPage() {
 							<DonutLegend
 								color="bg-green-500"
 								label="Remaining"
-								value={`${remainingPct}%`}
+								value={`${budgetMetrics.remaining}%`}
 								amount={formatCurrency(stats.remaining)}
 							/>
 							<DonutLegend
 								color="bg-purple-500"
 								label="Spent"
-								value={`${spentPct}%`}
+								value={`${budgetMetrics.spent}%`}
 								amount={formatCurrency(stats.expenses)}
 							/>
 							<DonutLegend
@@ -466,7 +469,7 @@ interface DateRangeDropdownProps {
 	onApply?: (month: string | null) => void;
 }
 
-function DateRangeDropdown({
+const DateRangeDropdown = memo(function DateRangeDropdown({
 	compact = false,
 	onApply,
 }: DateRangeDropdownProps) {
@@ -641,7 +644,7 @@ function DateRangeDropdown({
 			)}
 		</div>
 	);
-}
+});
 
 // ==========================================
 // TYPED SUB-COMPONENTS
@@ -654,7 +657,12 @@ interface CardProps {
 	action?: ReactNode;
 }
 
-function Card({ title, children, className = "", action }: CardProps) {
+const Card = memo(function Card({
+	title,
+	children,
+	className = "",
+	action,
+}: CardProps) {
 	return (
 		<div
 			className={`bg-white dark:bg-[#121212] border border-gray-100 dark:border-gray-800/80 rounded-3xl p-6 shadow-sm ${className}`}
@@ -673,7 +681,7 @@ function Card({ title, children, className = "", action }: CardProps) {
 			{children}
 		</div>
 	);
-}
+});
 
 interface DonutLegendProps {
 	color: string;
@@ -682,7 +690,7 @@ interface DonutLegendProps {
 	amount: string;
 }
 
-function DonutLegend({ color, label, value, amount }: DonutLegendProps) {
+const DonutLegend = memo(function DonutLegend({ color, label, value, amount }: DonutLegendProps) {
 	return (
 		<div className="flex items-center justify-between text-sm">
 			<div className="flex items-center gap-2">
@@ -697,7 +705,7 @@ function DonutLegend({ color, label, value, amount }: DonutLegendProps) {
 			<span className="font-bold text-gray-900 dark:text-white">{amount}</span>
 		</div>
 	);
-}
+});
 
 interface SparklineStatProps {
 	title: string;
@@ -708,7 +716,7 @@ interface SparklineStatProps {
 	path: string;
 }
 
-function SparklineStat({
+const SparklineStat = memo(function SparklineStat({
 	title,
 	amount,
 	trend,
@@ -761,7 +769,7 @@ function SparklineStat({
 			</svg>
 		</div>
 	);
-}
+});
 
 interface BudgetProgressProps {
 	icon: ElementType;
@@ -771,7 +779,7 @@ interface BudgetProgressProps {
 	color: string;
 }
 
-function BudgetProgress({
+const BudgetProgress = memo(function BudgetProgress({
 	icon: Icon,
 	name,
 	spent,
@@ -810,7 +818,7 @@ function BudgetProgress({
 			</div>
 		</div>
 	);
-}
+});
 
 interface ActionRowProps {
 	day: string;
@@ -821,7 +829,7 @@ interface ActionRowProps {
 	status: "upcoming" | "alert";
 }
 
-function ActionRow({
+const ActionRow = memo(function ActionRow({
 	day,
 	month,
 	title,
@@ -860,4 +868,4 @@ function ActionRow({
 			</div>
 		</div>
 	);
-}
+});

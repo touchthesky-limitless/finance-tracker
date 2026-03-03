@@ -5,9 +5,7 @@ import {
 	ChevronRight,
 	Hash,
 	Landmark,
-	Calendar,
 	Tag,
-	Check,
 	AlertCircle,
 } from "lucide-react";
 import { useBudgetStore } from "@/store/useBudgetStore";
@@ -46,11 +44,11 @@ export function CreateRuleModal({
 	const [newName, setNewName] = useState("");
 
 	const [useAmount, setUseAmount] = useState(false);
-	const [amountLogic, setAmountLogic] = useState("Equal to");
+	const [amountLogic] = useState("Equal to");
 	const [amountValue, setAmountValue] = useState<string>("0");
 
 	const [useAccount, setUseAccount] = useState(false);
-	const [selectedAccount, setSelectedAccount] = useState("");
+	const [selectedAccount] = useState("");
 
 	// Criteria States
 	const [useName, setUseName] = useState(true);
@@ -59,7 +57,7 @@ export function CreateRuleModal({
 	// NEW: Category Filter States
 	// const [useCategory, setUseCategory] = useState(true);
 	const [useCategory, setUseCategory] = useState(false);
-	const [matchCategory, setMatchCategory] = useState(initialCategory || "");
+	const [matchCategory] = useState(initialCategory || "");
 	// const [matchCategory, setMatchCategory] = useState(false);
 
 	const inputRef = useRef<HTMLInputElement>(null);
@@ -193,7 +191,7 @@ export function CreateRuleModal({
 	if (!isOpen) return null;
 
 	return (
-		<div className="fixed inset-0 z-100 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+		<div className="fixed inset-0 z-100 flex items-center justify-center bg-black/60 backdrop-blur-sm transform-gpu p-4">
 			<div className="bg-white dark:bg-[#0f0f0f] w-full max-w-4xl h-[80vh] rounded-3xl overflow-hidden flex flex-col shadow-2xl border border-slate-200 dark:border-white/10">
 				{/* Header */}
 				<div className="p-6 border-b border-slate-100 dark:border-white/5 flex justify-between items-center bg-white dark:bg-[#0f0f0f]">

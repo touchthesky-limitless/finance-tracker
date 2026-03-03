@@ -104,7 +104,7 @@ export default function EditTransactionModal({
 	};
 
 	return createPortal(
-		<div className="fixed inset-0 z-100 flex items-center justify-center p-4 bg-[#F8F9FB] dark:bg-black/90 backdrop-blur-sm animate-in fade-in duration-200">
+		<div className="fixed inset-0 z-100 flex items-center justify-center p-4 bg-[#F8F9FB] dark:bg-black/90 backdrop-blur-sm transform-gpu animate-in fade-in duration-200">
 			{/* Backdrop Click to Close */}
 			<div className="absolute inset-0" onClick={onClose} />
 

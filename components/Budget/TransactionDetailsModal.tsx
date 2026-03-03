@@ -15,7 +15,6 @@ import { formatMoney, formatDateLong } from "@/utils/formatters";
 import { DEFAULT_TAGS } from "@/data/categories";
 import { Transaction } from "@/store/useBudgetStore";
 import { ActionItemProps } from "@/types/budget";
-import { useOutsideClick } from "@/hooks/useOutsideClick";
 
 interface TransactionDetailsModalProps {
 	transaction: Transaction;
@@ -66,8 +65,7 @@ export default function TransactionDetailsModal({
 			data-transaction-details-modal
 			ref={modalRef}
 			tabIndex={-1}
-			// className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/40 backdrop-blur-[2px]"
-			className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/40 backdrop-blur-[2px]"
+			className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/40 backdrop-blur-[2px] transform-gpu"
 			onClick={onClose}
 		>
 			<div
