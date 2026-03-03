@@ -32,7 +32,6 @@ export function CreateRuleModal({
 
 	const transactions = useBudgetStore((state) => state.transactions);
 	const saveRule = useBudgetStore((state) => state.saveRule);
-	const updateTransaction = useBudgetStore((state) => state.updateTransaction);
 
 	const rules = useBudgetStore((state) => state.rules);
 
@@ -56,7 +55,7 @@ export function CreateRuleModal({
 
 	// NEW: Category Filter States
 	// const [useCategory, setUseCategory] = useState(true);
-	const [useCategory, setUseCategory] = useState(false);
+	const [useCategory, setUseCategory] = useState(!!initialCategory);
 	const [matchCategory] = useState(initialCategory || "");
 	// const [matchCategory, setMatchCategory] = useState(false);
 
@@ -85,7 +84,6 @@ export function CreateRuleModal({
 	).length;
 
 	const matchedTransactions = useMemo(() => {
-		// CALCULATE ONCE HERE
 		const numericAmountValue = parseFloat(amountValue.replace(/,/g, "")) || 0;
 
 		return transactions
@@ -99,26 +97,23 @@ export function CreateRuleModal({
 							? t.merchant.toLowerCase() === matchName.toLowerCase()
 							: t.merchant.toLowerCase().startsWith(matchName.toLowerCase()));
 
-				// Category Matching
+				// --- THE FIX: Only match if the CATEGORY also matches (if enabled) ---
 				const categoryMatch = !useCategory || t.category === matchCategory;
 
-				// Amount Matching (Wiring up the unused state)
+				// Amount Matching
 				const amountNum = Math.abs(t.amount);
 				const amountMatch =
 					!useAmount ||
 					(amountLogic === "Equal to"
-						? // ? amountNum === amountValue
-							// : amountLogic === "Greater than"
-							// 	? amountNum > amountValue
-							// 	: amountNum < amountValue);
-							amountNum === numericAmountValue
+						? amountNum === numericAmountValue
 						: amountLogic === "Greater than"
 							? amountNum > numericAmountValue
 							: amountNum < numericAmountValue);
 
-				// Account Matching (Wiring up the unused state)
+				// Account Matching
 				const accountMatch = !useAccount || t.account === selectedAccount;
 
+				// ALL criteria must be true (AND logic)
 				return nameMatch && categoryMatch && amountMatch && accountMatch;
 			})
 			.slice(0, 15);
@@ -137,32 +132,21 @@ export function CreateRuleModal({
 	]);
 
 	const handleSaveRule = () => {
-		// 1. Take a snapshot for undo
 		const snapshot = [...transactions];
 
-		// 2. SAVE & APPLY RULE
-		// We pass the new data AND the original name (initialName)
-		// to the store to handle the rename/update logic.
 		if (useName && matchName.trim() !== "") {
 			saveRule(
 				{
 					keyword: matchName.trim(),
 					category: targetCategory || matchCategory,
+					// --- THE FIX: Save the requirement that it must match the source category ---
+					matchCategory: useCategory ? matchCategory : undefined,
 				},
-				initialName, // Store uses this to find the old rule to replace
+				initialName,
 			);
 		}
 
-		// 3. Handle CUSTOM Merchants (Only if you are renaming the transactions themselves)
-		// Note: saveRule already updates the Category retroactively.
-		// You only need this loop if 'newName' is actually a NEW merchant for the bank line.
-		if (newName && newName.trim() !== "") {
-			matchedTransactions.forEach((t) => {
-				updateTransaction(t.id, { merchant: newName });
-			});
-		}
-
-		// 4. Trigger success chain
+		// ... existing rename logic ...
 		onSaveSuccess(matchedTransactions.length, snapshot);
 		onClose();
 	};

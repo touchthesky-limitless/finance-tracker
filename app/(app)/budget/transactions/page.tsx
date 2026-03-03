@@ -9,6 +9,7 @@ import {
 	ChevronLeft,
 	ChevronRight,
 } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 import { useBudgetStore } from "@/store/useBudgetStore";
 import { formatDateLong } from "@/utils/formatters";
 import CsvUploader from "@/components/CsvUploader";
@@ -42,6 +43,8 @@ interface SortConfig {
 const ITEMS_PER_PAGE = 12;
 
 export default function TransactionsPage() {
+	const searchParams = useSearchParams();
+	const categoryQuery = searchParams.get("category"); //
 	const [isMounted, setIsMounted] = useState(false);
 	useEffect(() => {
 		const timer = setTimeout(() => {
@@ -67,7 +70,7 @@ export default function TransactionsPage() {
 	const [sortPriority, setSortPriority] = useState<SortConfig[]>([
 		{ key: "date", direction: "desc" },
 	]);
-	const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
+	const [categoryFilter, setCategoryFilter] = useState<string | null>(categoryQuery);
 	const [, setIsEditModalOpen] = useState(false);
 
 	const [currentPage, setCurrentPage] = useState(1);
@@ -305,13 +308,13 @@ export default function TransactionsPage() {
                 */}
 				<table className="w-full min-w-225 border-collapse table-fixed text-sm [&_th:nth-child(5)]:pl-8 [&_td:nth-child(5)]:pl-8 [&_th:nth-child(4)]:pr-4 [&_td:nth-child(4)]:pr-4">
 					<colgroup>
-						<col className="w-12" /> {/* 1. Checkbox */}
-						<col className="w-[28%]" /> {/* 2. Name */}
-						<col className="w-[18%]" /> {/* 3. Category */}
-						<col className="w-[12%]" /> {/* 4. Amount */}
-						<col className="w-[18%]" /> {/* 5. Account */}
-						<col className="w-[12%]" /> {/* 6. Tags */}
-						<col className="w-[12%]" /> {/* 7. Status */}
+						<col className="w-12" />
+						<col className="w-[28%]" /> 
+						<col className="w-[18%]" />
+						<col className="w-[12%]" /> 
+						<col className="w-[18%]" />
+						<col className="w-[12%]" /> 
+						<col className="w-[12%]" /> 
 					</colgroup>
 
 					<thead className="sticky top-0 bg-[#F8F9FB] dark:bg-[#050505] z-20">

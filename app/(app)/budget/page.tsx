@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState, ReactNode, ElementType, useMemo, memo } from "react";
 import {
 	Download,
@@ -690,7 +691,12 @@ interface DonutLegendProps {
 	amount: string;
 }
 
-const DonutLegend = memo(function DonutLegend({ color, label, value, amount }: DonutLegendProps) {
+const DonutLegend = memo(function DonutLegend({
+	color,
+	label,
+	value,
+	amount,
+}: DonutLegendProps) {
 	return (
 		<div className="flex items-center justify-between text-sm">
 			<div className="flex items-center gap-2">
@@ -786,35 +792,46 @@ const BudgetProgress = memo(function BudgetProgress({
 	limit,
 	color,
 }: BudgetProgressProps) {
+	const router = useRouter(); // Initialize router
 	const percentage = Math.min((spent / limit) * 100, 100);
 	const isWarning = percentage > 90;
 
+	const handleClick = () => {
+		// Navigate to transactions page with the category in the URL
+		router.push(`/budget/transactions?category=${encodeURIComponent(name)}`);
+	};
+
 	return (
-		<div>
+		<div
+			onClick={handleClick}
+			className="group cursor-pointer p-2 -m-2 rounded-xl hover:bg-gray-50 dark:hover:bg-white/5 transition-all active:scale-[0.98]"
+		>
 			<div className="flex justify-between items-center mb-2">
 				<div className="flex items-center gap-2">
-					<div className={`p-1.5 rounded-md text-white shadow-sm ${color}`}>
+					<div
+						className={`p-1.5 rounded-md text-white shadow-sm transition-transform group-hover:scale-110 ${color}`}
+					>
 						<Icon size={12} />
 					</div>
-					<span className="text-sm font-bold text-gray-900 dark:text-white">
+					<span className="text-sm font-black text-gray-900 dark:text-white group-hover:text-orange-500 transition-colors">
 						{name}
 					</span>
 				</div>
 				<div className="text-xs">
-					<span className="font-bold text-gray-900 dark:text-white">
+					<span className="font-mono tabular-nums font-bold text-gray-900 dark:text-white">
 						${spent}
 					</span>
-					<span className="text-gray-400 font-medium">
+					<span className="font-mono tabular-nums text-gray-400 font-medium">
 						{" "}
 						/ ${Number(limit.toFixed(2))}
 					</span>
 				</div>
 			</div>
-			<div className="h-2 w-full bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+			<div className="h-2 w-full bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden border border-transparent group-hover:border-white/5">
 				<div
-					className={`h-full rounded-full transition-all duration-500 ${isWarning ? "bg-red-500" : color}`}
+					className={`h-full rounded-full transition-all duration-700 ease-out ${isWarning ? "bg-red-500" : color}`}
 					style={{ width: `${percentage}%` }}
-				></div>
+				/>
 			</div>
 		</div>
 	);

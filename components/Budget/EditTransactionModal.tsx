@@ -17,14 +17,17 @@ import {
 	BotMessageSquare,
 	Edit3,
 	X,
+	ChevronRight,
 } from "lucide-react";
 
-import { Transaction } from "@/store/useBudgetStore";
+import { Transaction, Rule } from "@/store/useBudgetStore";
 import { CategorySelector } from "@/components/CategorySelector";
 import { CreateRuleModal } from "@/components/Transactions/CreateRuleModal";
 import { useBudgetStore } from "@/store/useBudgetStore";
 import { formatThousandWithCommas } from "@/utils/formatters";
 import { FeatureGuard } from "@/components/ui/FeatureGuard";
+import { findParentCategory, getCategoryTheme } from "@/constants";
+import { CategoryIcon } from "@/components/CategoryIcon";
 
 interface EditTransactionModalProps {
 	transaction: Transaction;
@@ -47,23 +50,23 @@ export default function EditTransactionModal({
 	onClose,
 	onRuleSaved,
 }: EditTransactionModalProps) {
-	// initialize directly from props. The 'key' in the parent handles resets.
 	const [activeTab, setActiveTab] = useState<
 		"Basic Information" | "Location on Map" | "Pictures" | "Rules"
 	>("Basic Information");
+
 	const [editedData, setEditedData] = useState(transaction);
 	const [isRuleModalOpen, setIsRuleModalOpen] = useState(false);
 	const [searchTerm, setSearchTerm] = useState("");
-	const [ruleToEdit, setRuleToEdit] = useState<{
-		keyword: string;
-		category: string;
-	} | null>(null);
+
+	// Fixed: Rule state now includes matchCategory
+	const [ruleToEdit, setRuleToEdit] = useState<Rule | null>(null);
 
 	const transactions = useBudgetStore((state) => state.transactions);
 	const rules = useBudgetStore((state) => state.rules);
 	const deleteRule = useBudgetStore((state) => state.deleteRule);
 	const addTransactions = useBudgetStore((state) => state.addTransactions);
 	const updateTransaction = useBudgetStore((state) => state.updateTransaction);
+
 	const [deletingRule, setDeletingRule] = useState<string | null>(null);
 	const inputRef = useRef<HTMLInputElement>(null);
 
@@ -73,7 +76,7 @@ export default function EditTransactionModal({
 
 	useEffect(() => {
 		if (deletingRule) {
-			const timer = setTimeout(() => setDeletingRule(null), 5000); // Auto-cancel after 5 seconds
+			const timer = setTimeout(() => setDeletingRule(null), 5000);
 			return () => clearTimeout(timer);
 		}
 	}, [deletingRule]);
@@ -82,22 +85,15 @@ export default function EditTransactionModal({
 
 	const handleSave = () => {
 		const isExisting = transactions.some((t) => t.id === editedData.id);
-
-		// 1. Capture the snapshot before the update if you need it for Undo
 		const snapshot = [...transactions];
 
-		// 2. Perform the update
 		if (isExisting) {
 			updateTransaction(editedData.id, editedData);
 		} else {
 			addTransactions([editedData]);
 		}
 
-		// 3. CLOSE FIRST to clear 'selectedTransaction' in the parent
 		onClose();
-
-		// 4. Trigger the toast AFTER closing
-		// If you are calling onRuleSaved here, pass the snapshot and count
 		if (onRuleSaved) {
 			onRuleSaved(1, snapshot);
 		}
@@ -105,10 +101,9 @@ export default function EditTransactionModal({
 
 	return createPortal(
 		<div className="fixed inset-0 z-100 flex items-center justify-center p-4 bg-[#F8F9FB] dark:bg-black/90 backdrop-blur-sm transform-gpu animate-in fade-in duration-200">
-			{/* Backdrop Click to Close */}
 			<div className="absolute inset-0" onClick={onClose} />
 
-			<div className="relative w-full max-w-4xl bg-[#F8F9FB] dark:bg-[#121212] border border-gray-800 rounded-2xl shadow-2xl flex overflow-hidden h-fit max-h-[90vh] animate-in zoom-in-95 duration-200">
+			<div className="relative w-full max-w-4xl bg-[#F8F9FB] dark:bg-[#121212] border border-gray-200 dark:border-gray-800 rounded-2xl shadow-2xl flex overflow-hidden h-fit max-h-[90vh] animate-in zoom-in-95 duration-200">
 				{/* --- LEFT SIDEBAR --- */}
 				<div className="w-56 bg-[#F8F9FB] dark:bg-[#0d0d0d] border-r border-gray-100 dark:border-gray-800 p-4 flex flex-col justify-between">
 					<div className="space-y-1">
@@ -154,19 +149,17 @@ export default function EditTransactionModal({
 
 				{/* --- MAIN CONTENT --- */}
 				<div className="flex-1 flex flex-col bg-[#F8F9FB] dark:bg-[#121212] overflow-hidden">
-					{/* TAB CONTENT: RULES MANAGEMENT */}
+					{/* TAB: RULES MANAGEMENT */}
 					{activeTab === "Rules" ? (
 						<div className="flex-1 flex flex-col overflow-hidden">
-							{/* --- Unified Header Section --- */}
 							<div className="px-8 py-6 border-b border-gray-100 dark:border-gray-800 bg-white dark:bg-[#0d0d0d]">
 								<div className="flex items-center justify-between mb-1">
 									<h3 className="text-sm font-bold uppercase tracking-widest text-gray-500">
 										Active Automation Rules
 									</h3>
-									{/* --- ADD NEW RULE BUTTON --- */}
 									<button
 										onClick={() => {
-											setRuleToEdit(null); // Explicitly clear any previous edit
+											setRuleToEdit(null);
 											setIsRuleModalOpen(true);
 										}}
 										className="flex items-center gap-2 px-4 py-2 bg-orange-600 hover:bg-orange-500 text-white text-[11px] font-black uppercase tracking-wider rounded-xl transition-all shadow-lg shadow-orange-600/20 active:scale-95"
@@ -174,16 +167,12 @@ export default function EditTransactionModal({
 										<Plus size={14} />
 										New Rule
 									</button>
-									<span className="text-[10px] bg-orange-500/10 text-orange-500 px-2 py-1 rounded-md font-bold">
-										{rules.length} Total
-									</span>
 								</div>
 								<p className="text-xs text-gray-400 mb-6">
 									Manage how incoming transactions are automatically
 									categorized.
 								</p>
 
-								{/* Search Input with Clear Button */}
 								<div className="relative group">
 									<Search
 										className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-orange-500 transition-colors"
@@ -197,7 +186,6 @@ export default function EditTransactionModal({
 										value={searchTerm}
 										onChange={(e) => setSearchTerm(e.target.value)}
 									/>
-
 									{searchTerm && (
 										<button
 											type="button"
@@ -213,7 +201,7 @@ export default function EditTransactionModal({
 								</div>
 							</div>
 
-							{/* --- Scrollable Rules List --- */}
+							{/* SCROLLABLE RULES LIST */}
 							<div className="flex-1 overflow-y-auto px-8 py-6 space-y-3 scrollbar-hide">
 								{rules.length === 0 ? (
 									<div className="text-center py-20 text-gray-500 italic text-sm bg-white dark:bg-[#0d0d0d] rounded-2xl border border-dashed border-gray-100 dark:border-gray-800">
@@ -230,103 +218,141 @@ export default function EditTransactionModal({
 													.toLowerCase()
 													.includes(searchTerm.toLowerCase()),
 										)
-										.map((rule, index) => (
-											<div
-												key={index}
-												className="flex items-center justify-between p-5 bg-white dark:bg-[#0d0d0d] border border-gray-100 dark:border-gray-800 rounded-2xl group hover:border-orange-500/30 transition-all"
-											>
-												<div>
-													<p className="text-sm font-bold text-gray-900 dark:text-white group-hover:text-orange-500 transition-colors">
-														&quot;{rule.keyword}&quot;
-													</p>
-													<div className="flex items-center gap-2 mt-1.5">
-														<span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">
-															Maps to
-														</span>
-														<span className="text-[10px] text-orange-500 font-black uppercase tracking-wider">
-															{rule.category}
-														</span>
+										.map((rule, index) => {
+											// --- 1. Get Visual Metadata using Shared Utils ---
+											const targetParent = findParentCategory(rule.category);
+											const targetTheme = getCategoryTheme(rule.category);
+
+											const sourceParent = rule.matchCategory
+												? findParentCategory(rule.matchCategory)
+												: null;
+											const sourceTheme = rule.matchCategory
+												? getCategoryTheme(rule.matchCategory)
+												: null;
+
+											return (
+												<div
+													key={`${rule.keyword}-${index}`}
+													className="flex items-center justify-between p-5 bg-white dark:bg-[#0d0d0d] border border-gray-100 dark:border-gray-800 rounded-2xl group hover:border-orange-500/30 transition-all"
+												>
+													<div className="space-y-3">
+														{/* IF SECTION: The Search Criteria */}
+														<div className="flex flex-wrap items-center gap-2">
+															<div className="flex items-center gap-1.5 px-2 py-0.5 bg-slate-100 dark:bg-white/5 rounded-md border border-slate-200 dark:border-white/5">
+																<Search size={10} className="text-gray-400" />
+																<span className="text-[11px] font-bold text-gray-900 dark:text-white">
+																	&quot;{rule.keyword}&quot;
+																</span>
+															</div>
+
+															{rule.matchCategory && sourceTheme && (
+																<>
+																	<span className="text-[10px] font-black text-orange-500/50">
+																		+
+																	</span>
+																	<span
+																		className={`text-[10px] font-black uppercase tracking-tight  opacity-70`}
+																	>
+																		From:
+																	</span>
+																	<div
+																		className={`flex items-center gap-1.5 px-2 py-0.5 rounded-md border ${sourceTheme.border} ${sourceTheme.bg} bg-opacity-10 dark:bg-opacity-20`}
+																	>
+																		{/* Label */}
+
+																		{/* Icon */}
+																		<CategoryIcon
+																			name={sourceParent || "Uncategorized"}
+																			size={10}
+																			colorClass={sourceTheme.border}
+																		/>
+
+																		{/* Category Name */}
+																		<span
+																			className={`text-[10px] font-bold uppercase tracking-tight ${sourceTheme.border}`}
+																		>
+																			{rule.matchCategory}
+																		</span>
+																	</div>
+																</>
+															)}
+														</div>
+
+														{/* THEN SECTION: The Destination */}
+														<div className="flex items-center gap-2 pl-1">
+															<span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">
+																Maps to
+															</span>
+															<ChevronRight
+																size={10}
+																className="text-gray-400"
+															/>
+
+															<div
+																className={`flex items-center gap-2 px-2.5 py-1 rounded-lg shadow-sm ${targetTheme.bg}`}
+															>
+																<CategoryIcon
+																	name={targetParent}
+																	size={11}
+																	colorClass="text-white"
+																/>
+																<span className="text-[11px] font-black uppercase tracking-wider text-white">
+																	{rule.category}
+																</span>
+															</div>
+														</div>
+													</div>
+
+													{/* ACTION BUTTONS */}
+													<div className="flex items-center gap-1">
+														<button
+															onClick={() => {
+																setRuleToEdit(rule);
+																setIsRuleModalOpen(true);
+															}}
+															className="p-2 text-gray-400 hover:text-orange-500 hover:bg-orange-500/10 rounded-xl transition-all"
+														>
+															<Edit3 size={16} />
+														</button>
+
+														{deletingRule === rule.keyword ? (
+															<div className="flex items-center gap-1 animate-in fade-in zoom-in duration-200">
+																<button
+																	onClick={() => setDeletingRule(null)}
+																	className="px-2 py-1 text-[10px] font-bold text-gray-500 hover:text-gray-700"
+																>
+																	Cancel
+																</button>
+																<button
+																	onClick={() => {
+																		deleteRule(rule.keyword);
+																		setDeletingRule(null);
+																	}}
+																	className="px-3 py-1 bg-red-500 text-white text-[10px] font-black uppercase tracking-tighter rounded-lg shadow-lg shadow-red-500/20"
+																>
+																	Delete
+																</button>
+															</div>
+														) : (
+															<button
+																onClick={() => setDeletingRule(rule.keyword)}
+																className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-500/10 rounded-xl transition-all"
+															>
+																<Trash2 size={16} />
+															</button>
+														)}
 													</div>
 												</div>
-												<div className="flex items-center gap-1">
-													{/* EDIT BUTTON */}
-													<button
-														onClick={() => {
-															setRuleToEdit({
-																keyword: rule.keyword,
-																category: rule.category,
-															});
-															setIsRuleModalOpen(true);
-														}}
-														className="p-2 text-gray-400 hover:text-orange-500 hover:bg-orange-500/10 rounded-xl transition-all"
-														title="Edit Rule"
-													>
-														<Edit3 size={16} />
-													</button>
-
-													{/* SMART DELETE BUTTON */}
-													{deletingRule === rule.keyword ? (
-														<div className="flex items-center gap-1 animate-in fade-in zoom-in duration-200">
-															<button
-																onClick={() => setDeletingRule(null)}
-																className="px-2 py-1 text-[10px] font-bold text-gray-500 hover:text-gray-700"
-															>
-																Cancel
-															</button>
-															<button
-																onClick={() => {
-																	deleteRule(rule.keyword);
-																	setDeletingRule(null);
-																}}
-																className="px-3 py-1 bg-red-500 text-white text-[10px] font-black uppercase tracking-tighter rounded-lg shadow-lg shadow-red-500/20"
-															>
-																Delete
-															</button>
-														</div>
-													) : (
-														<button
-															onClick={() => setDeletingRule(rule.keyword)}
-															className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-500/10 rounded-xl transition-all"
-														>
-															<Trash2 size={16} />
-														</button>
-													)}
-												</div>
-											</div>
-										))
+											);
+										})
 								)}
-
-								{/* Search No Results State */}
-								{rules.length > 0 &&
-									rules.filter(
-										(rule) =>
-											rule.keyword
-												.toLowerCase()
-												.includes(searchTerm.toLowerCase()) ||
-											rule.category
-												.toLowerCase()
-												.includes(searchTerm.toLowerCase()),
-									).length === 0 && (
-										<div className="text-center py-10 text-gray-500 text-sm">
-											No rules found matching &quot;
-											<span className="font-bold">{searchTerm}</span>&quot;
-										</div>
-									)}
 							</div>
 						</div>
 					) : (
-						/* TAB CONTENT: BASIC INFORMATION */
-						<div
-							className="flex-1 overflow-y-auto px-8 py-6 scrollbar-hide"
-							style={{
-								msOverflowStyle: "none",
-								scrollbarWidth: "none",
-								WebkitOverflowScrolling: "touch",
-							}}
-						>
+						/* TAB: BASIC INFORMATION */
+						<div className="flex-1 overflow-y-auto px-8 py-6 scrollbar-hide">
 							<div className="space-y-8">
-								{/* Transaction Type Tabs */}
-								<div className="flex gap-1 bg-[#F8F9FB] dark:bg-[#0d0d0d] p-1 rounded-xl w-fit mb-8 border border-gray-100 dark:border-gray-800">
+								<div className="flex gap-1 bg-[#F8F9FB] dark:bg-[#0d0d0d] p-1 rounded-xl w-fit border border-gray-100 dark:border-gray-800">
 									{["Expense", "Income", "Transfer"].map((type) => (
 										<button
 											key={type}
@@ -341,28 +367,22 @@ export default function EditTransactionModal({
 									))}
 								</div>
 
-								{/* Amount Input Block */}
-								<div className="space-y-6 mb-8 ">
+								<div className="space-y-6">
 									<label className="text-[10px] uppercase tracking-[0.2em] text-orange-500 font-black">
 										Expense Amount
 									</label>
-									<div className="relative group ">
-										<div className="absolute left-4 top-1/2 -translate-y-1/2  text-emerald-500 text-2xl font-bold ">
+									<div className="relative group">
+										<div className="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-500 text-2xl font-bold">
 											$
 										</div>
-
 										<input
-											type="text" // Must be text for commas
+											type="text"
 											className="w-full bg-[#F8F9FB] dark:bg-[#0d0d0d] border border-gray-500 dark:border-gray-800 rounded-xl py-4 pl-10 pr-12 text-3xl font-bold text-emerald-400 focus:border-orange-500/50 outline-none transition-all"
-											// Format the number for display
 											value={formatThousandWithCommas(
 												Math.abs(editedData.amount),
 											)}
 											onChange={(e) => {
-												// 1. Strip commas and non-numeric chars
 												let rawValue = e.target.value.replace(/[^0-9.]/g, "");
-
-												// 2. Fix leading zero
 												if (
 													rawValue.length > 1 &&
 													rawValue.startsWith("0") &&
@@ -370,14 +390,8 @@ export default function EditTransactionModal({
 												) {
 													rawValue = rawValue.substring(1);
 												}
-
-												// 3. Convert to number and maintain the negative sign (expense)
 												const numericValue = parseFloat(rawValue) || 0;
-
-												setEditedData({
-													...editedData,
-													amount: -numericValue, // Keeping it negative as per your original logic
-												});
+												setEditedData({ ...editedData, amount: -numericValue });
 											}}
 										/>
 										<div className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-600 hover:text-emerald-500 cursor-pointer">
@@ -386,17 +400,13 @@ export default function EditTransactionModal({
 									</div>
 								</div>
 
-								{/* Category Section */}
-								<div className="h-fit">
-									<CategorySelector
-										currentCategory={editedData.category}
-										onSelect={(sub) => {
-											setEditedData({ ...editedData, category: sub });
-										}}
-									/>
-								</div>
+								<CategorySelector
+									currentCategory={editedData.category}
+									onSelect={(sub) =>
+										setEditedData({ ...editedData, category: sub })
+									}
+								/>
 
-								{/* --- Create Rule Section --- */}
 								{!isNew && (
 									<div className="pt-4 border-t border-slate-100 dark:border-white/5">
 										<button
@@ -415,7 +425,6 @@ export default function EditTransactionModal({
 									</div>
 								)}
 
-								{/* Date Input */}
 								<div className="grid grid-cols-2 gap-4 mt-6">
 									<div className="space-y-2">
 										<label className="text-[10px] uppercase tracking-[0.2em] text-gray-500 font-black">
@@ -437,7 +446,6 @@ export default function EditTransactionModal({
 										</div>
 									</div>
 
-									{/* Account Selector */}
 									<div className="space-y-2">
 										<label className="text-[10px] uppercase tracking-[0.2em] text-gray-500 font-black">
 											Account
@@ -468,19 +476,15 @@ export default function EditTransactionModal({
 									</div>
 								</div>
 
-								{/* Description Field */}
 								<div className="space-y-2">
 									<label className="text-[10px] uppercase tracking-[0.2em] text-gray-500 font-black">
-										Description
+										Merchant Name
 									</label>
 									<textarea
-										className="w-full bg-[#F8F9FB] dark:bg-[#0d0d0d] border border-gray-800 rounded-xl p-4 text-gray-300 focus:border-orange-500/50 outline-none min-h-1 resize-none"
+										className="w-full bg-[#F8F9FB] dark:bg-[#0d0d0d] border border-gray-800 rounded-xl p-4 text-gray-300 focus:border-orange-500/50 outline-none min-h-20 resize-none"
 										value={editedData.merchant}
 										onChange={(e) =>
-											setEditedData({
-												...editedData,
-												merchant: e.target.value,
-											})
+											setEditedData({ ...editedData, merchant: e.target.value })
 										}
 									/>
 								</div>
@@ -506,15 +510,15 @@ export default function EditTransactionModal({
 					</div>
 				</div>
 
-				{/* --- Create Rule Modal update --- */}
 				<CreateRuleModal
-					key={ruleToEdit ? `edit-${ruleToEdit.keyword}` : `new-${editedData.id}`}
+					key={
+						ruleToEdit ? `edit-${ruleToEdit.keyword}` : `new-${editedData.id}`
+					}
 					isOpen={isRuleModalOpen}
 					onClose={() => {
 						setIsRuleModalOpen(false);
-						setRuleToEdit(null); // Reset when closing
+						setRuleToEdit(null);
 					}}
-					// --- The Logic Chain ---
 					initialName={
 						ruleToEdit
 							? ruleToEdit.keyword
@@ -532,7 +536,7 @@ export default function EditTransactionModal({
 					onSaveSuccess={(count, snapshot) => {
 						onRuleSaved(count, snapshot);
 						setIsRuleModalOpen(false);
-						setRuleToEdit(null); // Reset on success
+						setRuleToEdit(null);
 					}}
 				/>
 			</div>
@@ -541,7 +545,6 @@ export default function EditTransactionModal({
 	);
 }
 
-// --- SUB-COMPONENT ---
 function NavButton({ icon, label, active, onClick }: NavButtonProps) {
 	return (
 		<button

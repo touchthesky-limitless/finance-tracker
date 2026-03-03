@@ -6,24 +6,24 @@ import { CATEGORY_HIERARCHY } from "@/constants";
 export interface Transaction {
 	[key: string]: string | number | boolean | string[] | undefined;
 	id: string;
-	date: string; // Matches SQL 'date'
-	merchant: string; // Matches SQL 'merchant'
-	description?: string; // Matches SQL 'description' (Optional Note)
-	amount: number; // Matches SQL 'amount'
-	category: string; // Matches SQL 'category'
-	account: string; // Matches SQL 'account'
-
-	// UI State Flags (Aligned with SQL snake_case)
+	date: string;
+	merchant: string;
+	description?: string;
+	amount: number;
+	category: string;
+	account: string;
 	needs_review: boolean;
 	needs_subcat: boolean;
-
-	// Metadata (Optional in TS, handled by DB)
 	user_id?: string;
 	created_at?: string;
-
-	// App-specific (Not currently in your SQL schema)
 	tags?: string[];
 	note?: string;
+}
+
+export interface Rule {
+	keyword: string;
+	category: string;
+	matchCategory?: string;
 }
 
 interface BudgetState {
@@ -31,27 +31,27 @@ interface BudgetState {
 	isLoading: boolean;
 	customTags: string[];
 	hasHydrated: boolean;
-	rules: { keyword: string; category: string }[];
+	rules: Rule[];
 	toast: { count: number; snapshot: Transaction[] } | null;
 	setHasHydrated: (state: boolean) => void;
 	setToast: (toast: { count: number; snapshot: Transaction[] } | null) => void;
-	saveRule: (
-		rule: { keyword: string; category: string },
-		oldKeyword?: string,
-	) => void;
-	deleteRule: (keyword: string) => void;
+	saveRule: (rule: Rule, oldKeyword?: string) => Promise<void>;
+	deleteRule: (keyword: string) => Promise<void>;
 	addCustomTag: (tag: string) => void;
 	setLoading: (loading: boolean) => void;
 	addTransactions: (newTxs: Transaction[]) => Promise<void>;
 	fetchTransactions: () => Promise<void>;
 	setTransactions: (txs: Transaction[]) => void;
 	clearData: () => void;
-	deleteTransaction: (id: string) => void;
-	updateTransaction: (id: string, updates: Partial<Transaction>) => void;
+	deleteTransaction: (id: string) => Promise<void>;
+	updateTransaction: (
+		id: string,
+		updates: Partial<Transaction>,
+	) => Promise<void>;
 	getCategoryTotals: () => Record<string, number>;
-	undoBulkUpdate: (previousTransactions: Transaction[]) => void; // For Edits (Replace)
+	undoBulkUpdate: (previousTransactions: Transaction[]) => void;
 	bulkDeleteTransactions: (ids: string[]) => Promise<void>;
-	undoDelete: (restoredTxs: Transaction[]) => Promise<void>; // For Deletes (Merge)
+	undoDelete: (restoredTxs: Transaction[]) => Promise<void>;
 }
 
 export const useBudgetStore = create<BudgetState>()(
@@ -63,26 +63,18 @@ export const useBudgetStore = create<BudgetState>()(
 			isLoading: false,
 			hasHydrated: false,
 			toast: null,
-			// setToast: (toast) => set({ toast }),
-			setToast: (toastValue) => {
-				// console.log("🚀 Store is receiving toast data:", toastValue);
-				set({ toast: toastValue });
-			},
 
+			setToast: (toastValue) => set({ toast: toastValue }),
 			setHasHydrated: (state: boolean) => set({ hasHydrated: state }),
+			setTransactions: (txs) => set({ transactions: txs }),
+			setLoading: (loading) => set({ isLoading: loading }),
 
-			addTransactions: async (newTxs: Transaction[]) => {
-				// 1. Get the current user
+			addTransactions: async (newTxs) => {
 				const {
 					data: { user },
 				} = await supabase.auth.getUser();
+				if (!user) return;
 
-				if (!user) {
-					console.error("Auth required to add transactions");
-					return;
-				}
-
-				// 2. Map local transactions to match SQL columns (snake_case)
 				const txsToInsert = newTxs.map((tx) => ({
 					user_id: user.id,
 					date: tx.date,
@@ -95,60 +87,53 @@ export const useBudgetStore = create<BudgetState>()(
 					needs_subcat: tx.needs_subcat ?? true,
 				}));
 
-				// 3. Push to Supabase
 				const { data, error } = await supabase
 					.from("transactions")
 					.insert(txsToInsert)
-					.select(); // Returns the created rows with their new DB IDs
+					.select();
 
-				if (error) {
-					console.error("Supabase Insert Error:", error.message);
-					throw error;
-				}
+				if (error) throw error;
 
-				// 4. Update the local Zustand state with the DB-confirmed data
 				set((state) => ({
 					transactions: [...(data as Transaction[]), ...state.transactions],
 				}));
 			},
 
-			setTransactions: (txs) => set({ transactions: txs }),
-
 			fetchTransactions: async () => {
-				// 1. SILENT ABORT: Check state BEFORE calling set({ isLoading: true })
-				// This prevents a wasted re-render when navigating between pages.
 				const { transactions, isLoading } = get();
 				if (transactions.length > 0 || isLoading) return;
 
-				// 2. START FETCH: Now we notify the UI to show the Shimmer
 				set({ isLoading: true });
 
 				try {
-					// Use getSession() instead of getUser() if you want it even faster (reads from cookie)
 					const {
 						data: { user },
 					} = await supabase.auth.getUser();
-
 					if (!user) {
 						set({ isLoading: false, hasHydrated: true });
 						return;
 					}
 
-					// 3. PARALLEL FETCH: Keep your Promise.all, it's efficient.
 					const [txResponse, rulesResponse] = await Promise.all([
 						supabase
 							.from("transactions")
 							.select("*")
 							.order("date", { ascending: false }),
-						supabase.from("rules").select("keyword, category"),
+						supabase.from("rules").select("keyword, category, match_category"),
 					]);
 
-					// 4. BATCHED UPDATE: Final state change
+					// Map snake_case from DB back to camelCase for local state
+					const mappedRules: Rule[] = (rulesResponse.data || []).map((r) => ({
+						keyword: r.keyword,
+						category: r.category,
+						matchCategory: r.match_category,
+					}));
+
 					set({
 						transactions: (txResponse.data as Transaction[]) || [],
-						rules: rulesResponse.data || [],
+						rules: mappedRules,
 						isLoading: false,
-						hasHydrated: true, // Mark as finished for the Global Shimmer
+						hasHydrated: true,
 					});
 				} catch (error) {
 					console.error("Fetch Error:", error);
@@ -162,8 +147,6 @@ export const useBudgetStore = create<BudgetState>()(
 				} = await supabase.auth.getUser();
 				if (!user) return;
 
-				// 1. Sync to Supabase (Upsert based on keyword)
-				// If oldKeyword exists, we delete the old one first to handle renames
 				if (oldKeyword && oldKeyword !== newRule.keyword) {
 					await supabase.from("rules").delete().eq("keyword", oldKeyword);
 				}
@@ -173,6 +156,7 @@ export const useBudgetStore = create<BudgetState>()(
 						user_id: user.id,
 						keyword: newRule.keyword,
 						category: newRule.category,
+						match_category: newRule.matchCategory,
 					},
 					{ onConflict: "user_id,keyword" },
 				);
@@ -182,32 +166,19 @@ export const useBudgetStore = create<BudgetState>()(
 					return;
 				}
 
-				// 2. Update local state (keep your existing logic for retroactive transaction updates)
 				set((state) => {
-					const rules = state.rules || [];
-					const targetIndex = oldKeyword
-						? rules.findIndex(
-								(r) => r.keyword.toLowerCase() === oldKeyword.toLowerCase(),
-							)
-						: rules.findIndex(
-								(r) =>
-									r.keyword.toLowerCase() === newRule.keyword.toLowerCase(),
-							);
-
-					let updatedRules = [...rules];
-					if (targetIndex > -1) {
-						updatedRules[targetIndex] = newRule;
-					} else {
-						updatedRules = [...rules, newRule];
-					}
-
 					const updatedTransactions = state.transactions.map((tx) => {
-						if (
-							tx.merchant?.toLowerCase().includes(newRule.keyword.toLowerCase())
-						) {
+						const nameMatches = tx.merchant
+							?.toLowerCase()
+							.includes(newRule.keyword.toLowerCase());
+						const categoryMatches =
+							!newRule.matchCategory || tx.category === newRule.matchCategory;
+
+						if (nameMatches && categoryMatches) {
 							const isGenericParent =
 								Object.keys(CATEGORY_HIERARCHY).includes(newRule.category) ||
 								newRule.category === "Uncategorized";
+
 							return {
 								...tx,
 								category: newRule.category,
@@ -218,119 +189,75 @@ export const useBudgetStore = create<BudgetState>()(
 						return tx;
 					});
 
-					return { rules: updatedRules, transactions: updatedTransactions };
+					const otherRules = state.rules.filter(
+						(r) => r.keyword !== (oldKeyword || newRule.keyword),
+					);
+
+					return {
+						rules: [...otherRules, newRule],
+						transactions: updatedTransactions,
+					};
 				});
 			},
 
 			deleteRule: async (keyword) => {
-				// 1. Sync to Supabase
 				const { error } = await supabase
 					.from("rules")
 					.delete()
 					.eq("keyword", keyword);
-
-				if (error) {
-					console.error("Delete Rule Error:", error.message);
-					return;
-				}
-
-				// 2. Update local state
+				if (error) return;
 				set((state) => ({
 					rules: state.rules.filter((r) => r.keyword !== keyword),
 				}));
 			},
 
-			updateTransaction: async (id: string, updates: Partial<Transaction>) => {
-				// 1. Optimistic Update (Optional: updates UI immediately)
+			updateTransaction: async (id, updates) => {
 				set((state) => ({
 					transactions: state.transactions.map((t) =>
 						t.id === id ? { ...t, ...updates } : t,
 					),
 				}));
 
-				// 2. Sync to Supabase
 				const { error } = await supabase
 					.from("transactions")
 					.update(updates)
 					.eq("id", id);
-
-				if (error) {
-					// Optional: Re-fetch on error to sync state
-					get().fetchTransactions();
-				}
+				if (error) get().fetchTransactions();
 			},
 
-			deleteTransaction: async (id: string) => {
-				// 1. Local Update
+			deleteTransaction: async (id) => {
 				set((state) => ({
 					transactions: state.transactions.filter((t) => t.id !== id),
 				}));
-
-				// 2. Cloud Update
-				const { error } = await supabase
-					.from("transactions")
-					.delete()
-					.eq("id", id);
-
-				if (error) console.error("Deletion failed:", error.message);
+				await supabase.from("transactions").delete().eq("id", id);
 			},
 
-			bulkDeleteTransactions: async (ids: string[]) => {
-				// 1. Optimistic Local Update (Instant UI reaction)
+			bulkDeleteTransactions: async (ids) => {
 				set((state) => ({
 					transactions: state.transactions.filter((t) => !ids.includes(t.id)),
 				}));
-
-				// 2. Cloud Update
-				const { error } = await supabase
-					.from("transactions")
-					.delete()
-					.in("id", ids); // Deletes all IDs in the array at once
-
-				if (error) console.error("Bulk deletion failed:", error.message);
+				await supabase.from("transactions").delete().in("id", ids);
 			},
 
 			undoDelete: async (restoredTxs) => {
-				// 1. Instantly MERGE the deleted items back into the existing UI array
 				set((state) => ({
 					transactions: [...restoredTxs, ...state.transactions],
 				}));
-
-				// 2. Re-insert them into Supabase quietly in the background
-				const { error } = await supabase
-					.from("transactions")
-					.insert(restoredTxs);
-
-				if (error) console.error("Undo failed to sync with DB:", error.message);
+				await supabase.from("transactions").insert(restoredTxs);
 			},
 
 			clearData: () => set({ transactions: [], customTags: [], rules: [] }),
 
-			setLoading: (loading) => set({ isLoading: loading }),
-
 			getCategoryTotals: () => {
 				const { transactions } = get();
 				const totals: Record<string, number> = {};
-
 				transactions.forEach((tx) => {
-					// We only want to chart "Spending" (Negative numbers)
-					// Skip Income or Debt Payments for a pure Spending Chart
 					if (tx.category === "Income" || tx.category === "Debt payments")
 						return;
-
 					const cat = tx.category || "Uncategorized";
-
-					// Use Math.abs to turn -50.00 into 50.00 for the chart
-					const amount = Math.abs(tx.amount || 0);
-
-					totals[cat] = (totals[cat] || 0) + amount;
+					totals[cat] = (totals[cat] || 0) + Math.abs(tx.amount || 0);
 				});
 				return totals;
-			},
-
-			getNetCashFlow: () => {
-				const { transactions } = get();
-				return transactions.reduce((sum, tx) => sum + (tx.amount || 0), 0);
 			},
 
 			addCustomTag: (tag) =>
@@ -346,11 +273,9 @@ export const useBudgetStore = create<BudgetState>()(
 		{
 			name: `budget-storage`,
 			onRehydrateStorage: () => (state) => {
-				// This runs as soon as localStorage is read
 				state?.setHasHydrated(true);
 			},
 			storage: createJSONStorage(() => localStorage),
-			// 3. Optional: Only persist rules and tags, let Supabase handle transactions
 			partialize: (state) => ({
 				rules: state.rules,
 				customTags: state.customTags,
