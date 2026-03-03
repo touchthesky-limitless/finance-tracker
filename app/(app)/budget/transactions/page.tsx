@@ -20,6 +20,7 @@ import dynamic from "next/dynamic";
 import { SearchInput } from "@/components/ui/SearchInput";
 import { useSearchState } from "@/hooks/useSearchState";
 import { CategorySelector } from "@/components/CategorySelector";
+import { UndoToast } from "@/components/ui/UndoToast";
 
 const EditTransactionModal = dynamic(
 	() => import("@/components/Budget/EditTransactionModal"),
@@ -52,6 +53,10 @@ export default function TransactionsPage() {
 	const setToast = useBudgetStore((state) => state.setToast);
 	const transactions = useBudgetStore((state) => state.transactions);
 	const updateTransaction = useBudgetStore((state) => state.updateTransaction);
+	const bulkDeleteTransactions = useBudgetStore(
+		(state) => state.bulkDeleteTransactions,
+	);
+	const toast = useBudgetStore((state) => state.toast);
 
 	const [selectedTransaction, setSelectedTransaction] =
 		useState<Transaction | null>(null);
@@ -66,6 +71,13 @@ export default function TransactionsPage() {
 	const [, setIsEditModalOpen] = useState(false);
 
 	const [currentPage, setCurrentPage] = useState(1);
+	const [selectedIds, setSelectedIds] = useState<string[]>([]);
+	const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
+	const undoDelete = useBudgetStore((state) => state.undoDelete);
+	const [deleteToast, setDeleteToast] = useState<{
+		count: number;
+		snapshot: Transaction[];
+	} | null>(null);
 	const { inputRef, handleClear } = useSearchState(setSearchQuery);
 
 	const handleRuleSaved = (count: number, snapshot: Transaction[]) => {
@@ -193,6 +205,49 @@ export default function TransactionsPage() {
 		setSelectedTransaction(t);
 	}, []);
 
+	// Toggle a single row
+	const handleSelectRow = React.useCallback(
+		(id: string, e: React.MouseEvent) => {
+			e.stopPropagation();
+			setSelectedIds((prev) =>
+				prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id],
+			);
+		},
+		[],
+	);
+
+	// Toggle all visible rows
+	const handleSelectAllVisible = () => {
+		const visibleIds = paginatedTransactions.map((t) => t.id);
+		const allSelected = visibleIds.every((id) => selectedIds.includes(id));
+
+		if (allSelected) {
+			// Deselect all visible
+			setSelectedIds((prev) => prev.filter((id) => !visibleIds.includes(id)));
+		} else {
+			// Select all visible
+			setSelectedIds((prev) => Array.from(new Set([...prev, ...visibleIds])));
+		}
+	};
+
+	// The Bulk Delete Action
+	const handleBulkDelete = async () => {
+		// Capture the exact items we are about to delete
+		const snapshotBackup = transactions.filter((t) =>
+			selectedIds.includes(t.id),
+		);
+
+		// Execute the real deletion
+		await bulkDeleteTransactions(selectedIds);
+
+		// Trigger the LOCAL delete toast
+		setDeleteToast({ count: selectedIds.length, snapshot: snapshotBackup });
+
+		// Reset UI state
+		setSelectedIds([]);
+		setShowBulkDeleteConfirm(false);
+	};
+
 	useEffect(() => {
 		if (!selectedTransaction) return;
 		const handleBeforeUnload = (e: BeforeUnloadEvent) => {
@@ -259,6 +314,39 @@ export default function TransactionsPage() {
 				<table className="w-full border-collapse">
 					<thead className="sticky top-0 bg-[#F8F9FB] dark:bg-[#050505] z-20">
 						<tr className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest text-left border-b border-gray-200/50 dark:border-white/5">
+							{/* --- MASTER CHECKBOX --- */}
+							<th className="py-4 px-3 w-10">
+								<div
+									onClick={handleSelectAllVisible}
+									className={`w-4 h-4 rounded border flex items-center justify-center transition-all cursor-pointer ${
+										paginatedTransactions.length > 0 &&
+										paginatedTransactions.every((t) =>
+											selectedIds.includes(t.id),
+										)
+											? "bg-orange-600 border-orange-600"
+											: "border-gray-300 dark:border-gray-600 hover:border-orange-500"
+									}`}
+								>
+									{paginatedTransactions.length > 0 &&
+										paginatedTransactions.every((t) =>
+											selectedIds.includes(t.id),
+										) && (
+											<svg
+												className="w-3 h-3 text-white"
+												fill="none"
+												viewBox="0 0 24 24"
+												stroke="currentColor"
+											>
+												<path
+													strokeLinecap="round"
+													strokeLinejoin="round"
+													strokeWidth={3}
+													d="M5 13l4 4L19 7"
+												/>
+											</svg>
+										)}
+								</div>
+							</th>
 							<SortableHeader
 								label="Name"
 								activeKey="name"
@@ -336,6 +424,8 @@ export default function TransactionsPage() {
 											key={t.id}
 											transaction={t}
 											onRowClick={handleRowClick}
+											isSelected={selectedIds.includes(t.id)}
+											onSelect={handleSelectRow}
 										/>
 									))}
 								</React.Fragment>
@@ -437,6 +527,119 @@ export default function TransactionsPage() {
 					onClose={() => setSelectedTransaction(null)}
 					onUpdate={updateTransaction}
 					onRuleSaved={handleRuleSaved}
+				/>
+			)}
+
+			{/* --- FLOATING BULK ACTION BAR --- */}
+			{selectedIds.length > 0 && (
+				<div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-60 animate-in slide-in-from-bottom-10 fade-in duration-300">
+					<div className="bg-[#111111] border border-white/10 shadow-[0_20px_40px_rgba(0,0,0,0.5)] rounded-full px-6 py-3 flex items-center gap-6">
+						<span className="text-white text-sm font-bold whitespace-nowrap">
+							{selectedIds.length} Selected
+						</span>
+
+						<div className="w-px h-6 bg-white/20" />
+
+						<button className="text-sm font-medium text-white hover:text-orange-500 transition-colors whitespace-nowrap">
+							Change Category
+						</button>
+
+						<div className="w-px h-6 bg-white/20" />
+
+						<button className="text-sm font-medium text-white hover:text-orange-500 transition-colors whitespace-nowrap">
+							Rename
+						</button>
+
+						<div className="w-px h-6 bg-white/20" />
+
+						<button
+							onClick={() => setShowBulkDeleteConfirm(true)}
+							className="text-sm font-medium text-red-500 hover:text-red-400 transition-colors whitespace-nowrap"
+						>
+							Delete
+						</button>
+
+						<div className="w-px h-6 bg-white/20 ml-2" />
+
+						<button
+							onClick={() => setSelectedIds([])}
+							className="text-gray-400 hover:text-white transition-colors p-1"
+						>
+							<X size={16} strokeWidth={3} />
+						</button>
+					</div>
+				</div>
+			)}
+			{/* Bulk Delete Confirmation Modal */}
+			{showBulkDeleteConfirm && (
+				<div className="fixed inset-0 z-100 flex items-center justify-center p-4">
+					{/* Backdrop */}
+					<div
+						className="absolute inset-0 bg-black/60 backdrop-blur-md transform-gpu animate-in fade-in duration-200"
+						onClick={() => setShowBulkDeleteConfirm(false)}
+					/>
+
+					{/* Modal Dialog */}
+					<div className="relative bg-white dark:bg-[#121212] border border-gray-200 dark:border-white/10 w-full max-w-sm rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+						<div className="p-6 text-center">
+							<div className="w-16 h-16 rounded-full bg-red-50 dark:bg-red-500/10 flex items-center justify-center mx-auto mb-4">
+								<Trash2
+									className="text-red-600 dark:text-red-500"
+									size={28}
+									strokeWidth={2.5}
+								/>
+							</div>
+
+							<h3 className="text-xl font-black tracking-tight text-gray-900 dark:text-white mb-2">
+								Delete {selectedIds.length} Transactions?
+							</h3>
+
+							<p className="text-sm text-gray-500 dark:text-gray-400 mb-8 px-2">
+								This action cannot be undone. These transactions will be
+								permanently removed from your budget.
+							</p>
+
+							<div className="flex gap-3">
+								<button
+									onClick={() => setShowBulkDeleteConfirm(false)}
+									className="flex-1 py-3 px-4 bg-gray-100 dark:bg-white/5 hover:bg-gray-200 dark:hover:bg-white/10 text-gray-700 dark:text-gray-300 font-bold rounded-xl transition-all active:scale-95"
+								>
+									Cancel
+								</button>
+								<button
+									onClick={handleBulkDelete}
+									className="flex-1 py-3 px-4 bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl transition-all shadow-lg shadow-red-600/20 active:scale-95"
+								>
+									Yes, Delete
+								</button>
+							</div>
+						</div>
+					</div>
+				</div>
+			)}
+			{/* 1. THE DELETE TOAST (Uses Merge Math) */}
+			{deleteToast && (
+				<UndoToast
+					show={!!deleteToast}
+					message={`Deleted ${deleteToast.count} transactions`}
+					onUndo={() => {
+						undoDelete(deleteToast.snapshot);
+						setDeleteToast(null);
+					}}
+					onClose={() => setDeleteToast(null)}
+				/>
+			)}
+
+			{/* 2. THE EDIT TOAST (Uses Full Array Replacement Math) */}
+			{toast && (
+				<UndoToast
+					show={!!toast}
+					message={`Updated ${toast.count} transactions`}
+					onUndo={() => {
+						useBudgetStore.getState().undoBulkUpdate(toast.snapshot);
+						setToast(null);
+					}}
+					onClose={() => setToast(null)}
 				/>
 			)}
 		</div>

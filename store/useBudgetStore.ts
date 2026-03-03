@@ -49,7 +49,9 @@ interface BudgetState {
 	deleteTransaction: (id: string) => void;
 	updateTransaction: (id: string, updates: Partial<Transaction>) => void;
 	getCategoryTotals: () => Record<string, number>;
-	undoBulkUpdate: (previousTransactions: Transaction[]) => void;
+	undoBulkUpdate: (previousTransactions: Transaction[]) => void; // For Edits (Replace)
+	bulkDeleteTransactions: (ids: string[]) => Promise<void>;
+	undoDelete: (restoredTxs: Transaction[]) => Promise<void>; // For Deletes (Merge)
 }
 
 export const useBudgetStore = create<BudgetState>()(
@@ -273,6 +275,35 @@ export const useBudgetStore = create<BudgetState>()(
 				if (error) console.error("Deletion failed:", error.message);
 			},
 
+			bulkDeleteTransactions: async (ids: string[]) => {
+				// 1. Optimistic Local Update (Instant UI reaction)
+				set((state) => ({
+					transactions: state.transactions.filter((t) => !ids.includes(t.id)),
+				}));
+
+				// 2. Cloud Update
+				const { error } = await supabase
+					.from("transactions")
+					.delete()
+					.in("id", ids); // Deletes all IDs in the array at once
+
+				if (error) console.error("Bulk deletion failed:", error.message);
+			},
+
+			undoDelete: async (restoredTxs) => {
+				// 1. Instantly MERGE the deleted items back into the existing UI array
+				set((state) => ({
+					transactions: [...restoredTxs, ...state.transactions],
+				}));
+
+				// 2. Re-insert them into Supabase quietly in the background
+				const { error } = await supabase
+					.from("transactions")
+					.insert(restoredTxs);
+
+				if (error) console.error("Undo failed to sync with DB:", error.message);
+			},
+
 			clearData: () => set({ transactions: [], customTags: [], rules: [] }),
 
 			setLoading: (loading) => set({ isLoading: loading }),
@@ -315,9 +346,9 @@ export const useBudgetStore = create<BudgetState>()(
 		{
 			name: `budget-storage`,
 			onRehydrateStorage: () => (state) => {
-                // This runs as soon as localStorage is read
-                state?.setHasHydrated(true);
-            },
+				// This runs as soon as localStorage is read
+				state?.setHasHydrated(true);
+			},
 			storage: createJSONStorage(() => localStorage),
 			// 3. Optional: Only persist rules and tags, let Supabase handle transactions
 			partialize: (state) => ({

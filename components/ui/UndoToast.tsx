@@ -69,10 +69,7 @@ export function UndoToast({
 
 				<button
 					type="button"
-					onClick={() => {
-						onUndo();
-						onClose();
-					}}
+					onClick={onUndo}
 					className="flex items-center gap-2 text-sm font-black uppercase tracking-widest text-orange-500 hover:text-orange-400 transition-colors group"
 				>
 					<RotateCcw
