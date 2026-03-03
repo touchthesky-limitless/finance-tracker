@@ -4,6 +4,7 @@ import Sidebar from "@/components/Sidebar";
 import StoreInitializer from "@/components/StoreInitializer";
 import GlobalShimmer from "@/components/GlobalShimmer";
 import { useBudgetStore } from "@/store/useBudgetStore";
+import WelcomeNotification from "@/components/WelcomeNotification";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
 	const hasHydrated = useBudgetStore((state) => state.hasHydrated);
@@ -17,6 +18,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 		<div className="flex min-h-screen bg-white dark:bg-[#050505]">
 			{/* Keeps your Zustand state synced with the server */}
 			<StoreInitializer />
+
+            <WelcomeNotification />
+            
 			{/* Sidebar is fixed width or responsive drawer */}
 			<Sidebar />
 

@@ -12,7 +12,7 @@ import {
     Menu,
     X,
 } from "lucide-react";
-import { LogoutButton } from "@/app/(auth)/logout/page";
+import { LogoutButton } from "@/components/LogoutButton";
 import ThemeToggle from "@/components/ThemeToggle";
 
 export default function Sidebar() {
