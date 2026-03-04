@@ -11,6 +11,7 @@ import {
 	LayoutGrid,
 	Check,
 	X,
+	Menu,
 } from "lucide-react";
 import { CategoryIcon } from "@/components/CategoryIcon";
 import { AddCategoryModal } from "@/components/AddCategoryModal";
@@ -30,14 +31,13 @@ export default function CategoriesPage() {
 	const [deletingCategory, setDeletingCategory] = useState<string | null>(null);
 	const [editingId, setEditingId] = useState<string | null>(null);
 	const [tempName, setTempName] = useState("");
-	const [isError, setIsError] = useState(false);
 	const [isConfirmingReset, setIsConfirmingReset] = useState(false);
 	const [showResetMenu, setShowResetMenu] = useState(false);
 	const [showSuccess, setShowSuccess] = useState(false);
 	const [isRefreshing, setIsRefreshing] = useState(false);
 	const [lastSynced, setLastSynced] = useState<Date>(new Date());
+	const [isSidebarOpen, setIsSidebarOpen] = useState(false); // Mobile Sidebar State
 
-	// --- Store with Shallow Selector for Performance ---
 	const {
 		customCategories,
 		fetchCustomCategories,
@@ -64,7 +64,6 @@ export default function CategoriesPage() {
 		isShowingAll,
 	} = useUnifiedCategories(transactionType, activePrimary);
 
-	// --- Actions ---
 	const handleRefresh = async () => {
 		setIsRefreshing(true);
 		await fetchCustomCategories();
@@ -84,19 +83,14 @@ export default function CategoriesPage() {
 			setEditingId(null);
 			return;
 		}
-
 		const isDuplicate = allUnifiedCategories.some(
 			(existing) =>
 				existing.name.toLowerCase() === trimmedName.toLowerCase() &&
 				existing.id !== cat.id,
 		);
-
 		if (isDuplicate) {
-			setIsError(true);
-			setTimeout(() => setIsError(false), 2000);
 			return;
 		}
-
 		try {
 			await updateCustomCategory(cat.id!, {
 				name: trimmedName,
@@ -108,7 +102,7 @@ export default function CategoriesPage() {
 			});
 			setEditingId(null);
 		} catch (err) {
-			console.error("Update failed", err);
+			console.error(err);
 		}
 	};
 
@@ -117,7 +111,6 @@ export default function CategoriesPage() {
 		setIsConfirmingReset(false);
 		setShowResetMenu(false);
 		setShowSuccess(true);
-
 		setTimeout(() => setShowSuccess(false), 2000);
 	};
 
@@ -126,9 +119,34 @@ export default function CategoriesPage() {
 	}, [fetchCustomCategories]);
 
 	return (
-		<div className="flex h-full w-full bg-[#121212] text-gray-300">
-			{/* LEFT SIDEBAR */}
-			<div className="w-64 border-r border-white/5 flex flex-col shrink-0 bg-[#0d0d0d]">
+		<div className="flex h-full w-full bg-[#121212] text-gray-300 overflow-hidden relative">
+			{/* MOBILE SIDEBAR OVERLAY */}
+			{isSidebarOpen && (
+				<div
+					className="fixed inset-0 bg-black/60 backdrop-blur-sm z-100 lg:hidden"
+					onClick={() => setIsSidebarOpen(false)}
+				/>
+			)}
+
+			{/* LEFT SIDEBAR (Desktop: static, Mobile: fixed drawer) */}
+			<div
+				className={`
+                fixed inset-y-0 left-0 z-101 w-64 bg-[#0d0d0d] border-r border-white/5 flex flex-col transition-transform duration-300 lg:relative lg:translate-x-0
+                ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"}
+            `}
+			>
+				<div className="p-4 border-b border-white/5 flex items-center justify-between">
+					<span className="font-black text-xs uppercase tracking-widest text-orange-500">
+						Categories
+					</span>
+					<button
+						onClick={() => setIsSidebarOpen(false)}
+						className="lg:hidden p-1"
+					>
+						<X size={20} />
+					</button>
+				</div>
+
 				<div className="p-4 border-b border-white/5">
 					<div className="flex flex-col rounded-lg border border-white/10 overflow-hidden text-sm font-medium">
 						{(["Expense", "Income", "Transfer"] as TransactionType[]).map(
@@ -138,12 +156,9 @@ export default function CategoriesPage() {
 									onClick={() => {
 										setTransactionType(type);
 										setActivePrimary("All");
+										if (window.innerWidth < 1024) setIsSidebarOpen(false);
 									}}
-									className={`py-2.5 text-center transition-colors border-b border-white/5 last:border-b-0 ${
-										transactionType === type
-											? "bg-orange-600/10 text-orange-500 font-bold"
-											: "hover:bg-white/5 text-gray-400"
-									}`}
+									className={`py-2.5 text-center transition-colors border-b border-white/5 last:border-b-0 ${transactionType === type ? "bg-orange-600/10 text-orange-500 font-bold" : "hover:bg-white/5 text-gray-400"}`}
 								>
 									{type}
 								</button>
@@ -158,12 +173,11 @@ export default function CategoriesPage() {
 					</h3>
 					<nav className="space-y-0.5">
 						<button
-							onClick={() => setActivePrimary("All")}
-							className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-all border-l-2 ${
-								isShowingAll
-									? "border-orange-500 text-white bg-white/5 font-bold"
-									: "border-transparent text-gray-400 hover:text-gray-200 hover:bg-white/5 font-medium"
-							}`}
+							onClick={() => {
+								setActivePrimary("All");
+								setIsSidebarOpen(false);
+							}}
+							className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-all border-l-2 ${isShowingAll ? "border-orange-500 text-white bg-white/5 font-bold" : "border-transparent text-gray-400 hover:text-gray-200 hover:bg-white/5 font-medium"}`}
 						>
 							<LayoutGrid
 								size={16}
@@ -175,12 +189,11 @@ export default function CategoriesPage() {
 						{primaryCategories.map((cat) => (
 							<button
 								key={cat.name}
-								onClick={() => setActivePrimary(cat.name)}
-								className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-all border-l-2 ${
-									activePrimary === cat.name
-										? "border-orange-500 text-white bg-white/5 font-bold"
-										: "border-transparent text-gray-400 hover:text-gray-200 hover:bg-white/5 font-medium"
-								}`}
+								onClick={() => {
+									setActivePrimary(cat.name);
+									setIsSidebarOpen(false);
+								}}
+								className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-all border-l-2 ${activePrimary === cat.name ? "border-orange-500 text-white bg-white/5 font-bold" : "border-transparent text-gray-400 hover:text-gray-200 hover:bg-white/5 font-medium"}`}
 							>
 								<CategoryIcon
 									name={cat.icon || cat.name}
@@ -199,12 +212,20 @@ export default function CategoriesPage() {
 			</div>
 
 			{/* RIGHT CONTENT */}
-			<div className="flex-1 flex flex-col h-full overflow-hidden">
-				<div className="flex items-center justify-between p-6 border-b border-white/5">
-					<div className="flex items-center gap-4">
+			<div className="flex-1 flex flex-col h-full overflow-hidden w-full">
+				{/* Header */}
+				<div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 sm:p-6 border-b border-white/5 bg-[#121212] gap-4">
+					<div className="flex items-center justify-between sm:justify-start gap-4">
+						<button
+							onClick={() => setIsSidebarOpen(true)}
+							className="lg:hidden p-2 bg-white/5 rounded-lg border border-white/10"
+						>
+							<Menu size={20} />
+						</button>
+
 						<div className="flex items-center gap-3">
 							<div
-								className={`p-2 rounded-xl ${isShowingAll ? "bg-orange-500/10 border-orange-500/20" : "bg-white/5 border-white/10"} border`}
+								className={`hidden xs:flex p-2 rounded-xl ${isShowingAll ? "bg-orange-500/10 border-orange-500/20" : "bg-white/5 border-white/10"} border`}
 							>
 								{isShowingAll ? (
 									<LayoutGrid size={20} className="text-orange-500" />
@@ -216,118 +237,119 @@ export default function CategoriesPage() {
 									/>
 								)}
 							</div>
-							<h1 className="text-xl font-bold text-white tracking-tight">
-								{isShowingAll ? "All Categories" : activePrimary}
+							<h1 className="text-lg sm:text-xl font-bold text-white tracking-tight truncate max-w-37.5 sm:max-w-none">
+								{isShowingAll ? "All" : activePrimary}
 							</h1>
 						</div>
 
-						<div className="h-6 w-px bg-white/10 mx-2" />
+						<div className="hidden sm:block h-6 w-px bg-white/10 mx-2" />
 
 						<button
 							onClick={() => setIsAddModalOpen(true)}
-							className="flex items-center gap-2 px-4 py-2 bg-orange-600 hover:bg-orange-500 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-lg shadow-orange-600/10 active:scale-95"
+							className="flex items-center gap-1 sm:gap-2 px-3 sm:px-4 py-2 bg-orange-600 hover:bg-orange-500 text-white rounded-xl text-[10px] sm:text-xs font-black uppercase tracking-wider transition-all shadow-lg shadow-orange-600/10"
 						>
-							<Plus size={16} strokeWidth={3} />
-							{isShowingAll ? "Add Category" : "Sub-Category"}
+							<Plus size={14} strokeWidth={3} />
+							<span className="hidden xs:inline">
+								{isShowingAll ? "Add Category" : "Sub-Category"}
+							</span>
+							<span className="xs:hidden">Add</span>
 						</button>
 					</div>
 
-					<div className="flex items-center gap-4">
+					<div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-4">
 						<div className="flex flex-col items-end pr-2 border-r border-white/5">
-							<span className="text-[8px] font-black uppercase text-gray-600 tracking-[0.2em] mb-0.5">
-								Database Sync
+							<span className="text-[7px] sm:text-[8px] font-black uppercase text-gray-600 tracking-[0.2em]">
+								Sync
 							</span>
-							<span className="text-[10px] font-bold text-orange-500/80 tabular-nums">
-								{lastSynced.toLocaleTimeString([], { hour12: true })}
+							<span className="text-[9px] sm:text-[10px] font-bold text-orange-500/80 tabular-nums">
+								{lastSynced.toLocaleTimeString([], {
+									hour: "2-digit",
+									minute: "2-digit",
+								})}
 							</span>
 						</div>
 
-						<button
-							onClick={handleRefresh}
-							disabled={isRefreshing}
-							className="p-2 text-gray-500 hover:text-white hover:bg-white/5 rounded-xl border border-transparent hover:border-white/10 transition-all active:scale-90 disabled:opacity-30"
-						>
-							<RotateCcw
-								size={16}
-								className={isRefreshing ? "animate-spin text-orange-500" : ""}
-							/>
-						</button>
-
-						<div className="relative">
+						<div className="flex items-center gap-1 sm:gap-2">
 							<button
-								disabled={showSuccess}
-								onClick={() => {
-									setShowResetMenu(!showResetMenu);
-									setIsConfirmingReset(false);
-								}}
-								className={`p-2 rounded-xl transition-all duration-300 border border-transparent ${
-									showSuccess
-										? "text-green-500 bg-green-500/10 border-green-500/20 scale-110"
-										: "text-gray-500 hover:text-white hover:bg-white/5 hover:border-white/10"
-								}`}
+								onClick={handleRefresh}
+								disabled={isRefreshing}
+								className="p-2 text-gray-500 hover:text-white bg-white/2 sm:bg-transparent rounded-xl border border-transparent hover:border-white/10 disabled:opacity-30"
 							>
-								{showSuccess ? <Check size={18} /> : <MoreVertical size={18} />}
+								<RotateCcw
+									size={16}
+									className={isRefreshing ? "animate-spin text-orange-500" : ""}
+								/>
 							</button>
 
-							{showResetMenu && (
-								<>
-									<div
-										className="fixed inset-0 z-10"
-										onClick={() => {
-											setShowResetMenu(false);
-											setIsConfirmingReset(false);
-										}}
-									/>
-									<div className="absolute right-0 mt-2 w-56 bg-[#0d0d0d] border border-white/10 rounded-xl shadow-2xl z-20 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-										{isConfirmingReset ? (
-											<div className="p-2 space-y-1 animate-in slide-in-from-right-2 duration-200">
-												<p className="px-3 py-2 text-[10px] font-black uppercase text-red-500/60 tracking-tighter">
-													Are you absolutely sure?
-												</p>
+							<div className="relative">
+								<button
+									disabled={showSuccess}
+									onClick={() => {
+										setShowResetMenu(!showResetMenu);
+										setIsConfirmingReset(false);
+									}}
+									className={`p-2 rounded-xl transition-all border border-transparent ${showSuccess ? "text-green-500 bg-green-500/10 border-green-500/20" : "text-gray-500 hover:text-white bg-white/2 sm:bg-transparent hover:bg-white/5 hover:border-white/10"}`}
+								>
+									{showSuccess ? (
+										<Check size={18} />
+									) : (
+										<MoreVertical size={18} />
+									)}
+								</button>
+								{showResetMenu && (
+									<>
+										<div
+											className="fixed inset-0 z-110"
+											onClick={() => setShowResetMenu(false)}
+										/>
+										<div className="absolute right-0 mt-2 w-48 sm:w-56 bg-[#0d0d0d] border border-white/10 rounded-xl shadow-2xl z-111 overflow-hidden animate-in fade-in zoom-in-95">
+											{isConfirmingReset ? (
+												<div className="p-2 space-y-1">
+													<p className="px-3 py-2 text-[10px] font-black uppercase text-red-500/60 tracking-tighter">
+														Are you sure?
+													</p>
+													<button
+														onClick={handleReset}
+														className="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs bg-red-500 text-white rounded-lg font-black uppercase tracking-tighter"
+													>
+														<Trash2 size={14} /> Wipe All
+													</button>
+													<button
+														onClick={() => {
+															setIsConfirmingReset(false);
+															setShowResetMenu(false);
+														}}
+														className="w-full py-2 text-[10px] font-bold text-gray-500"
+													>
+														Cancel
+													</button>
+												</div>
+											) : (
 												<button
-													onClick={handleReset}
-													className="w-full flex items-center gap-2 px-3 py-2 text-sm bg-red-500 text-white rounded-lg font-black uppercase tracking-tighter shadow-lg shadow-red-500/20 active:scale-95 transition-all"
-												>
-													<Trash2 size={14} /> Yes, Delete All
-												</button>
-												<button
-													onClick={() => {
-														setIsConfirmingReset(false);
-														setShowResetMenu(false);
+													disabled={!hasCustomCategories}
+													onClick={(e) => {
+														e.stopPropagation();
+														setIsConfirmingReset(true);
 													}}
-													className="w-full text-center py-2 text-[10px] font-bold text-gray-500 hover:text-gray-300 transition-colors"
+													className="w-full flex items-center gap-2 px-2 py-2 text-sm font-bold disabled:opacity-30 text-red-500 hover:bg-red-500/10"
 												>
-													Nevermind, Cancel
+													<RotateCcw size={16} /> Reset Custom Categories
 												</button>
-											</div>
-										) : (
-											<button
-												disabled={!hasCustomCategories}
-												onClick={(e) => {
-													e.stopPropagation();
-													setIsConfirmingReset(true);
-												}}
-												className="w-full flex items-center gap-2 px-4 py-3 text-sm transition-colors font-bold disabled:opacity-30 disabled:cursor-not-allowed text-red-500 hover:bg-red-500/10"
-											>
-												<RotateCcw size={16} /> Reset Categories
-												{!hasCustomCategories && (
-													<span className="ml-auto text-[9px] text-gray-600 uppercase">
-														Empty
-													</span>
-												)}
-											</button>
-										)}
-									</div>
-								</>
-							)}
+											)}
+										</div>
+									</>
+								)}
+							</div>
 						</div>
 					</div>
 				</div>
 
-				<div className="flex-1 overflow-y-auto p-6 scrollbar-hide">
-					<div className="flex items-center justify-between px-4 pb-4 border-b border-white/5 text-[11px] font-bold text-cyan-500/80 uppercase tracking-[0.2em] mb-2">
-						<span>Category Name</span>
-						<span className="pr-12">Operation</span>
+				{/* Table Content */}
+				<div className="flex-1 overflow-y-auto p-3 sm:p-6 scrollbar-hide">
+					{/* Header Row */}
+					<div className="flex items-center justify-between px-2 sm:px-4 pb-4 border-b border-white/5 text-[9px] sm:text-[11px] font-bold text-cyan-500/80 uppercase tracking-[0.2em] mb-2">
+						<span>Category</span>
+						<span className="pr-4 sm:pr-12">Action</span>
 					</div>
 
 					<div className="space-y-1">
@@ -348,51 +370,34 @@ export default function CategoriesPage() {
 										editingId !== cat.id &&
 										setActivePrimary(cat.name)
 									}
-									className={`flex items-center justify-between p-4 rounded-xl border border-transparent hover:border-white/5 hover:bg-white/2 transition-all group ${activePrimary === "All" && editingId !== cat.id ? "cursor-pointer" : "cursor-default"}`}
+									className={`flex items-center justify-between p-3 sm:p-4 rounded-xl border border-transparent hover:border-white/5 hover:bg-white/2 group ${activePrimary === "All" && editingId !== cat.id ? "cursor-pointer" : "cursor-default"}`}
 								>
-									<div className="flex items-center gap-3 flex-1">
-										<div className="p-2 rounded-lg bg-[#0d0d0d] border border-white/5">
+									<div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
+										<div className="p-1.5 sm:p-2 rounded-lg bg-[#0d0d0d] border border-white/5 shrink-0">
 											<CategoryIcon
 												name={cat.icon || cat.name}
-												size={18}
+												size={16}
 												colorClass={cat.theme.text}
 											/>
 										</div>
 
-										<div className="flex items-center gap-2 flex-1">
+										<div className="flex items-center gap-2 flex-1 min-w-0">
 											{editingId === cat.id ? (
-												<div className="flex flex-col flex-1 max-w-50">
+												<div className="flex flex-col flex-1 max-w-30 sm:max-w-50">
 													<input
 														autoFocus
 														value={tempName}
-														onChange={(e) => {
-															setTempName(e.target.value);
-															if (isError) setIsError(false);
-														}}
-														onKeyDown={(e) => {
-															if (e.key === "Enter" && !isRowDuplicate)
-																handleSaveInline(cat);
-															if (e.key === "Escape") setEditingId(null);
-														}}
-														className={`bg-white/5 border rounded px-2 py-1 text-sm text-white focus:outline-none w-full transition-colors ${
-															isError || isRowDuplicate
-																? "border-red-500 animate-shake"
-																: "border-orange-500/50"
-														}`}
+														onChange={(e) => setTempName(e.target.value)}
+														className={`bg-white/5 border rounded px-2 py-1 text-xs sm:text-sm text-white focus:outline-none w-full ${isRowDuplicate ? "border-red-500" : "border-orange-500/50"}`}
 													/>
-													{isRowDuplicate && (
-														<span className="text-[10px] text-red-500 font-bold uppercase mt-1 animate-in fade-in slide-in-from-top-1">
-															Duplicate Category
-														</span>
-													)}
 												</div>
 											) : (
 												<>
-													<span className="text-sm font-medium text-gray-200">
+													<span className="text-xs sm:text-sm font-medium text-gray-200 truncate">
 														{cat.name}
 													</span>
 													{cat.isCustom && (
-														<span className="text-[9px] font-black bg-orange-500/10 text-orange-500 px-1.5 py-0.5 rounded border border-orange-500/20 uppercase">
+														<span className="hidden xs:inline text-[8px] font-black bg-orange-500/10 text-orange-500 px-1 py-0.5 rounded border border-orange-500/20 uppercase">
 															Custom
 														</span>
 													)}
@@ -402,7 +407,12 @@ export default function CategoriesPage() {
 									</div>
 
 									<div
-										className={`flex items-center gap-2 transition-all duration-200 ${editingId === cat.id ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
+										className={`flex items-center gap-1 sm:gap-2 transition-all duration-200 ${
+											editingId === cat.id
+												? "opacity-100"
+												: "opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
+										}`}
+										// 1. THIS IS THE KEY: Stop any clicks in this area from hitting the parent row
 										onClick={(e) => e.stopPropagation()}
 									>
 										{cat.isCustom ? (
@@ -410,17 +420,20 @@ export default function CategoriesPage() {
 												<div className="flex items-center gap-1 animate-in fade-in zoom-in duration-200">
 													<button
 														disabled={isRowDuplicate || !tempName.trim()}
-														onClick={() => handleSaveInline(cat)}
-														className="p-1.5 text-green-500 hover:bg-green-500/10 rounded-lg transition-all disabled:opacity-20"
+														onClick={(e) => {
+															e.stopPropagation();
+															handleSaveInline(cat);
+														}}
+														className="p-1.5 text-green-500 hover:bg-green-500/10 rounded-lg"
 													>
 														<Check size={16} />
 													</button>
 													<button
-														onClick={() => {
+														onClick={(e) => {
+															e.stopPropagation();
 															setEditingId(null);
-															setIsError(false);
 														}}
-														className="p-1.5 text-gray-500 hover:text-gray-300 transition-colors"
+														className="p-1.5 text-gray-500 hover:text-gray-300"
 													>
 														<X size={16} />
 													</button>
@@ -428,13 +441,17 @@ export default function CategoriesPage() {
 											) : deletingCategory === cat.name ? (
 												<div className="flex items-center gap-1 animate-in fade-in zoom-in duration-200">
 													<button
-														onClick={() => setDeletingCategory(null)}
+														onClick={(e) => {
+															e.stopPropagation();
+															setDeletingCategory(null);
+														}}
 														className="px-2 py-1 text-[10px] font-bold text-gray-500 hover:text-gray-300"
 													>
 														Cancel
 													</button>
 													<button
-														onClick={async () => {
+														onClick={async (e) => {
+															e.stopPropagation(); // 2. Critical for the confirmation button
 															if (cat.id) {
 																await deleteCustomCategory(cat.id);
 																setDeletingCategory(null);
@@ -453,22 +470,23 @@ export default function CategoriesPage() {
 															setEditingId(cat.id || null);
 															setTempName(cat.name);
 														}}
-														className="p-2 text-gray-500 hover:text-orange-500 hover:bg-orange-500/10 rounded-lg transition-all"
-														title="Edit Name"
+														className="p-2 text-gray-500 hover:text-orange-500 hover:bg-orange-500/10 rounded-lg"
 													>
 														<Edit3 size={16} />
 													</button>
 													<button
-														onClick={() => setDeletingCategory(cat.name)}
-														className="p-2 text-gray-500 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-all"
-														title="Delete"
+														onClick={(e) => {
+															e.stopPropagation();
+															setDeletingCategory(cat.name);
+														}}
+														className="p-2 text-gray-500 hover:text-red-500 hover:bg-red-500/10 rounded-lg"
 													>
 														<Trash2 size={16} />
 													</button>
 												</>
 											)
 										) : (
-											<span className="text-[9px] font-black text-gray-600 uppercase tracking-[0.2em] pr-2">
+											<span className="text-[7px] sm:text-[9px] font-black text-gray-600 uppercase tracking-widest pr-1">
 												System Default
 											</span>
 										)}
@@ -479,8 +497,8 @@ export default function CategoriesPage() {
 					</div>
 				</div>
 			</div>
+
 			<AddCategoryModal
-				key={isAddModalOpen ? `open-${activePrimary}` : "closed"}
 				isOpen={isAddModalOpen}
 				onClose={() => setIsAddModalOpen(false)}
 				parentCategory={isShowingAll ? undefined : activePrimary}

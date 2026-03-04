@@ -11,6 +11,7 @@ import {
 	CATEGORY_HIERARCHY,
 	getCategoryTheme,
 	searchCategories,
+	UnifiedCategory,
 } from "@/constants";
 import {
 	useFloating,
@@ -25,6 +26,7 @@ import {
 	size,
 } from "@floating-ui/react";
 import { CategoryIcon } from "@/components/CategoryIcon";
+import { useUnifiedCategories } from "@/hooks/useUnifiedCategories";
 
 interface CategorySelectorProps {
 	currentCategory: string;
@@ -39,7 +41,7 @@ interface ParentTabProps {
 }
 
 interface SubCategoryRowProps {
-	sub: string;
+	category: UnifiedCategory;
 	parent: string;
 	isSelected: boolean;
 	onSelect: (sub: string, parent: string) => void;
@@ -68,23 +70,29 @@ ParentTab.displayName = "ParentTab";
 
 // Optimized Right Pane Item
 const SubCategoryRow = memo(
-	({ sub, parent, isSelected, onSelect }: SubCategoryRowProps) => (
+	({ category, parent, isSelected, onSelect }: SubCategoryRowProps) => (
 		<button
 			type="button"
-			onClick={() => onSelect(sub, parent)}
+			onClick={() => onSelect(category.name, parent)}
 			className="w-full text-left px-4 py-3 rounded-lg flex items-center justify-between transition-colors group"
 		>
 			<div className="flex items-center gap-3">
 				<CategoryIcon
-					name={sub}
+					name={category.icon || category.name}
 					size={14}
 					colorClass={getCategoryTheme(parent).text}
 				/>
 				<span
 					className={`text-xs ${isSelected ? "text-orange-400 font-bold" : "text-gray-400"}`}
 				>
-					{sub}
+					{category.name}
 				</span>
+				{/* Optional: Add the Custom badge here too for clarity */}
+				{category.isCustom && (
+					<span className="text-[8px] bg-orange-500/10 text-orange-500 px-1 rounded uppercase font-black">
+						Custom
+					</span>
+				)}
 			</div>
 			{isSelected && <Check size={14} className="text-orange-500" />}
 		</button>
@@ -101,6 +109,9 @@ export function CategorySelector({
 	const [catQuery, setCatQuery] = useState("");
 	const inputRef = useRef<HTMLInputElement>(null);
 
+	// Use your unified hook to get the merged list
+	const { allUnifiedCategories } = useUnifiedCategories("Expense", "All");
+
 	// This creates a "low-priority" version of the query
 	const deferredQuery = useDeferredValue(catQuery);
 
@@ -114,22 +125,75 @@ export function CategorySelector({
 		return found || "Food & drink";
 	});
 
+	// Find the full category object from our master list to get real icon/theme
+	const selectedCategoryData = useMemo(() => {
+		return allUnifiedCategories.find((cat) => cat.name === currentCategory);
+	}, [allUnifiedCategories, currentCategory]);
+
+	// Determine display values
+	const displayIcon = selectedCategoryData?.icon || currentCategory;
+	const displayColorClass =
+		selectedCategoryData?.theme?.text || "text-gray-400";
+
+	// 1. Build a Dynamic Hierarchy that merges System + Custom
+	// Inside CategorySelector
+	const dynamicHierarchy = useMemo(() => {
+		// We map the static hierarchy into UnifiedCategory-like objects first
+		const base: Record<string, UnifiedCategory[]> = {};
+
+		// Convert static hierarchy to objects
+		Object.keys(CATEGORY_HIERARCHY).forEach((parent) => {
+			base[parent] = CATEGORY_HIERARCHY[parent].map(
+				(subName) =>
+					allUnifiedCategories.find((c) => c.name === subName) ||
+					({
+						name: subName,
+						icon: subName,
+						theme: getCategoryTheme(parent),
+						isCustom: false,
+					} as UnifiedCategory),
+			);
+		});
+
+		// Inject Custom Categories
+		allUnifiedCategories.forEach((cat) => {
+			if (!cat.isCustom) return;
+
+			if (cat.parentName && base[cat.parentName]) {
+				// Add custom sub-category object
+				if (!base[cat.parentName].some((c) => c.name === cat.name)) {
+					base[cat.parentName].push(cat);
+				}
+			} else if (!cat.parentName) {
+				// Add custom primary category entry
+				if (!base[cat.name]) base[cat.name] = [];
+			}
+		});
+
+		return base;
+	}, [allUnifiedCategories]);
+
 	// Filtering Logic
 	const visibleParents = useMemo(() => {
-		const query = deferredQuery.toLowerCase().trim(); // Changed from catQuery
-		if (!query) return Object.keys(CATEGORY_HIERARCHY);
-		return Object.keys(CATEGORY_HIERARCHY).filter(
+		const query = deferredQuery.toLowerCase().trim();
+		const parents = Object.keys(dynamicHierarchy);
+
+		if (!query) return parents;
+
+		return parents.filter(
 			(parent) =>
+				// Check if the Parent name matches the query
 				parent.toLowerCase().includes(query) ||
-				CATEGORY_HIERARCHY[parent].some((sub) =>
-					sub.toLowerCase().includes(query),
+				// Check if any Sub-Category object within this parent matches the query
+				dynamicHierarchy[parent].some((cat) =>
+					cat.name.toLowerCase().includes(query),
 				),
 		);
-	}, [deferredQuery]); // Dependency changed
+	}, [deferredQuery, dynamicHierarchy]);
 
 	// Derived Active Parent (The Auto-Snap Fix)
 	const activeParent = useMemo(() => {
-		const query = deferredQuery.toLowerCase().trim(); // Changed from catQuery
+		const query = deferredQuery.toLowerCase().trim();
 		if (!query) return selectedParent;
 
 		const currentHasMatch =
@@ -141,20 +205,7 @@ export function CategorySelector({
 		if (currentHasMatch) return selectedParent;
 
 		return visibleParents.length > 0 ? visibleParents[0] : selectedParent;
-	}, [deferredQuery, visibleParents, selectedParent]); // Dependency changed
-
-	// Helper to find the parent name
-	const findParent = (name: string) => {
-		return (
-			Object.keys(CATEGORY_HIERARCHY).find(
-				(parent) =>
-					CATEGORY_HIERARCHY[parent].includes(name) || parent === name,
-			) || "Uncategorized"
-		);
-	};
-
-	const parentName = findParent(currentCategory);
-	const subCategoryColor = getCategoryTheme(parentName);
+	}, [deferredQuery, visibleParents, selectedParent]);
 
 	// 1. Initialize Floating UI logic
 	const {
@@ -209,8 +260,8 @@ export function CategorySelector({
 
 			{/* --- TRIGGER BUTTON --- */}
 			<button
-				ref={setReference} // ATTACH REF HERE
-				{...getReferenceProps()} // ATTACH PROPS HERE
+				ref={setReference}
+				{...getReferenceProps()}
 				type="button"
 				onClick={() => setIsOpen(!isOpen)}
 				className={
@@ -221,15 +272,13 @@ export function CategorySelector({
 			>
 				<div className="flex items-center gap-2">
 					{variant === "filter" ? (
-						<>
-							<span>{currentCategory || "Category"}</span>
-						</>
+						<span>{currentCategory || "Category"}</span>
 					) : (
 						<>
 							<CategoryIcon
-								name={currentCategory}
+								name={displayIcon}
 								size={18}
-								colorClass={subCategoryColor.text}
+								colorClass={displayColorClass}
 							/>
 							<span className="text-sm text-gray-900 dark:text-white font-medium">
 								{currentCategory}
@@ -255,9 +304,9 @@ export function CategorySelector({
 			{isOpen && (
 				<FloatingPortal>
 					<div
-						ref={setFloating} // ATTACH REF HERE
+						ref={setFloating}
 						style={floatingStyles}
-						{...getFloatingProps()} // ATTACH PROPS HERE
+						{...getFloatingProps()}
 						className="z-200 bg-white dark:bg-[#0d0d0d] shadow-2xl rounded-xl border border-slate-200 dark:border-gray-800 overflow-hidden"
 					>
 						{/* SEARCH AREA */}
@@ -337,18 +386,18 @@ export function CategorySelector({
 								className="flex-1 bg-[#F8F9FB] dark:bg-[#090909] overflow-y-auto p-2 scrollbar-hide"
 								style={{ scrollbarWidth: "none" }}
 							>
-								{(CATEGORY_HIERARCHY[activeParent] || [])
+								{(dynamicHierarchy[activeParent] || [])
 									.filter(
-										(sub) =>
+										(cat) =>
 											!catQuery ||
-											sub.toLowerCase().includes(catQuery.toLowerCase()),
+											cat.name.toLowerCase().includes(catQuery.toLowerCase()),
 									)
-									.map((sub) => (
+									.map((cat) => (
 										<SubCategoryRow
-											key={sub}
-											sub={sub}
+											key={cat.id || cat.name}
+											category={cat}
 											parent={activeParent}
-											isSelected={currentCategory === sub}
+											isSelected={currentCategory === cat.name}
 											onSelect={(s, p) => {
 												onSelect(s, p);
 												setIsOpen(false);

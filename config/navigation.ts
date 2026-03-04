@@ -66,7 +66,6 @@ export const NAV_GROUPS: NavGroupType[] = [
 	{
 		label: "Basis Data",
 		items: [
-			{ name: "Accounts", href: "/budget/accounts", icon: Wallet },
 			{
 				name: "Transaction Categories",
 				href: "/budget/categories",
@@ -74,6 +73,13 @@ export const NAV_GROUPS: NavGroupType[] = [
 				icon: ListTree,
 				isLocked: false,
 			},
+			{
+				name: "Accounts",
+				href: "/budget/accounts",
+				icon: Wallet,
+				isLocked: true,
+			},
+
 			{
 				name: "Transaction Tags",
 				href: "/budget/tags",
