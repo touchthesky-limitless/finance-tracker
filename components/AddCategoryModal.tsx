@@ -38,6 +38,7 @@ export function AddCategoryModal({
 		() => parentData?.icon || iconOptions[0] || "Banknote",
 	);
 
+    // TODO: Fix selected icon and color
 	const [selectedColor, setSelectedColor] = useState(
 		() => parentData?.theme?.colorKey || colorOptions[0] || "Gray",
 	);

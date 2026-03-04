@@ -9,6 +9,9 @@ import { getCategoryTheme } from "@/constants/categories";
 
 export function useBudgetData(timeFilter: string) {
 	const transactions = useBudgetStore((state) => state.transactions);
+	const confirmedMerchants = useBudgetStore(
+		(state) => state.confirmedRecurringMerchants,
+	);
 
 	// --- 1. UNIFIED PARSER ---
 	// Extract Month and Year from strings like "Jan 2026", "Year 2025", or "This Month"
@@ -55,82 +58,94 @@ export function useBudgetData(timeFilter: string) {
 	}, [timeFilter]);
 
 	// --- 2. FILTER TRANSACTIONS ---
-const filteredTransactions = useMemo(() => {
-    // 1. START THE CLOCK
-    // const start = performance.now();
-    // console.log("🚀 DATA ENGINE CHECKING...");
+	const filteredTransactions = useMemo(() => {
+		// 1. START THE CLOCK
+		// const start = performance.now();
+		// console.log("🚀 DATA ENGINE CHECKING...");
 
-    // 2. Safety Gate
-    if (!transactions || transactions.length === 0) {
-        // const end = performance.now();
-        // console.log(`%c ⚡ Engine (Empty State): ${(end - start).toFixed(3)}ms`, "color: #6b7280;");
-        return [];
-    }
+		// 2. Safety Gate
+		if (!transactions || transactions.length === 0) {
+			// const end = performance.now();
+			// console.log(`%c ⚡ Engine (Empty State): ${(end - start).toFixed(3)}ms`, "color: #6b7280;");
+			return [];
+		}
 
-    if (!timeFilter) {
-        console.warn("⚠️ Data Engine Aborted: No timeFilter provided.");
-        return [];
-    }
+		if (!timeFilter) {
+			console.warn("⚠️ Data Engine Aborted: No timeFilter provided.");
+			return [];
+		}
 
-    // console.log(`✅ Processing ${transactions.length} transactions...`);
+		// console.log(`✅ Processing ${transactions.length} transactions...`);
 
-    const { isSpecificMonth, selectedMonth, selectedYear, now } = filterContext;
+		const { isSpecificMonth, selectedMonth, selectedYear, now } = filterContext;
 
-    // STEP 1: PRE-CALCULATE BOUNDARIES
-    const currentYear = now.getFullYear();
-    const currentMonth = now.getMonth();
-    const currentDate = now.getDate();
+		// STEP 1: PRE-CALCULATE BOUNDARIES
+		const currentYear = now.getFullYear();
+		const currentMonth = now.getMonth();
+		const currentDate = now.getDate();
 
-    const lastM = new Date(currentYear, currentMonth - 1, 1);
-    const twelveMonthsAgo = new Date(currentYear, currentMonth - 12, currentDate);
+		const lastM = new Date(currentYear, currentMonth - 1, 1);
+		const twelveMonthsAgo = new Date(
+			currentYear,
+			currentMonth - 12,
+			currentDate,
+		);
 
-    const dayOfWeek = now.getDay();
-    const diffToMonday = currentDate - (dayOfWeek === 0 ? 6 : dayOfWeek - 1);
-    const monday = new Date(currentYear, currentMonth, diffToMonday);
-    const sunday = new Date(monday);
-    sunday.setDate(monday.getDate() + 6);
-    sunday.setHours(23, 59, 59, 999);
+		const dayOfWeek = now.getDay();
+		const diffToMonday = currentDate - (dayOfWeek === 0 ? 6 : dayOfWeek - 1);
+		const monday = new Date(currentYear, currentMonth, diffToMonday);
+		const sunday = new Date(monday);
+		sunday.setDate(monday.getDate() + 6);
+		sunday.setHours(23, 59, 59, 999);
 
-    let targetYear = currentYear;
-    if (timeFilter.startsWith("Year")) {
-        targetYear = parseInt(timeFilter.split(" ").pop() || String(currentYear));
-    }
+		let targetYear = currentYear;
+		if (timeFilter.startsWith("Year")) {
+			targetYear = parseInt(timeFilter.split(" ").pop() || String(currentYear));
+		}
 
-    // STEP 2: FILTER TRANSACTIONS
-    const result = transactions.filter((t) => {
-        if (!t.date) return false;
+		// STEP 2: FILTER TRANSACTIONS
+		const result = transactions.filter((t) => {
+			if (!t.date) return false;
 
-        const txDate = new Date(t.date);
-        if (isNaN(txDate.getTime())) return false;
+			const txDate = new Date(t.date);
+			if (isNaN(txDate.getTime())) return false;
 
-        const txYear = txDate.getFullYear();
-        const txMonth = txDate.getMonth();
-        const txDay = txDate.getDate();
+			const txYear = txDate.getFullYear();
+			const txMonth = txDate.getMonth();
+			const txDay = txDate.getDate();
 
-        if (isSpecificMonth) return txMonth === selectedMonth && txYear === selectedYear;
-        if (timeFilter === "This Month") return txMonth === currentMonth && txYear === currentYear;
-        if (timeFilter === "Last Month") return txMonth === lastM.getMonth() && txYear === lastM.getFullYear();
-        if (timeFilter.startsWith("Year")) return txYear === targetYear;
-        if (timeFilter === "This Year") return txYear === currentYear;
-        if (timeFilter === "Last 12 Months") return txDate >= twelveMonthsAgo;
-        if (timeFilter.startsWith("Today")) return txYear === currentYear && txMonth === currentMonth && txDay === currentDate;
-        if (timeFilter.startsWith("This Week")) {
-            const txMidnight = new Date(txYear, txMonth, txDay);
-            return txMidnight >= monday && txMidnight <= sunday;
-        }
+			if (isSpecificMonth)
+				return txMonth === selectedMonth && txYear === selectedYear;
+			if (timeFilter === "This Month")
+				return txMonth === currentMonth && txYear === currentYear;
+			if (timeFilter === "Last Month")
+				return txMonth === lastM.getMonth() && txYear === lastM.getFullYear();
+			if (timeFilter.startsWith("Year")) return txYear === targetYear;
+			if (timeFilter === "This Year") return txYear === currentYear;
+			if (timeFilter === "Last 12 Months") return txDate >= twelveMonthsAgo;
+			if (timeFilter.startsWith("Today"))
+				return (
+					txYear === currentYear &&
+					txMonth === currentMonth &&
+					txDay === currentDate
+				);
+			if (timeFilter.startsWith("This Week")) {
+				const txMidnight = new Date(txYear, txMonth, txDay);
+				return txMidnight >= monday && txMidnight <= sunday;
+			}
 
-        return true;
-    });
+			return true;
+		});
 
-    // 3. LOG THE SUCCESSFUL RUN (Outside the filter loop)
-    // const end = performance.now();
-    // console.log(
-    //     `%c ⚡ Engine Speed: ${(end - start).toFixed(3)}ms`,
-    //     "color: #f97316; font-weight: bold; font-size: 12px;"
-    // );
+		// 3. LOG THE SUCCESSFUL RUN (Outside the filter loop)
+		// const end = performance.now();
+		// console.log(
+		//     `%c ⚡ Engine Speed: ${(end - start).toFixed(3)}ms`,
+		//     "color: #f97316; font-weight: bold; font-size: 12px;"
+		// );
 
-    return result;
-}, [transactions, timeFilter, filterContext]);
+		return result;
+	}, [transactions, timeFilter, filterContext]);
 
 	// --- 3. DERIVED STATS ---
 	const stats = useMemo(() => {
@@ -289,51 +304,174 @@ const filteredTransactions = useMemo(() => {
 			.slice(0, 10); // Usually only need the top 5-10 for UI
 	}, [filteredTransactions]);
 
-	// Inside useBudgetData.ts
 	const predictedBills = useMemo(() => {
-		const merchants: Record<string, { dates: number[]; amounts: number[] }> =
-			{};
+		const merchants: Record<
+			string,
+			{ dates: number[]; amounts: number[]; category: string }
+		> = {};
 
-		// 1. Group transaction dates by merchant
 		transactions.forEach((t) => {
-			if (t.amount < 0) {
+			// Exclude internal payments/transfers
+			const isPayment = /PAYMENT|TRANSFER|PMT/i.test(t.merchant);
+			if (t.amount < 0 && !isPayment) {
 				const name = t.merchant
-					.replace(/^(SQ\s\*|TST\s\*|PY\s\*)/i, "")
+					.replace(/^(SQ\s\*|TST\s\*|PY\s\*|PAYMENT\s\*)/i, "")
 					.split(" ")
 					.slice(0, 2)
 					.join(" ");
-				if (!merchants[name]) merchants[name] = { dates: [], amounts: [] };
+
+				if (!merchants[name]) {
+					merchants[name] = { dates: [], amounts: [], category: t.category };
+				}
 				merchants[name].dates.push(new Date(t.date).getTime());
 				merchants[name].amounts.push(Math.abs(t.amount));
 			}
 		});
 
-		// 2. Identify patterns (occurring ~once a month)
-		return (
-			Object.entries(merchants)
-				// eslint-disable-next-line @typescript-eslint/no-unused-vars
-				.filter(([_, data]) => data.dates.length >= 2) // Need at least 2 occurrences
-				.map(([name, data]) => {
-					const lastDate = new Date(Math.max(...data.dates));
-					const avgAmount =
-						data.amounts.reduce((a, b) => a + b, 0) / data.amounts.length;
+		return Object.entries(merchants)
+			.filter(([name, data]) => {
+				// 1. Manual Confirmation always wins
+				const isManuallyConfirmed = confirmedMerchants.some(
+					(m) => m.toLowerCase() === name.toLowerCase(),
+				);
+				if (isManuallyConfirmed) return true;
 
-					// Project the next date (30 days after the last one)
-					const nextDate = new Date(lastDate);
-					nextDate.setDate(lastDate.getDate() + 30);
+				// 2. Must happen at least twice
+				if (data.dates.length < 2) return false;
 
-					return {
-						name,
-						avgAmount,
-						dueDate: nextDate,
-						frequency: data.dates.length >= 12 ? "Yearly" : "Monthly",
-					};
-				})
-				.filter((bill) => bill.dueDate > new Date()) // Only show future ones
-				.sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime())
-				.slice(0, 4)
-		); // Top 4 upcoming
-	}, [transactions]);
+				const catLower = (data.category || "").toLowerCase();
+
+				// 3. Block everyday variable spending
+				const variableCategories = [
+					"shopping",
+					"transportation",
+					"groceries",
+					"food & drink",
+					"gas",
+					"dining",
+					"restaurants",
+					"general",
+				];
+				if (variableCategories.includes(catLower)) return false;
+
+				// 🌟 THE VIP PASS: Insurance, Utilities, and Housing are automatically trusted
+				const isKnownBillCat =
+					catLower.includes("insurance") ||
+					catLower.includes("utilit") ||
+					catLower.includes("housing");
+
+				// 4. Amount Stability
+				const maxAmt = Math.max(...data.amounts);
+				const minAmt = Math.min(...data.amounts);
+				const diff = maxAmt - minAmt;
+
+				// If it's a VIP bill, ignore variance (allows for $15 Renters + $120 Auto)
+				const isStableAmount =
+					isKnownBillCat || diff <= 10 || diff <= maxAmt * 0.5;
+
+				// 5. Frequency Check (Count unique months)
+				const uniqueMonths = new Set(
+					data.dates.map((d) => {
+						const dateObj = new Date(d);
+						return `${dateObj.getFullYear()}-${dateObj.getMonth()}`;
+					}),
+				).size;
+
+				// If it's a VIP bill, allow it even if 4 policies hit in the exact same month!
+				const isSpacedOut = isKnownBillCat || uniqueMonths >= 2;
+
+				return isStableAmount && isSpacedOut;
+			})
+			.map(([name, data]) => {
+				const lastDate = new Date(Math.max(...data.dates));
+				const dayOfMonth = lastDate.getDate();
+
+				// Sum split bills accurately
+				const uniqueMonths = new Set(
+					data.dates.map((d) => {
+						const dateObj = new Date(d);
+						return `${dateObj.getFullYear()}-${dateObj.getMonth()}`;
+					}),
+				).size;
+				const totalAmount = data.amounts.reduce((a, b) => a + b, 0);
+				const avgMonthlyAmount = totalAmount / Math.max(1, uniqueMonths);
+
+				const now = new Date();
+				const nextDate = new Date(
+					now.getFullYear(),
+					now.getMonth(),
+					dayOfMonth,
+				);
+				if (nextDate <= now) {
+					nextDate.setMonth(nextDate.getMonth() + 1);
+				}
+
+				// ✅ EXACTLY AS REQUESTED: Only Entertainment (and its subcategories) are Subscriptions.
+				const catLower = (data.category || "").toLowerCase();
+				const isEntertainment =
+					catLower.includes("entertainment") ||
+					catLower === "music" ||
+					catLower === "movies & tv" ||
+					catLower === "streaming" ||
+					catLower === "games";
+
+				return {
+					id: name,
+					merchant: name,
+					amount: avgMonthlyAmount,
+					category: data.category || "Uncategorized",
+					dueDate: nextDate,
+					dayOfMonth,
+					frequency: data.dates.length >= 12 ? "Yearly" : "Monthly",
+					// The rest go to Upcoming Recurring Bills
+					type: isEntertainment ? "subscription" : "bill",
+				};
+			})
+			.filter((bill) => bill.dueDate > new Date())
+			.sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime());
+	}, [transactions, confirmedMerchants]);
+
+	const potentialSubscriptions = useMemo(() => {
+		const identifiedNames = new Set(
+			predictedBills.map((b) => b.merchant.toLowerCase()),
+		);
+
+		return transactions
+			.filter((t) => {
+				const name = t.merchant.toLowerCase();
+				const amount = Math.abs(t.amount);
+
+				if (identifiedNames.has(name) || t.amount >= 0) return false;
+				if (/PAYMENT|TRANSFER|PMT|DEP/i.test(t.merchant)) return false;
+
+				const catLower = (t.category || "").toLowerCase();
+
+				// ✅ STRICTLY SUBSCRIPTIONS ONLY:
+				// Reject anything categorized as housing, utilities, or insurance from the detector.
+				if (
+					catLower.includes("insurance") ||
+					catLower.includes("utilit") ||
+					catLower.includes("housing")
+				) {
+					return false;
+				}
+
+				// Detection Fingerprints (Looking for digital services only)
+				const hasSubKeyword =
+					/PRO|PLUS|PREMIUM|MONTHLY|ANNUAL|SUBS|MEMBERSHIP/i.test(t.merchant);
+				const isCommonPricePoint = [
+					9.99, 12.99, 14.99, 15.99, 19.99, 29.99, 99.0,
+				].includes(amount);
+				const isLikelyService =
+					/CLAUDE|OPENAI|NETFLIX|SPOTIFY|ADOBE|YOUTUBE|APPLE|GOOGLE|AMAZON|HULU|DISNEY/i.test(
+						t.merchant,
+					);
+
+				return hasSubKeyword || (isCommonPricePoint && isLikelyService);
+			})
+			.filter((v, i, a) => a.findIndex((t) => t.merchant === v.merchant) === i)
+			.slice(0, 4);
+	}, [transactions, predictedBills]);
 
 	return {
 		stats,
@@ -345,5 +483,6 @@ const filteredTransactions = useMemo(() => {
 		filteredTransactions,
 		yearTabs: ["This Month", "Last Month", "Last 12 Months"],
 		predictedBills,
+		potentialSubscriptions,
 	};
 }

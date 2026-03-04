@@ -3,7 +3,6 @@ import { useBudgetStore } from "@/store/useBudgetStore";
 import {
 	CATEGORY_HIERARCHY,
 	getCategoryTheme,
-	PARENT_COLORS,
 	UnifiedCategory,
 } from "@/constants";
 

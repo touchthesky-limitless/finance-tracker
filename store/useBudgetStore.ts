@@ -44,6 +44,7 @@ interface BudgetState {
 	hasHydrated: boolean;
 	rules: Rule[];
 	toast: { count: number; snapshot: Transaction[] } | null;
+	confirmedRecurringMerchants: string[];
 	fetchCustomCategories: () => Promise<void>;
 	setHasHydrated: (state: boolean) => void;
 	setToast: (toast: { count: number; snapshot: Transaction[] } | null) => void;
@@ -76,6 +77,7 @@ interface BudgetState {
 		updates: { name: string; icon: string; color: string },
 	) => Promise<void>;
 	resetCustomCategories: () => Promise<void>;
+	confirmRecurring: (merchantName: string) => void;
 }
 
 const applyRulesToTransaction = (
@@ -117,6 +119,7 @@ export const useBudgetStore = create<BudgetState>()(
 			isLoading: false,
 			hasHydrated: false,
 			toast: null,
+			confirmedRecurringMerchants: [],
 
 			setToast: (toastValue) => set({ toast: toastValue }),
 			setHasHydrated: (state: boolean) => set({ hasHydrated: state }),
@@ -380,7 +383,7 @@ export const useBudgetStore = create<BudgetState>()(
 				// 3. Optional: Trigger a re-fetch or manually update local state
 				// If you want the UI to update immediately without a refresh,
 				// you would merge this new data into your local hierarchy here.
-				console.log("Category added successfully:", data);
+				// console.log("Category added successfully:", data);
 			},
 
 			fetchCustomCategories: async () => {
@@ -454,6 +457,14 @@ export const useBudgetStore = create<BudgetState>()(
 				// 2. Clear local state
 				set({ customCategories: [] });
 			},
+
+			confirmRecurring: (name: string) =>
+				set((state) => ({
+					confirmedRecurringMerchants: [
+						...state.confirmedRecurringMerchants,
+						name,
+					],
+				})),
 		}),
 		{
 			name: `budget-storage`,

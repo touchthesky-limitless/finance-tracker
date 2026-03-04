@@ -437,9 +437,9 @@ export default function OverviewPage() {
 										month={bill.dueDate.toLocaleDateString("en-US", {
 											month: "short",
 										})}
-										title={bill.name}
+										title={bill.merchant}
 										subtitle={`Estimated based on ${bill.frequency} history`}
-										amount={formatCurrency(bill.avgAmount)}
+										amount={formatCurrency(bill.amount)}
 										status="upcoming"
 									/>
 								))

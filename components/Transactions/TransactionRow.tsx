@@ -1,32 +1,18 @@
-import { memo } from "react";
+"use client";
+
+import { memo, useMemo } from "react";
 import { CATEGORY_HIERARCHY, getCategoryTheme } from "@/constants/categories";
 import { Transaction } from "@/store/useBudgetStore";
 import { NeedsReviewBadge } from "@/components/ui/NeedsReviewBadge";
 import { CategoryIcon } from "@/components/CategoryIcon";
+import { useUnifiedCategories } from "@/hooks/useUnifiedCategories";
 
 // ==========================================
 // 1. GLOBAL CACHE & STATIC HELPERS
 // ==========================================
 // Move expensive calculations OUTSIDE the component so they don't run 500x per render.
 const PARENT_KEYS = Object.keys(CATEGORY_HIERARCHY);
-const PARENT_KEY_SET = new Set(PARENT_KEYS); // Set.has() is O(1), much faster than Array.includes()
-
-const categoryCache = new Map<string, string>();
-
-const getParentCategory = (category: string) => {
-	// Return cached result instantly if we've seen this category before
-	if (categoryCache.has(category)) return categoryCache.get(category)!;
-
-	const parentName =
-		PARENT_KEYS.find(
-			(parent) =>
-				CATEGORY_HIERARCHY[parent].includes(category) || parent === category,
-		) || "Uncategorized";
-
-	// Save for next time
-	categoryCache.set(category, parentName);
-	return parentName;
-};
+const PARENT_KEY_SET = new Set(PARENT_KEYS);
 
 // Instantiating this once is ~10x faster than calling .toLocaleString() in a loop
 const numberFormatter = new Intl.NumberFormat("en-US");
@@ -47,10 +33,15 @@ export const TransactionRow = memo(function TransactionRow({
 	isSelected,
 	onSelect,
 }: TransactionRowProps) {
-	// Now these lookups are basically instant O(1) reads
-	const parentName = getParentCategory(transaction.category);
-	const subCategoryColor = getCategoryTheme(parentName);
-
+	const { allUnifiedCategories } = useUnifiedCategories("Expense", "All");
+	const categoryData = useMemo(() => {
+		const transactionCatName = transaction.category.toLowerCase();
+		return allUnifiedCategories.find(
+			(cat) => cat.name.toLowerCase() === transactionCatName,
+		);
+	}, [allUnifiedCategories, transaction.category]);
+	const theme = categoryData?.theme || getCategoryTheme("Uncategorized");
+	const iconName = categoryData?.icon || "HelpCircle";
 	const isParentCat = PARENT_KEY_SET.has(transaction.category);
 	const isUncategorized = transaction.category === "Uncategorized";
 
@@ -112,11 +103,7 @@ export const TransactionRow = memo(function TransactionRow({
 			{/* 2. Category Column */}
 			<td className="py-4 px-2">
 				<div className="inline-flex items-center gap-2 px-3 py-1.5">
-					<CategoryIcon
-						name={transaction.category}
-						size={16}
-						colorClass={subCategoryColor.text}
-					/>
+					<CategoryIcon name={iconName} size={16} colorClass={theme.text} />
 					<span className="text-xs font-medium text-gray-700 dark:text-gray-300">
 						{transaction.category}
 					</span>
