@@ -11,6 +11,7 @@ import {
 	Smartphone,
 	Info,
 	LucideIcon,
+	ListTree,
 } from "lucide-react";
 
 export interface SidebarItemType {
@@ -69,9 +70,17 @@ export const NAV_GROUPS: NavGroupType[] = [
 			{
 				name: "Transaction Categories",
 				href: "/budget/categories",
-				icon: LayoutDashboard,
+				hasAdd: true,
+				icon: ListTree,
+				isLocked: false,
 			},
-			{ name: "Transaction Tags", href: "/budget/tags", icon: Tags },
+			{
+				name: "Transaction Tags",
+				href: "/budget/tags",
+				hasAdd: false,
+				icon: Tags,
+				isLocked: true,
+			},
 			{
 				name: "Transaction Templates",
 				href: "/budget/templates",

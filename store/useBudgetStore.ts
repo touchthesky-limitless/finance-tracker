@@ -26,13 +26,25 @@ export interface Rule {
 	matchCategory?: string;
 }
 
+export interface CustomCategory {
+	id: string;
+	user_id: string;
+	name: string;
+	parent_name: string | null;
+	icon_name: string;
+	color_key: string;
+	created_at: string;
+}
+
 interface BudgetState {
 	transactions: Transaction[];
 	isLoading: boolean;
 	customTags: string[];
+	customCategories: CustomCategory[];
 	hasHydrated: boolean;
 	rules: Rule[];
 	toast: { count: number; snapshot: Transaction[] } | null;
+	fetchCustomCategories: () => Promise<void>;
 	setHasHydrated: (state: boolean) => void;
 	setToast: (toast: { count: number; snapshot: Transaction[] } | null) => void;
 	saveRule: (rule: Rule, oldKeyword?: string) => Promise<void>;
@@ -52,6 +64,18 @@ interface BudgetState {
 	undoBulkUpdate: (previousTransactions: Transaction[]) => void;
 	bulkDeleteTransactions: (ids: string[]) => Promise<void>;
 	undoDelete: (restoredTxs: Transaction[]) => Promise<void>;
+	addCustomCategory: (category: {
+		name: string;
+		parent?: string;
+		icon: string;
+		color: string;
+	}) => Promise<void>;
+	deleteCustomCategory: (id: string) => Promise<void>;
+	updateCustomCategory: (
+		id: string,
+		updates: { name: string; icon: string; color: string },
+	) => Promise<void>;
+	resetCustomCategories: () => Promise<void>;
 }
 
 const applyRulesToTransaction = (
@@ -88,6 +112,7 @@ export const useBudgetStore = create<BudgetState>()(
 		(set, get) => ({
 			transactions: [],
 			customTags: [],
+			customCategories: [],
 			rules: [],
 			isLoading: false,
 			hasHydrated: false,
@@ -305,16 +330,143 @@ export const useBudgetStore = create<BudgetState>()(
 
 			undoBulkUpdate: (previousTransactions) =>
 				set({ transactions: previousTransactions }),
+
+			addCustomCategory: async (category) => {
+				// 1. Get the current user
+				const {
+					data: { user },
+				} = await supabase.auth.getUser();
+				if (!user) return;
+
+				// Get existing categories from the current store state
+				const existing = get().customCategories;
+
+				if (
+					existing.some(
+						(c) => c.name.toLowerCase() === category.name.toLowerCase(),
+					)
+				) {
+					throw new Error("Category already exists");
+				}
+
+				// 2. Insert into your Supabase table
+				const { data, error } = await supabase
+					.from("custom_categories")
+					.insert({
+						user_id: user.id,
+						name: category.name,
+						parent_name: category.parent || null,
+						icon_name: category.icon,
+						color_key: category.color,
+					})
+					.select()
+					.single(); //Get the created row back
+
+				if (error) {
+					console.error("Error adding category:", error);
+					throw error;
+				}
+
+				// Update local state so the UI re-renders immediately
+				if (data) {
+					set((state) => ({
+						customCategories: [
+							...state.customCategories,
+							data as CustomCategory,
+						],
+					}));
+				}
+
+				// 3. Optional: Trigger a re-fetch or manually update local state
+				// If you want the UI to update immediately without a refresh,
+				// you would merge this new data into your local hierarchy here.
+				console.log("Category added successfully:", data);
+			},
+
+			fetchCustomCategories: async () => {
+				const { data, error } = await supabase
+					.from("custom_categories")
+					.select("*")
+					.order("created_at", { ascending: true });
+
+				if (!error && data) {
+					set({ customCategories: data as CustomCategory[] });
+				}
+
+				if (error) {
+					console.error("Error fetching categories:", error);
+					return;
+				}
+			},
+
+			deleteCustomCategory: async (id) => {
+				const { error } = await supabase
+					.from("custom_categories")
+					.delete()
+					.eq("id", id);
+
+				if (error) throw error;
+
+				// Update local state to remove the item
+				set((state) => ({
+					customCategories: state.customCategories.filter(
+						(cat) => cat.id !== id,
+					),
+				}));
+			},
+
+			updateCustomCategory: async (id, updates) => {
+				const { error } = await supabase
+					.from("custom_categories")
+					.update({
+						name: updates.name,
+						icon_name: updates.icon,
+						color_key: updates.color,
+					})
+					.eq("id", id);
+
+				if (error) throw error;
+
+				// Update local state immediately
+				set((state) => ({
+					customCategories: state.customCategories.map((cat) =>
+						cat.id === id
+							? {
+									...cat,
+									...updates,
+									icon_name: updates.icon,
+									color_key: updates.color,
+								}
+							: cat,
+					),
+				}));
+			},
+
+			resetCustomCategories: async () => {
+				// 1. Delete from Supabase
+				const { error } = await supabase
+					.from("custom_categories")
+					.delete()
+					.neq("id", "00000000-0000-0000-0000-000000000000"); // Standard way to delete all rows
+
+				if (error) throw error;
+
+				// 2. Clear local state
+				set({ customCategories: [] });
+			},
 		}),
 		{
 			name: `budget-storage`,
+			storage: createJSONStorage(() => localStorage), // Use localStorage
 			onRehydrateStorage: () => (state) => {
+				// Sets hydration to true once data is loaded from disk
 				state?.setHasHydrated(true);
 			},
-			storage: createJSONStorage(() => localStorage),
+			// Optional: Only persist specific fields
 			partialize: (state) => ({
 				rules: state.rules,
 				customTags: state.customTags,
+				customCategories: state.customCategories,
 			}),
 		},
 	),

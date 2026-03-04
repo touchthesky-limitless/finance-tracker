@@ -4,6 +4,15 @@ export interface CategoryTheme {
 	border: string;
 }
 
+export type UnifiedCategory = {
+	id?: string;
+	name: string;
+	isCustom: boolean;
+	parentName?: string;
+	theme: CategoryTheme;
+	icon?: string;
+};
+
 export const CATEGORY_HIERARCHY: Record<string, string[]> = {
 	"Income": [
 		"Wages",
@@ -213,25 +222,111 @@ export const PARENT_COLORS: Record<string, CategoryTheme> = {
 	},
 };
 
+export const CATEGORY_COLORS: Record<string, CategoryTheme> = {
+	Emerald: {
+		text: "text-emerald-500",
+		bg: "bg-emerald-500",
+		border: "border-emerald-500/20",
+	},
+	Blue: {
+		text: "text-blue-500",
+		bg: "bg-blue-500",
+		border: "border-blue-500/20",
+	},
+	Red: { text: "text-red-400", bg: "bg-red-400", border: "border-red-400/20" },
+	Indigo: {
+		text: "text-indigo-400",
+		bg: "bg-indigo-400",
+		border: "border-indigo-400/20",
+	},
+	Amber: {
+		text: "text-amber-400",
+		bg: "bg-amber-400",
+		border: "border-amber-400/20",
+	},
+	Orange: {
+		text: "text-orange-500",
+		bg: "bg-orange-500",
+		border: "border-orange-500/20",
+	},
+	Pink: {
+		text: "text-pink-500",
+		bg: "bg-pink-500",
+		border: "border-pink-500/20",
+	},
+	Yellow: {
+		text: "text-yellow-600",
+		bg: "bg-yellow-600",
+		border: "border-yellow-600/20",
+	},
+	Rose: {
+		text: "text-rose-500",
+		bg: "bg-rose-500",
+		border: "border-rose-500/20",
+	},
+	Purple: {
+		text: "text-purple-500",
+		bg: "bg-purple-500",
+		border: "border-purple-500/20",
+	},
+	Cyan: {
+		text: "text-cyan-500",
+		bg: "bg-cyan-500",
+		border: "border-cyan-500/20",
+	},
+	Sky: { text: "text-sky-400", bg: "bg-sky-400", border: "border-sky-400/20" },
+	Slate: {
+		text: "text-slate-400",
+		bg: "bg-slate-400",
+		border: "border-slate-400/20",
+	},
+	Fuchsia: {
+		text: "text-fuchsia-500",
+		bg: "bg-fuchsia-500",
+		border: "border-fuchsia-500/20",
+	},
+	Lime: {
+		text: "text-lime-500",
+		bg: "bg-lime-500",
+		border: "border-lime-500/20",
+	},
+};
+
 /**
  * Finds the parent category name for any given subcategory.
  */
 export function findParentCategory(subCategory: string): string {
+	// Look through the static hierarchy
 	for (const [parent, subs] of Object.entries(CATEGORY_HIERARCHY)) {
 		if (subs.includes(subCategory) || parent === subCategory) {
 			return parent;
 		}
 	}
-	return "Other";
+	// 2. If it's not in the static list, it might be a custom primary category.
+	// In that case, we return the name itself so getCategoryTheme
+	// can attempt to look up its specific custom color.
+	return subCategory || "Uncategorized";
 }
 
 /**
  * Helper to get the full theme object for a category.
  */
 export function getCategoryTheme(categoryName: string): CategoryTheme {
-	// If it's a subcategory, find the parent first to get the theme
+	// 1. Check if the categoryName is a System Category Name (e.g., "Food & drink")
+	if (PARENT_COLORS[categoryName]) return PARENT_COLORS[categoryName];
+
+	// 2. Check if the categoryName is a Color Name (e.g., "Emerald")
+	if (CATEGORY_COLORS[categoryName]) return CATEGORY_COLORS[categoryName];
+
+	// 3. If neither, try the parent lookup logic (for sub-categories)
 	const parent = findParentCategory(categoryName);
-	return PARENT_COLORS[parent] || PARENT_COLORS["Uncategorized"];
+
+	// 4. Return parent theme, or fallback to Uncategorized
+	return (
+		PARENT_COLORS[parent] ||
+		CATEGORY_COLORS[parent] ||
+		PARENT_COLORS["Uncategorized"]
+	);
 }
 
 /**
