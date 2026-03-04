@@ -23,12 +23,14 @@ export function useUnifiedCategories(
 				name: parent,
 				isCustom: false,
 				theme: getCategoryTheme(parent),
+				icon: parent
 			};
 			const subItems: UnifiedCategory[] = subs.map((sub) => ({
 				name: sub,
 				isCustom: false,
 				parentName: parent,
 				theme: getCategoryTheme(parent),
+				icon: sub
 			}));
 			return [parentItem, ...subItems];
 		});

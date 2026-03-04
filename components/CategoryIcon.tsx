@@ -1,16 +1,22 @@
 import { memo } from "react";
-import { Tag } from "lucide-react";
-import { ICON_MAP } from "@/constants/icons";
+import { HelpCircle } from "lucide-react";
+import { ALL_ICONS_MAP } from "@/constants/icons";
 
-interface IconProps {
-    name: string;
-    size: number;
-    colorClass?: string;
+interface CategoryIconProps {
+	name: string;
+	size?: number;
+	colorClass?: string;
 }
 
-export const CategoryIcon = memo(function CategoryIcon({ name, size, colorClass }: IconProps) {
-    const IconComponent = ICON_MAP[name] || Tag;
-    // Safety check: Ensure colorClass is a string before passing to Lucide
-    const finalClass = typeof colorClass === 'string' ? colorClass : '';
-    return <IconComponent size={size} className={finalClass} />;
+export const CategoryIcon = memo(function CategoryIcon({
+	name,
+	size = 16,
+	colorClass = "text-gray-400",
+}: CategoryIconProps) {
+	// Look up in our combined map (System Names + Raw Icon Names)
+	const IconComponent = ALL_ICONS_MAP[name] || HelpCircle;
+
+	const finalClass = typeof colorClass === "string" ? colorClass : "";
+
+	return <IconComponent size={size} className={finalClass} strokeWidth={2.5} />;
 });

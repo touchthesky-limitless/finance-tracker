@@ -499,6 +499,7 @@ export default function CategoriesPage() {
 			</div>
 
 			<AddCategoryModal
+				key={isShowingAll ? "primary" : activePrimary}
 				isOpen={isAddModalOpen}
 				onClose={() => setIsAddModalOpen(false)}
 				parentCategory={isShowingAll ? undefined : activePrimary}

@@ -74,6 +74,12 @@ export const NAV_GROUPS: NavGroupType[] = [
 				isLocked: false,
 			},
 			{
+				name: "Recurring",
+				href: "/budget/recurring",
+				icon: Repeat,
+				isLocked: false,
+			},
+			{
 				name: "Accounts",
 				href: "/budget/accounts",
 				icon: Wallet,
@@ -91,12 +97,6 @@ export const NAV_GROUPS: NavGroupType[] = [
 				name: "Transaction Templates",
 				href: "/budget/templates",
 				icon: Calendar,
-				isLocked: true,
-			},
-			{
-				name: "Scheduled Transactions",
-				href: "/budget/scheduled",
-				icon: Repeat,
 				isLocked: true,
 			},
 		],

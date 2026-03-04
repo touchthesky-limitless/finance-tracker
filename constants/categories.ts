@@ -2,6 +2,8 @@ export interface CategoryTheme {
 	text: string;
 	bg: string;
 	border: string;
+	dot?: string;
+	colorKey?: string;
 }
 
 export type UnifiedCategory = {
@@ -136,7 +138,7 @@ export const CATEGORY_HIERARCHY: Record<string, string[]> = {
 		"Charity",
 		"Other government & charity",
 	],
-	"Other": ["Uncategorized", "Other"],
+	"Uncategorized": ["Other"],
 };
 
 export const PARENT_COLORS: Record<string, CategoryTheme> = {
@@ -312,21 +314,33 @@ export function findParentCategory(subCategory: string): string {
  * Helper to get the full theme object for a category.
  */
 export function getCategoryTheme(categoryName: string): CategoryTheme {
-	// 1. Check if the categoryName is a System Category Name (e.g., "Food & drink")
-	if (PARENT_COLORS[categoryName]) return PARENT_COLORS[categoryName];
+    // 1. Helper to attach the key to the theme object
+    const withKey = (theme: Omit<CategoryTheme, 'colorKey'>, key: string): CategoryTheme => ({
+        ...theme,
+        colorKey: key
+    });
 
-	// 2. Check if the categoryName is a Color Name (e.g., "Emerald")
-	if (CATEGORY_COLORS[categoryName]) return CATEGORY_COLORS[categoryName];
+    // 2. Check if it's a System Category (e.g., "Food & drink")
+    if (PARENT_COLORS[categoryName]) {
+        // We need to find which CATEGORY_COLORS key this parent uses
+        // Or if PARENT_COLORS already maps to a key, use that.
+        return withKey(PARENT_COLORS[categoryName], categoryName);
+    }
 
-	// 3. If neither, try the parent lookup logic (for sub-categories)
-	const parent = findParentCategory(categoryName);
+    // 3. Check if it's a raw Color Name (e.g., "Emerald")
+    if (CATEGORY_COLORS[categoryName]) {
+        return withKey(CATEGORY_COLORS[categoryName], categoryName);
+    }
 
-	// 4. Return parent theme, or fallback to Uncategorized
-	return (
-		PARENT_COLORS[parent] ||
-		CATEGORY_COLORS[parent] ||
-		PARENT_COLORS["Uncategorized"]
-	);
+    // 4. Sub-category lookup
+    const parent = findParentCategory(categoryName);
+    const fallbackKey = parent || "Uncategorized";
+    
+    const theme = PARENT_COLORS[fallbackKey] || 
+                  CATEGORY_COLORS[fallbackKey] || 
+                  PARENT_COLORS["Uncategorized"];
+
+    return withKey(theme, fallbackKey);
 }
 
 /**

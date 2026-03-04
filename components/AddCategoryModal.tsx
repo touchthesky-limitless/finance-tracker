@@ -3,9 +3,10 @@
 import { useState, useMemo, useCallback } from "react";
 import { X, Check, Loader2 } from "lucide-react";
 import { CategoryIcon } from "@/components/CategoryIcon";
-import { CATEGORY_HIERARCHY, CATEGORY_COLORS } from "@/constants";
+import { CATEGORY_COLORS } from "@/constants";
 import { useBudgetStore } from "@/store/useBudgetStore";
 import { useUnifiedCategories } from "@/hooks/useUnifiedCategories";
+import { AVAILABLE_ICONS } from "@/constants/icons";
 
 interface AddCategoryModalProps {
 	isOpen: boolean;
@@ -18,21 +19,28 @@ export function AddCategoryModal({
 	onClose,
 	parentCategory,
 }: AddCategoryModalProps) {
-	const iconOptions = useMemo(() => Object.keys(CATEGORY_HIERARCHY), []);
+	// const iconOptions = useMemo(() => Object.keys(CATEGORY_HIERARCHY), []);
+	const iconOptions = useMemo(() => AVAILABLE_ICONS, []);
 	const colorOptions = useMemo(() => Object.keys(CATEGORY_COLORS), []);
 
 	// --- State ---
 	const [name, setName] = useState("");
 	const [isLoading, setIsLoading] = useState(false);
-	const [selectedIcon, setSelectedIcon] = useState(
-		() => parentCategory || iconOptions[0] || "Miscellaneous",
-	);
-	const [selectedColor, setSelectedColor] = useState(
-		() => parentCategory || colorOptions[0] || "Gray",
-	);
-
 	const addCustomCategory = useBudgetStore((state) => state.addCustomCategory);
 	const { allUnifiedCategories } = useUnifiedCategories("Expense", "All");
+
+	// Find the parent category's metadata
+	const parentData = useMemo(() => {
+		return allUnifiedCategories.find((cat) => cat.name === parentCategory);
+	}, [allUnifiedCategories, parentCategory]);
+
+	const [selectedIcon, setSelectedIcon] = useState(
+		() => parentData?.icon || iconOptions[0] || "Banknote",
+	);
+
+	const [selectedColor, setSelectedColor] = useState(
+		() => parentData?.theme?.colorKey || colorOptions[0] || "Gray",
+	);
 
 	// --- Derived Logic (Optimized with useMemo) ---
 	const trimmedName = name.trim();
