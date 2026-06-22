@@ -11,21 +11,23 @@ import {
 	Calculator,
 	Menu,
 	X,
+	WalletCards,
 } from "lucide-react";
 import { LogoutButton } from "@/components/LogoutButton";
 import ThemeToggle from "@/components/ThemeToggle";
 
 interface NavLinkProps {
-    href: string;
-    name: string;
-    icon: ReactNode;
-    onClick: () => void;
+	href: string;
+	name: string;
+	icon: ReactNode;
+	onClick: () => void;
 }
 
 const NAV_LINKS = [
 	{ name: "Overview", href: "/overview", icon: <LayoutDashboard size={18} /> },
 	{ name: "Budget Tracking", href: "/budget", icon: <ReceiptText size={18} /> },
 	{ name: "Market Pulse", href: "/stocks", icon: <BarChart3 size={18} /> },
+	{ name: "Wallet Rewards", href: "/wallet", icon: <WalletCards size={18} /> },
 	{ name: "Calculator", href: "/calculator", icon: <Calculator size={18} /> },
 ];
 

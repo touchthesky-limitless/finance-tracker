@@ -36,6 +36,24 @@ export interface CustomCategory {
 	created_at: string;
 }
 
+export interface CreditCard {
+	id: string;
+	name: string;
+	issuer: string;
+	network: string;
+	color: string;
+	currency: string;
+	multipliers: Record<string, number>;
+	image_url?: string;
+}
+
+export interface RewardCategory {
+	id: string;
+	name: string;
+	iconName: string; // Storing the string name of the icon for JSON serialization
+	accent: string;
+}
+
 interface BudgetState {
 	transactions: Transaction[];
 	isLoading: boolean;
@@ -45,6 +63,13 @@ interface BudgetState {
 	rules: Rule[];
 	toast: { count: number; snapshot: Transaction[] } | null;
 	confirmedRecurringMerchants: string[];
+	// --- WALLET REWARDS STATE ---
+	globalCards: CreditCard[];
+	walletIds: string[];
+	rewardCategories: RewardCategory[];
+	customRates: Record<string, Record<string, number>>;
+	preferredCards: Record<string, string>; // Maps Category ID to Card ID
+	setPreferredCard: (categoryId: string, cardId: string | null) => void;
 	fetchCustomCategories: () => Promise<void>;
 	setHasHydrated: (state: boolean) => void;
 	setToast: (toast: { count: number; snapshot: Transaction[] } | null) => void;
@@ -78,6 +103,10 @@ interface BudgetState {
 	) => Promise<void>;
 	resetCustomCategories: () => Promise<void>;
 	confirmRecurring: (merchantName: string) => void;
+	fetchGlobalCards: () => Promise<void>;
+	setWalletIds: (ids: string[]) => void;
+	setRewardCategories: (categories: RewardCategory[]) => void;
+	setCustomRates: (rates: Record<string, Record<string, number>>) => void;
 }
 
 const applyRulesToTransaction = (
@@ -120,6 +149,71 @@ export const useBudgetStore = create<BudgetState>()(
 			hasHydrated: false,
 			toast: null,
 			confirmedRecurringMerchants: [],
+			globalCards: [],
+			preferredCards: {},
+
+			// Put your 20 card IDs here so they are in your wallet by default!
+			walletIds: [
+				"amex-bce",
+				"amex-ed",
+				"amex-hilton-aspire",
+				"amex-hilton-no-af",
+				"amex-bbp",
+				"boa-cash-rewards",
+				"boa-alaska-biz",
+				"c1-vx",
+				"chase-csp",
+				"chase-cfu",
+				"chase-cff",
+				"chase-cip",
+				"chase-cic",
+				"chase-united-biz",
+				"citi-custom-cash",
+				"citi-aa-biz",
+				"citi-aa-plat",
+				"discover-it",
+				"usbank-triple-cash",
+				"wf-signify",
+			],
+			rewardCategories: [
+				{
+					id: "Dining",
+					name: "Dining",
+					iconName: "Utensils",
+					accent: "text-orange-400",
+				},
+				{
+					id: "Groceries",
+					name: "Groceries",
+					iconName: "ShoppingCart",
+					accent: "text-emerald-400",
+				},
+				{
+					id: "Travel",
+					name: "Travel",
+					iconName: "Plane",
+					accent: "text-blue-400",
+				},
+				{
+					id: "Gas",
+					name: "Gas",
+					iconName: "Fuel",
+					accent: "text-red-400",
+				},
+				{
+					id: "Transit",
+					name: "Transit",
+					iconName: "Car",
+					accent: "text-pink-400",
+				},
+				{
+					id: "CatchAll",
+					name: "Others",
+					iconName: "CreditCard",
+					accent: "text-gray-400",
+				},
+			],
+			customRates: {},
 
 			setToast: (toastValue) => set({ toast: toastValue }),
 			setHasHydrated: (state: boolean) => set({ hasHydrated: state }),
@@ -204,6 +298,29 @@ export const useBudgetStore = create<BudgetState>()(
 					set({ isLoading: false, hasHydrated: true });
 				}
 			},
+
+			fetchGlobalCards: async () => {
+				// Make sure you import supabase at the top of the file!
+				const { data, error } = await supabase.from("credit_cards").select("*");
+				if (!error && data) {
+					set({ globalCards: data as CreditCard[] });
+				}
+			},
+
+			setWalletIds: (ids) => set({ walletIds: ids }),
+			setRewardCategories: (categories) =>
+				set({ rewardCategories: categories }),
+			setCustomRates: (rates) => set({ customRates: rates }),
+			setPreferredCard: (categoryId, cardId) =>
+				set((state) => {
+					const updated = { ...state.preferredCards };
+					if (cardId === null) {
+						delete updated[categoryId]; // Un-starring
+					} else {
+						updated[categoryId] = cardId;
+					}
+					return { preferredCards: updated };
+				}),
 
 			saveRule: async (newRule, oldKeyword) => {
 				const {
@@ -468,6 +585,7 @@ export const useBudgetStore = create<BudgetState>()(
 		}),
 		{
 			name: `budget-storage`,
+			version: 1,
 			storage: createJSONStorage(() => localStorage), // Use localStorage
 			onRehydrateStorage: () => (state) => {
 				// Sets hydration to true once data is loaded from disk
@@ -478,6 +596,10 @@ export const useBudgetStore = create<BudgetState>()(
 				rules: state.rules,
 				customTags: state.customTags,
 				customCategories: state.customCategories,
+				walletIds: state.walletIds,
+				rewardCategories: state.rewardCategories,
+				customRates: state.customRates,
+				preferredCards: state.preferredCards,
 			}),
 		},
 	),
