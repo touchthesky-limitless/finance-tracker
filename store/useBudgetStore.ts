@@ -104,6 +104,7 @@ interface BudgetState {
 	resetCustomCategories: () => Promise<void>;
 	confirmRecurring: (merchantName: string) => void;
 	fetchGlobalCards: () => Promise<void>;
+	fetchPreferredCards: () => Promise<void>;
 	setWalletIds: (ids: string[]) => void;
 	setRewardCategories: (categories: RewardCategory[]) => void;
 	setCustomRates: (rates: Record<string, Record<string, number>>) => void;
@@ -307,20 +308,86 @@ export const useBudgetStore = create<BudgetState>()(
 				}
 			},
 
+			fetchPreferredCards: async () => {
+				try {
+					// 1. Ask Supabase who is logged in
+					const {
+						data: { session },
+					} = await supabase.auth.getSession();
+
+					// 2. If no user, just exit silently
+					if (!session) return;
+
+					// 3. Fetch their specific row from the database
+					const { data, error } = await supabase
+						.from("user_preferences")
+						.select("preferred_cards")
+						.eq("user_id", session.user.id)
+						.single(); // .single() because each user only has one row
+
+					// 4. Handle errors (Ignore PGRST116, which just means "User has no row yet")
+					if (error && error.code !== "PGRST116") {
+						console.error("Error fetching preferences:", error.message);
+						return;
+					}
+
+					// 5. If data exists, inject it into the Zustand store
+					if (data && data.preferred_cards) {
+						set({ preferredCards: data.preferred_cards });
+					}
+				} catch (err) {
+					console.error("Failed to fetch preferences:", err);
+				}
+			},
+
 			setWalletIds: (ids) => set({ walletIds: ids }),
 			setRewardCategories: (categories) =>
 				set({ rewardCategories: categories }),
 			setCustomRates: (rates) => set({ customRates: rates }),
-			setPreferredCard: (categoryId, cardId) =>
-				set((state) => {
-					const updated = { ...state.preferredCards };
-					if (cardId === null) {
-						delete updated[categoryId]; // Un-starring
-					} else {
-						updated[categoryId] = cardId;
+			setPreferredCard: async (categoryId, cardId) => {
+				// 1. Get the current state
+				const currentState = get().preferredCards;
+				const updated = { ...currentState };
+
+				// 2. Apply your existing logic
+				if (cardId === null) {
+					delete updated[categoryId]; // Un-starring
+				} else {
+					updated[categoryId] = cardId; // Starring
+				}
+
+				// 3. Update the UI instantly (Optimistic UI update)
+				set({ preferredCards: updated });
+
+				// 4. Persist to Supabase in the background
+				try {
+					// A. Ask Supabase who is currently logged in
+					const {
+						data: { session },
+					} = await supabase.auth.getSession();
+
+					// B. If nobody is logged in, stop here so we don't crash the database
+					if (!session) {
+						console.error("Cannot save: No user is logged in.");
+						return;
 					}
-					return { preferredCards: updated };
-				}),
+
+					// C. Grab their real, unique ID
+					const activeUserId = session.user.id;
+
+					// D. Save the data attached to their real ID
+					const { error } = await supabase.from("user_preferences").upsert({
+						user_id: activeUserId,
+						preferred_cards: updated,
+					});
+
+					if (error) {
+						console.error("Supabase update error:", error.message);
+					}
+				} catch (err) {
+					console.error("Failed to sync preferred cards:", err);
+				}
+			},
 
 			saveRule: async (newRule, oldKeyword) => {
 				const {

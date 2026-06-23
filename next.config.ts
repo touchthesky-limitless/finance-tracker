@@ -15,6 +15,12 @@ const nextConfig: NextConfig = {
 				hostname: "logo.clearbit.com", // Just in case you use other logo sources
 				port: "",
 			},
+            {
+                protocol: "https",
+                hostname: "**.supabase.co",
+                port: "",
+                pathname: "/storage/v1/object/public/**",
+            },
 		],
 	},
 };

@@ -1,7 +1,11 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import { CreditCard, RewardCategory, useBudgetStore } from "@/store/useBudgetStore";
+import {
+	CreditCard,
+	RewardCategory,
+	useBudgetStore,
+} from "@/store/useBudgetStore";
 import * as LucideIcons from "lucide-react";
 import {
 	Plus,
@@ -14,6 +18,7 @@ import {
 	Wallet,
 	Star,
 } from "lucide-react";
+import Image from "next/image";
 
 export default function WalletRewardsPage() {
 	// --- CONNECT TO ZUSTAND ---
@@ -31,13 +36,15 @@ export default function WalletRewardsPage() {
 		setCustomRates,
 		setPreferredCard,
 		fetchCustomCategories,
+		fetchPreferredCards,
 	} = useBudgetStore();
 
 	// Fetch global cards and custom categories from Supabase on load
 	useEffect(() => {
 		fetchGlobalCards();
 		fetchCustomCategories();
-	}, [fetchGlobalCards, fetchCustomCategories]);
+		fetchPreferredCards();
+	}, [fetchGlobalCards, fetchCustomCategories, fetchPreferredCards]);
 
 	// --- UI TOGGLES ---
 	const [isAddingCategory, setIsAddingCategory] = useState(false);
@@ -45,7 +52,9 @@ export default function WalletRewardsPage() {
 	const [isWalletManagerOpen, setIsWalletManagerOpen] = useState(false);
 	const [newCategoryName, setNewCategoryName] = useState("");
 	const [editingCategory, setEditingCategory] = useState<string | null>(null);
-	const [tempRates, setTempRates] = useState<Record<string, number | undefined>>({});
+	const [tempRates, setTempRates] = useState<
+		Record<string, number | undefined>
+	>({});
 
 	// --- PREPARE DATABASE CATEGORIES ---
 	const availableDatabaseCategories = useMemo(() => {
@@ -121,8 +130,9 @@ export default function WalletRewardsPage() {
 			const rankedCards = [];
 
 			// Map the string icon name to the actual Lucide component
-			const IconComponent = (LucideIcons[category.iconName as keyof typeof LucideIcons] || 
-                LucideIcons.Tag) as unknown as React.ElementType;
+			const IconComponent = (LucideIcons[
+				category.iconName as keyof typeof LucideIcons
+			] || LucideIcons.Tag) as unknown as React.ElementType;
 
 			for (let j = 0; j < userWallet.length; j++) {
 				const card = userWallet[j];
@@ -209,47 +219,49 @@ export default function WalletRewardsPage() {
 
 	const saveCustomRates = () => {
 		// 1. Safety check: Exit if we somehow click save without a category selected
-        if (!editingCategory) return;
+		if (!editingCategory) return;
 
-        const finalRates: Record<string, Record<string, number>> = { ...customRates };
-        
-        // 2. Use editingCategory instead of selectedCategoryId
-        if (!finalRates[editingCategory]) {
-            finalRates[editingCategory] = {};
-        }
+		const finalRates: Record<string, Record<string, number>> = {
+			...customRates,
+		};
 
-        const cardIds = Object.keys(tempRates);
-        for (let i = 0; i < cardIds.length; i++) {
-            const cardId = cardIds[i];
-            const val = tempRates[cardId];
-            
-            if (val === undefined) {
-                // Remove the override if the user cleared it out
-                delete finalRates[editingCategory][cardId];
-            } else {
-                // Save the valid numerical rate
-                finalRates[editingCategory][cardId] = val;
-            }
-        }
+		// 2. Use editingCategory instead of selectedCategoryId
+		if (!finalRates[editingCategory]) {
+			finalRates[editingCategory] = {};
+		}
 
-        setCustomRates(finalRates);
-        setEditingCategory(null);
+		const cardIds = Object.keys(tempRates);
+		for (let i = 0; i < cardIds.length; i++) {
+			const cardId = cardIds[i];
+			const val = tempRates[cardId];
+
+			if (val === undefined) {
+				// Remove the override if the user cleared it out
+				delete finalRates[editingCategory][cardId];
+			} else {
+				// Save the valid numerical rate
+				finalRates[editingCategory][cardId] = val;
+			}
+		}
+
+		setCustomRates(finalRates);
+		setEditingCategory(null);
 	};
 
 	const handleAddCard = (id: string) => {
-        const newWallet = [];
-        
-        // Copy the existing wallet IDs safely
-        for (let i = 0; i < walletIds.length; i++) {
-            newWallet.push(walletIds[i]);
-        }
-        
-        // Add the newly clicked card ID
-        newWallet.push(id);
+		const newWallet = [];
 
-        // Update the global store
-        setWalletIds(newWallet);
-    };
+		// Copy the existing wallet IDs safely
+		for (let i = 0; i < walletIds.length; i++) {
+			newWallet.push(walletIds[i]);
+		}
+
+		// Add the newly clicked card ID
+		newWallet.push(id);
+
+		// Update the global store
+		setWalletIds(newWallet);
+	};
 
 	if (!hasHydrated) {
 		return <div className="min-h-screen bg-[#050505]" />;
@@ -321,7 +333,9 @@ export default function WalletRewardsPage() {
 								<div className="max-h-50 overflow-y-auto custom-scrollbar p-1">
 									{availableDatabaseCategories.length > 0 ? (
 										availableDatabaseCategories.map((cat) => {
-											const Icon = (LucideIcons[cat.iconName as keyof typeof LucideIcons] || LucideIcons.Tag) as unknown as React.ElementType;
+											const Icon = (LucideIcons[
+												cat.iconName as keyof typeof LucideIcons
+											] || LucideIcons.Tag) as unknown as React.ElementType;
 											return (
 												<button
 													key={cat.id}
@@ -404,9 +418,9 @@ export default function WalletRewardsPage() {
 										className={`p-2 rounded-xl bg-white/5 ${item.category.accent}`}
 									>
 										{(() => {
-        const Icon = item.category.icon as React.ElementType;
-        return <Icon size={16} />;
-    })()}
+											const Icon = item.category.icon as React.ElementType;
+											return <Icon size={16} />;
+										})()}
 									</div>
 									<h2 className="text-sm font-bold tracking-wide pr-8">
 										{item.category.name}
@@ -425,7 +439,7 @@ export default function WalletRewardsPage() {
 							</div>
 
 							{/* Center Content: The Winning Card */}
-							<div className="flex-grow flex items-center justify-center relative z-10 mb-6">
+							<div className="grow flex items-center justify-center relative z-10 mb-6">
 								{!hasCards ? (
 									<p className="text-xs text-gray-600 font-medium italic">
 										Wallet is empty
@@ -433,16 +447,19 @@ export default function WalletRewardsPage() {
 								) : (
 									<div className="relative w-full max-w-50 aspect-[1.58/1] transform group-hover:scale-105 transition-transform duration-500 rounded-xl shadow-2xl">
 										{item.topCard?.card.image_url ? (
-											/* Render Real Image */
-											<img
+											/* Render Real Optimized Image */
+											<Image
 												src={item.topCard.card.image_url}
 												alt={item.topCard.card.name}
-												className="w-full h-full object-contain drop-shadow-2xl rounded-xl"
+												fill
+												sizes="(max-width: 768px) 200px, 200px"
+												className="object-contain drop-shadow-2xl rounded-xl"
+												priority={true} // Speeds up Largest Contentful Paint (LCP)
 											/>
 										) : (
 											/* Fallback: CSS Gradient */
 											<div
-												className={`w-full h-full rounded-xl p-4 flex flex-col justify-between border border-white/20 bg-gradient-to-br ${item.topCard?.card.color}`}
+												className={`w-full h-full rounded-xl p-4 flex flex-col justify-between border border-white/20 bg-linear-to-br ${item.topCard?.card.color}`}
 											>
 												<div className="flex justify-between items-start">
 													<div className="w-8 h-6 rounded bg-black/20 flex items-center justify-center">
@@ -487,7 +504,7 @@ export default function WalletRewardsPage() {
 
 							{hasCards && (
 								<div
-									className={`absolute -top-20 -right-20 w-48 h-48 rounded-full bg-gradient-to-br ${item.topCard?.card.color} opacity-10 blur-[50px] pointer-events-none group-hover:opacity-20 transition-opacity duration-700`}
+									className={`absolute -top-20 -right-20 w-48 h-48 rounded-full bg-linear-to-br ${item.topCard?.card.color} opacity-10 blur-[50px] pointer-events-none group-hover:opacity-20 transition-opacity duration-700`}
 								/>
 							)}
 						</div>
@@ -558,19 +575,22 @@ export default function WalletRewardsPage() {
 									return (
 										<div
 											key={card.id}
-											className="flex items-center justify-between p-2.5 rounded-xl hover:bg-white/[0.03] border border-transparent hover:border-white/5 transition-colors group"
+											className="flex items-center justify-between p-2.5 rounded-xl hover:bg-white/3 border border-transparent hover:border-white/5 transition-colors group"
 										>
 											<div className="flex items-center gap-3 overflow-hidden pr-2">
 												{/* Sleek color indicator instead of chunky block */}
 												{card.image_url ? (
-													<img
+													<Image
 														src={card.image_url}
 														alt={card.name}
+														fill
+														sizes="(max-width: 768px) 200px, 200px"
 														className="w-8 h-5 rounded shadow-sm object-cover border border-white/20"
+														priority={true} // Speeds up Largest Contentful Paint (LCP)
 													/>
 												) : (
 													<div
-														className={`w-1 h-8 rounded-full bg-gradient-to-b ${card.color} shrink-0`}
+														className={`w-1 h-8 rounded-full bg-linear-to-b ${card.color} shrink-0`}
 													/>
 												)}
 												<div className="truncate">
@@ -672,7 +692,7 @@ export default function WalletRewardsPage() {
 						</div>
 
 						{/* Scrollable Content Area */}
-						<div className="p-6 overflow-y-auto space-y-8 flex-grow custom-scrollbar">
+						<div className="p-6 overflow-y-auto space-y-8 grow custom-scrollbar">
 							{/* Active Cards Grid */}
 							<div className="space-y-3">
 								<h4 className="text-[10px] font-black uppercase tracking-widest text-gray-500">
@@ -686,14 +706,17 @@ export default function WalletRewardsPage() {
 										>
 											<div className="flex items-center gap-3">
 												{card.image_url ? (
-													<img
+													<Image
 														src={card.image_url}
 														alt={card.name}
+														fill
+														sizes="(max-width: 768px) 200px, 200px"
 														className="w-10 h-6 rounded shadow-sm object-cover border border-white/20 shrink-0"
+														priority={true}
 													/>
 												) : (
 													<div
-														className={`w-8 h-5 rounded shadow-sm border border-white/20 bg-gradient-to-br ${card.color}`}
+														className={`w-8 h-5 rounded shadow-sm border border-white/20 bg-linear-to-br ${card.color}`}
 													/>
 												)}
 												<p className="text-sm font-bold truncate max-w-50">
@@ -726,17 +749,20 @@ export default function WalletRewardsPage() {
 											>
 												<div className="flex items-center gap-3">
 													{card.image_url ? (
-														<img
+														<Image
 															src={card.image_url}
 															alt={card.name}
+															fill
+															sizes="(max-width: 768px) 200px, 200px"
 															className="w-8 h-5 rounded shadow-sm object-cover border border-white/20 opacity-50"
+															priority={true}
 														/>
 													) : (
 														<div
-															className={`w-8 h-5 rounded shadow-sm border border-white/20 bg-gradient-to-br ${card.color}`}
+															className={`w-8 h-5 rounded shadow-sm border border-white/20 bg-linear-to-br ${card.color}`}
 														/>
 													)}
-													<p className="text-sm font-bold text-gray-400 truncate max-w-[140px]">
+													<p className="text-sm font-bold text-gray-400 truncate max-w-35">
 														{card.name}
 													</p>
 												</div>
