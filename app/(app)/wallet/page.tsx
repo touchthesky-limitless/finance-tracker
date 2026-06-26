@@ -17,6 +17,8 @@ import {
 	Save,
 	Wallet,
 	Star,
+	Search,
+	Command,
 } from "lucide-react";
 import Image from "next/image";
 
@@ -50,6 +52,9 @@ export default function WalletRewardsPage() {
 	const [isAddingCategory, setIsAddingCategory] = useState(false);
 	const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
 	const [isWalletManagerOpen, setIsWalletManagerOpen] = useState(false);
+	// --- QUICK SEARCH STATE ---
+	const [isSearchOpen, setIsSearchOpen] = useState(false);
+	const [searchQuery, setSearchQuery] = useState("");
 	const [newCategoryName, setNewCategoryName] = useState("");
 	const [editingCategory, setEditingCategory] = useState<string | null>(null);
 	const [tempRates, setTempRates] = useState<
@@ -263,6 +268,35 @@ export default function WalletRewardsPage() {
 		setWalletIds(newWallet);
 	};
 
+	// --- KEYBOARD SHORTCUT (Cmd+K or Ctrl+K) ---
+	useEffect(() => {
+		const handleKeyDown = (e: KeyboardEvent) => {
+			if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+				e.preventDefault();
+				setIsSearchOpen(true);
+			}
+		};
+		window.addEventListener("keydown", handleKeyDown);
+		return () => window.removeEventListener("keydown", handleKeyDown);
+	}, []);
+
+	// --- SEARCH LOGIC ---
+	const searchResults = useMemo(() => {
+		if (!searchQuery.trim()) return [];
+
+		const query = searchQuery.toLowerCase();
+		const results = [];
+
+		for (let i = 0; i < optimizedCategories.length; i++) {
+			const item = optimizedCategories[i];
+			if (item.category.name.toLowerCase().includes(query)) {
+				results.push(item);
+			}
+		}
+
+		return results;
+	}, [searchQuery, optimizedCategories]);
+
 	if (!hasHydrated) {
 		return <div className="min-h-screen bg-[#050505]" />;
 	}
@@ -383,16 +417,34 @@ export default function WalletRewardsPage() {
 					<div className="w-px h-8 bg-white/10" />
 
 					{/* NEW: Clean Wallet Manager Button */}
-					<button
-						onClick={() => setIsWalletManagerOpen(true)}
-						className="flex items-center gap-3 bg-[#111] border border-white/20 hover:border-white/50 px-5 py-2.5 rounded-xl transition-all shadow-xl"
-					>
-						<Wallet size={18} className="text-gray-400" />
-						<span className="text-sm font-bold">My Wallet</span>
-						<span className="bg-white/10 text-white text-xs font-black px-2 py-0.5 rounded-full">
-							{userWallet.length}
-						</span>
-					</button>
+
+					<div className="flex items-center gap-3">
+						{/* QUICK SEARCH BUTTON */}
+						<button
+							onClick={() => setIsSearchOpen(true)}
+							className="flex items-center gap-3 bg-[#111] border border-white/10 hover:border-emerald-500/50 px-4 py-2.5 rounded-xl transition-all shadow-xl text-gray-400 hover:text-emerald-400 group"
+						>
+							<Search size={18} />
+							<span className="text-sm font-bold hidden sm:block">
+								Quick Find
+							</span>
+							<div className="hidden sm:flex items-center gap-0.5 bg-white/5 px-1.5 py-0.5 rounded text-[10px] font-black tracking-widest border border-white/5 group-hover:border-emerald-500/20">
+								<Command size={10} /> K
+							</div>
+						</button>
+
+						{/* WALLET MANAGER BUTTON */}
+						<button
+							onClick={() => setIsWalletManagerOpen(true)}
+							className="flex items-center gap-3 bg-[#111] border border-white/20 hover:border-white/50 px-5 py-2.5 rounded-xl transition-all shadow-xl"
+						>
+							<Wallet size={18} className="text-gray-400" />
+							<span className="text-sm font-bold">My Wallet</span>
+							<span className="bg-white/10 text-white text-xs font-black px-2 py-0.5 rounded-full">
+								{userWallet.length}
+							</span>
+						</button>
+					</div>
 				</div>
 			</div>
 
@@ -515,7 +567,7 @@ export default function WalletRewardsPage() {
 			{/* --- EDIT MULTIPLIERS MODAL --- */}
 			{editingCategory && (
 				<div className="fixed inset-0 z-100 flex items-center justify-center bg-black/70 backdrop-blur-md p-4 animate-in fade-in duration-200">
-					<div className="bg-[#0a0a0a] border border-white/10 rounded-3xl w-full max-w-lg flex flex-col shadow-2xl max-h-[35vh]">
+					<div className="bg-[#0a0a0a] border border-white/10 rounded-3xl w-full max-w-lg flex flex-col shadow-2xl max-h-[45vh]">
 						{/* 1. Header (Fixed at Top) */}
 						<div className="p-6 border-b border-white/5 flex items-center justify-between shrink-0">
 							<div>
@@ -583,7 +635,8 @@ export default function WalletRewardsPage() {
 													<Image
 														src={card.image_url}
 														alt={card.name}
-														fill
+														width={40}
+														height={24}
 														sizes="(max-width: 768px) 200px, 200px"
 														className="w-8 h-5 rounded shadow-sm object-cover border border-white/20"
 														priority={true} // Speeds up Largest Contentful Paint (LCP)
@@ -709,7 +762,8 @@ export default function WalletRewardsPage() {
 													<Image
 														src={card.image_url}
 														alt={card.name}
-														fill
+														width={40}
+														height={24}
 														sizes="(max-width: 768px) 200px, 200px"
 														className="w-10 h-6 rounded shadow-sm object-cover border border-white/20 shrink-0"
 														priority={true}
@@ -773,6 +827,120 @@ export default function WalletRewardsPage() {
 								</div>
 							)}
 						</div>
+					</div>
+				</div>
+			)}
+			{/* --- QUICK SEARCH MODAL --- */}
+			{isSearchOpen && (
+				<div className="fixed inset-0 z-100 flex items-start justify-center bg-black/80 backdrop-blur-sm p-4 pt-[10vh] animate-in fade-in duration-200">
+					<div className="bg-[#0a0a0a] border border-white/10 rounded-2xl w-full max-w-xl overflow-hidden shadow-[0_0_50px_rgba(0,0,0,0.5)]">
+						{/* Search Input */}
+						<div className="flex items-center gap-3 px-4 py-4 border-b border-white/10 bg-[#111]">
+							<Search size={20} className="text-emerald-500" />
+							<input
+								autoFocus
+								type="text"
+								value={searchQuery}
+								onChange={(e) => setSearchQuery(e.target.value)}
+								placeholder="Type a category (e.g., Dining, Gas)..."
+								className="w-full bg-transparent border-none outline-none text-lg placeholder:text-gray-600 font-medium text-white"
+							/>
+							<button
+								onClick={() => {
+									setIsSearchOpen(false);
+									setSearchQuery("");
+								}}
+								className="bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white text-[10px] font-black tracking-widest uppercase px-2 py-1 rounded transition-colors"
+							>
+								Esc
+							</button>
+						</div>
+
+						{/* Search Results */}
+						{searchQuery.trim() !== "" && (
+							<div className="max-h-[60vh] overflow-y-auto custom-scrollbar p-2">
+								{searchResults.length > 0 ? (
+									<div className="space-y-2">
+										{searchResults.map((item) => {
+											const Icon = item.category.icon as React.ElementType;
+											return (
+												<div
+													key={item.category.id}
+													className="flex items-center justify-between p-3 rounded-xl hover:bg-white/5 transition-colors cursor-default"
+												>
+													<div className="flex items-center gap-4">
+														<div
+															className={`p-2 rounded-lg bg-white/5 ${item.category.accent}`}
+														>
+															<Icon size={18} />
+														</div>
+														<div>
+															<p className="text-sm font-bold text-gray-300">
+																{item.category.name}
+															</p>
+															<p className="text-xs text-gray-500 font-medium">
+																{item.topCard
+																	? item.topCard.card.name
+																	: "No cards available"}
+															</p>
+														</div>
+													</div>
+
+													{item.topCard && (
+														<div className="flex items-center gap-4">
+															<div
+																className={`text-xl font-black ${item.category.accent}`}
+															>
+																{item.topCard.rate}x
+															</div>
+															{item.topCard.card.image_url ? (
+																<Image
+																	src={item.topCard.card.image_url}
+																	alt={item.topCard.card.name}
+																	width={48}
+																	height={30}
+																	className="rounded shadow-sm object-cover border border-white/20"
+																/>
+															) : (
+																<div
+																	className={`w-12 h-[30px] rounded shadow-sm border border-white/20 bg-gradient-to-br ${item.topCard.card.color}`}
+																/>
+															)}
+														</div>
+													)}
+												</div>
+											);
+										})}
+									</div>
+								) : (
+									<div className="py-12 text-center">
+										<p className="text-gray-500 font-medium text-sm">
+											No categories found for "{searchQuery}"
+										</p>
+									</div>
+								)}
+							</div>
+						)}
+
+						{/* Empty State / Suggestions */}
+						{searchQuery.trim() === "" && (
+							<div className="px-6 py-8 text-center bg-[#050505]">
+								<p className="text-xs font-bold text-gray-600 uppercase tracking-widest mb-4">
+									Instant answers at the register
+								</p>
+								<div className="flex flex-wrap items-center justify-center gap-2">
+									{optimizedCategories.slice(0, 3).map((item) => (
+										<button
+											key={item.category.id}
+											onClick={() => setSearchQuery(item.category.name)}
+											className="px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs text-gray-400 hover:text-white hover:border-white/30 transition-colors"
+										>
+											{item.category.name}
+										</button>
+									))}
+								</div>
+							</div>
+						)}
 					</div>
 				</div>
 			)}
