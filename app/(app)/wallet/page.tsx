@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import { CATEGORY_DICTIONARY, CategoryId } from "@/config/categoryDictionary";
+import * as Popover from "@radix-ui/react-popover";
 
 export default function WalletRewardsPage() {
 	// --- CONNECT TO ZUSTAND ---
@@ -56,7 +57,6 @@ export default function WalletRewardsPage() {
 	const [isSearchOpen, setIsSearchOpen] = useState(false);
 	const [hiddenCategories, setHiddenCategories] = useState<string[]>([]);
 	const [deletingCategory, setDeletingCategory] = useState<string | null>(null);
-	const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
 	// --- STATE ---
 	const [searchQuery, setSearchQuery] = useState("");
@@ -260,40 +260,46 @@ export default function WalletRewardsPage() {
 					.length > 0 ? (
 					<div className="relative group">
 						<div className="relative">
-							<button
-								onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-								className="w-full flex items-center justify-between bg-[#111] border border-white/20 text-white text-xs font-bold rounded-xl px-4 py-2"
-							>
-								+ Add Category
-							</button>
+							<Popover.Root>
+								{/* The Trigger button */}
+								<Popover.Trigger asChild>
+									<button className="w-full flex items-center justify-between bg-[#111] border border-white/20 text-white text-[13px] font-bold rounded-lg px-3 py-1.5 hover:border-emerald-500/50 transition-colors">
+										+ Add New Category <span>▼</span>
+									</button>
+								</Popover.Trigger>
 
-							{isDropdownOpen && (
-								<div className="absolute max-h-80 overflow-y-auto custom-scrollbar top-full left-0 mt-2 w-full bg-[#111] border border-white/20 rounded-xl overflow-hidden z-50">
-									{unifiedCategories
-										.filter((cat) => !activeCategoryIds.includes(cat.id))
-										.map((cat) => {
-											const Icon = cat.icon as React.ElementType;
-											if (!Icon) return null;
-											return (
-												<div
-													key={cat.id}
-													onClick={() => {
-														addActiveCategory(cat.id as CategoryId);
-														setIsDropdownOpen(false);
-													}}
-													className="flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 cursor-pointer transition-colors"
-												>
-													<div className="w-4 h-4 flex items-center justify-center shrink-0">
-														<Icon size={14} className={cat.accent} />
-													</div>
-													<span className="text-[10px] font-bold">
-														{cat.name}
-													</span>
-												</div>
-											);
-										})}
-								</div>
-							)}
+								{/* The Dropdown Content */}
+								<Popover.Portal>
+									<Popover.Content
+										className="bg-[#111] border border-white/20 rounded-lg overflow-hidden z-50 shadow-2xl w-(--radix-popover-trigger-width)"
+										sideOffset={5}
+									>
+										<div className="max-h-70 overflow-y-auto custom-scrollbar">
+											{unifiedCategories
+												.filter((cat) => !activeCategoryIds.includes(cat.id))
+												.map((cat) => {
+													const Icon = cat.icon as React.ElementType;
+													return (
+														<div
+															key={cat.id}
+															onClick={() =>
+																addActiveCategory(cat.id as CategoryId)
+															}
+															className="flex items-center gap-2 px-3 py-2 hover:bg-white/5 cursor-pointer transition-colors"
+														>
+															<div className="w-4 h-4 flex items-center justify-center shrink-0">
+																<Icon size={12} className={cat.accent} />
+															</div>
+															<span className="text-[10px] font-bold truncate">
+																{cat.name}
+															</span>
+														</div>
+													);
+												})}
+										</div>
+									</Popover.Content>
+								</Popover.Portal>
+							</Popover.Root>
 						</div>
 					</div>
 				) : (
@@ -463,22 +469,39 @@ export default function WalletRewardsPage() {
 			{/* --- EDIT MULTIPLIERS MODAL --- */}
 			{editingCategory && (
 				<div className="fixed inset-0 z-100 flex items-center justify-center bg-black/70 backdrop-blur-md p-4 animate-in fade-in duration-200">
-					<div className="bg-[#0a0a0a] border border-white/10 rounded-3xl w-full max-w-lg flex flex-col shadow-2xl max-h-[45vh]">
+					<div className="bg-[#0a0a0a] border border-white/10 rounded-3xl w-full max-w-lg flex flex-col shadow-2xl max-h-[65vh]">
 						<div className="p-6 border-b border-white/5 flex items-center justify-between shrink-0">
 							<div>
-								<h3 className="text-xl font-black tracking-tight">
-									Edit Multipliers
-								</h3>
-								<p className="text-xs font-medium text-gray-500 mt-1">
-									Set custom rates for{" "}
-									<span className="text-white">
-										{
-											unifiedCategories.find((c) => c.id === editingCategory)
-												?.name
-										}
-									</span>
-									.
-								</p>
+								{(() => {
+									const category = unifiedCategories.find(
+										(c) => c.id === editingCategory,
+									);
+									if (!category) return null;
+
+									const Icon = category.icon as React.ElementType;
+
+									return (
+										<div className="flex items-center gap-3 mb-6">
+											<div
+												className={`p-2 rounded-xl bg-white/5 ${category.accent}`}
+											>
+												<Icon size={20} />
+											</div>
+											<div>
+												<h3 className="text-xl font-black tracking-tight">
+													Edit Multipliers
+												</h3>
+												<p className="flex items-center gap-2 text-xs font-medium text-gray-500 mt-0.5">
+													Set custom rates for
+													<span className="flex items-center gap-1.5 text-white bg-white/5 px-2 py-0.5 rounded-md">
+														{category.name}
+														<Icon size={12} className={category.accent} />
+													</span>
+												</p>
+											</div>
+										</div>
+									);
+								})()}
 							</div>
 							<button
 								onClick={() => setEditingCategory(null)}
