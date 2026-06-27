@@ -216,22 +216,16 @@ export default function WalletRewardsPage() {
 					<h1 className="text-3xl font-black tracking-tighter uppercase italic">
 						Spend Optimizer
 					</h1>
-					<p className="text-sm font-medium text-gray-500">
-						At the register? Here is the exact card you should use.
-					</p>
 				</div>
 
 				<div className="flex items-center gap-3">
 					{/* QUICK SEARCH BUTTON */}
 					<button
 						onClick={() => setIsSearchOpen(true)}
-						className="flex items-center gap-3 bg-[#111] border border-white/10 hover:border-emerald-500/50 px-4 py-2.5 rounded-xl transition-all shadow-xl text-gray-400 hover:text-emerald-400 group"
+						className="flex items-center gap-3 bg-[#111] border border-white/10 hover:border-gray-500/50 px-4 py-2.5 rounded-xl transition-all shadow-xl text-gray-400 hover:text-gray-400 group"
 					>
 						<Search size={18} />
-						<span className="text-sm font-bold hidden sm:block">
-							Quick Find
-						</span>
-						<div className="hidden sm:flex items-center gap-0.5 bg-white/5 px-1.5 py-0.5 rounded text-[10px] font-black tracking-widest border border-white/5 group-hover:border-emerald-500/20">
+						<div className="hidden sm:flex items-center gap-0.5 bg-white/5 px-1.5 py-0.5 rounded text-[10px] font-black tracking-widest border border-white/5 group-hover:border-gray-500/20">
 							<Command size={10} /> K
 						</div>
 					</button>
@@ -239,77 +233,62 @@ export default function WalletRewardsPage() {
 					{/* WALLET MANAGER BUTTON */}
 					<button
 						onClick={() => setIsWalletManagerOpen(true)}
-						className="flex items-center gap-3 bg-[#111] border border-white/20 hover:border-white/50 px-5 py-2.5 rounded-xl transition-all shadow-xl"
+						className="flex items-center gap-3 bg-[#111] border border-white/20 hover:border-blue-500/50 px-4 py-2.5 rounded-xl transition-all shadow-xl"
 					>
-						<Wallet size={18} className="text-gray-400" />
-						<span className="text-sm font-bold">My Wallet</span>
+						<Wallet size={18} className="text-blue-400" />
+						<span className="text-sm">Wallet</span>
 						<span className="bg-white/10 text-white text-xs font-black px-2 py-0.5 rounded-full">
 							{userWallet.length}
 						</span>
 					</button>
-				</div>
-			</div>
 
-			{/* --- SMART ADD CATEGORY DROPDOWN --- */}
-			<div className="flex items-center justify-between bg-[#0a0a0a] border border-white/5 p-4 rounded-2xl">
-				<div>
-					<h3 className="text-sm font-bold text-white">Track a new category</h3>
-					<p className="text-xs text-gray-500 mt-0.5">
-						Add more spending areas to your dashboard.
-					</p>
-				</div>
+					{/* ADD CATEGORY POPOVER */}
+					<Popover.Root>
+						<Popover.Trigger asChild>
+							<button className="flex items-center gap-2 bg-[#111] border border-white/20 hover:border-emerald-500/50 px-4 py-2.5 rounded-xl transition-all shadow-xl text-white text-sm">
+								<Plus size={18} className="text-emerald-500" />
+								Category
+							</button>
+						</Popover.Trigger>
 
-				{unifiedCategories.filter((cat) => !activeCategoryIds.includes(cat.id))
-					.length > 0 ? (
-					<div className="relative group">
-						<div className="relative">
-							<Popover.Root>
-								{/* The Trigger button */}
-								<Popover.Trigger asChild>
-									<button className="w-full flex items-center justify-between bg-[#111] border border-white/20 text-white text-[13px] font-bold rounded-lg px-3 py-1.5 hover:border-emerald-500/50 transition-colors">
-										+ Add New Category <span>▼</span>
-									</button>
-								</Popover.Trigger>
-
-								{/* The Dropdown Content */}
-								<Popover.Portal>
-									<Popover.Content
-										className="bg-[#111] border border-white/20 rounded-lg overflow-hidden z-50 shadow-2xl w-(--radix-popover-trigger-width)"
-										sideOffset={5}
-									>
-										<div className="max-h-70 overflow-y-auto custom-scrollbar">
-											{unifiedCategories
-												.filter((cat) => !activeCategoryIds.includes(cat.id))
-												.map((cat) => {
-													const Icon = cat.icon as React.ElementType;
-													return (
-														<div
-															key={cat.id}
-															onClick={() =>
-																addActiveCategory(cat.id as CategoryId)
-															}
-															className="flex items-center gap-2 px-3 py-2 hover:bg-white/5 cursor-pointer transition-colors"
-														>
-															<div className="w-4 h-4 flex items-center justify-center shrink-0">
-																<Icon size={12} className={cat.accent} />
-															</div>
-															<span className="text-[10px] font-bold truncate">
-																{cat.name}
-															</span>
-														</div>
-													);
-												})}
+						<Popover.Portal>
+							<Popover.Content
+								className="bg-[#111] border border-white/20 rounded-xl overflow-hidden z-50 shadow-2xl w-50 mt-2"
+								sideOffset={5}
+							>
+								<div className="max-h-70 overflow-y-auto custom-scrollbar">
+									{unifiedCategories.filter(
+										(cat) => !activeCategoryIds.includes(cat.id),
+									).length > 0 ? (
+										unifiedCategories
+											.filter((cat) => !activeCategoryIds.includes(cat.id))
+											.map((cat) => {
+												const Icon = cat.icon as React.ElementType;
+												return (
+													<div
+														key={cat.id}
+														onClick={() =>
+															addActiveCategory(cat.id as CategoryId)
+														}
+														className="flex items-center gap-3 px-4 py-3 hover:bg-white/5 cursor-pointer transition-colors"
+													>
+														<Icon size={16} className={cat.accent} />
+														<span className="text-xs font-bold text-gray-200">
+															{cat.name}
+														</span>
+													</div>
+												);
+											})
+									) : (
+										<div className="px-4 py-3 text-xs text-gray-500 italic">
+											All tracked
 										</div>
-									</Popover.Content>
-								</Popover.Portal>
-							</Popover.Root>
-						</div>
-					</div>
-				) : (
-					<div className="px-3 py-1.5 bg-white/5 rounded-lg border border-white/10 text-xs text-gray-500 font-bold">
-						All tracked
-					</div>
-				)}
+									)}
+								</div>
+							</Popover.Content>
+						</Popover.Portal>
+					</Popover.Root>
+				</div>
 			</div>
 
 			{/* --- BENTO BOX GRID --- */}
