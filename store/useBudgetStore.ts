@@ -2,6 +2,8 @@ import { supabase } from "@/lib/supabase";
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import { CATEGORY_HIERARCHY } from "@/constants";
+import { CATEGORY_DICTIONARY } from "@/config/categoryDictionary";
+import { DEFAULT_CATEGORIES } from "@/config/categoryDictionary";
 
 export interface Transaction {
 	[key: string]: string | number | boolean | string[] | undefined;
@@ -47,13 +49,6 @@ export interface CreditCard {
 	image_url?: string;
 }
 
-export interface RewardCategory {
-	id: string;
-	name: string;
-	iconName: string; // Storing the string name of the icon for JSON serialization
-	accent: string;
-}
-
 interface BudgetState {
 	transactions: Transaction[];
 	isLoading: boolean;
@@ -63,12 +58,12 @@ interface BudgetState {
 	rules: Rule[];
 	toast: { count: number; snapshot: Transaction[] } | null;
 	confirmedRecurringMerchants: string[];
-	// --- WALLET REWARDS STATE ---
 	globalCards: CreditCard[];
 	walletIds: string[];
-	rewardCategories: RewardCategory[];
 	customRates: Record<string, Record<string, number>>;
 	preferredCards: Record<string, string>; // Maps Category ID to Card ID
+	activeCategoryIds: string[];
+	addActiveCategory: (id: string) => void;
 	setPreferredCard: (categoryId: string, cardId: string | null) => void;
 	fetchCustomCategories: () => Promise<void>;
 	setHasHydrated: (state: boolean) => void;
@@ -106,8 +101,9 @@ interface BudgetState {
 	fetchGlobalCards: () => Promise<void>;
 	fetchPreferredCards: () => Promise<void>;
 	setWalletIds: (ids: string[]) => void;
-	setRewardCategories: (categories: RewardCategory[]) => void;
 	setCustomRates: (rates: Record<string, Record<string, number>>) => void;
+	fetchActiveCategories: () => Promise<void>;
+	removeActiveCategory: (id: string) => void;
 }
 
 const applyRulesToTransaction = (
@@ -153,6 +149,84 @@ export const useBudgetStore = create<BudgetState>()(
 			globalCards: [],
 			preferredCards: {},
 
+			// The state only holds strings now
+			activeCategoryIds: DEFAULT_CATEGORIES,
+
+			addActiveCategory: async (categoryId) => {
+				const current = get().activeCategoryIds;
+
+				if (current.includes(categoryId)) return;
+
+				const updated = [...current, categoryId];
+
+				// 1. Optimistic Update (UI updates instantly)
+				set({ activeCategoryIds: updated });
+
+				try {
+					const { data } = await supabase.auth.getSession();
+					if (!data.session) return;
+
+					const { error } = await supabase.from("user_preferences").upsert({
+						user_id: data.session.user.id,
+						active_categories: updated,
+					});
+
+					if (error) {
+						// 2. Rollback if Supabase fails (Safety Net)
+						set({ activeCategoryIds: current });
+						console.error("Supabase sync error:", error.message);
+					}
+				} catch (err) {
+					// 2. Rollback on crash
+					set({ activeCategoryIds: current });
+					console.error("Failed to save category:", err);
+				}
+			},
+
+			removeActiveCategory: async (categoryId: string) => {
+				const current = get().activeCategoryIds;
+				const updated = current.filter((id) => id !== categoryId);
+
+				set({ activeCategoryIds: updated });
+
+				const {
+					data: { session },
+				} = await supabase.auth.getSession();
+				if (session) {
+					await supabase.from("user_preferences").upsert({
+						user_id: session.user.id,
+						active_categories: updated,
+					});
+				}
+			},
+
+			fetchActiveCategories: async () => {
+				set({ activeCategoryIds: [] });
+				const {
+					data: { session },
+				} = await supabase.auth.getSession();
+				if (!session) return;
+
+				const { data, error } = await supabase
+					.from("user_preferences")
+					.select("active_categories")
+					.eq("user_id", session.user.id)
+					.single();
+
+				if (error) {
+					// If error is because no row exists (PGRST116), that's fine!
+					// Otherwise, log it so you know why your app failed to load.
+					if (error.code !== "PGRST116") {
+						console.error("Error loading categories:", error.message);
+					}
+					return; // Stop here if there's no data to load
+				}
+
+				if (data && data.active_categories) {
+					set({ activeCategoryIds: data.active_categories });
+				}
+			},
+
 			// Put your 20 card IDs here so they are in your wallet by default!
 			walletIds: [
 				"amex-bce",
@@ -175,44 +249,6 @@ export const useBudgetStore = create<BudgetState>()(
 				"discover-it",
 				"usbank-triple-cash",
 				"wf-signify",
-			],
-			rewardCategories: [
-				{
-					id: "Dining",
-					name: "Dining",
-					iconName: "Utensils",
-					accent: "text-orange-400",
-				},
-				{
-					id: "Groceries",
-					name: "Groceries",
-					iconName: "ShoppingCart",
-					accent: "text-emerald-400",
-				},
-				{
-					id: "Travel",
-					name: "Travel",
-					iconName: "Plane",
-					accent: "text-blue-400",
-				},
-				{
-					id: "Gas",
-					name: "Gas",
-					iconName: "Fuel",
-					accent: "text-red-400",
-				},
-				{
-					id: "Transit",
-					name: "Transit",
-					iconName: "Car",
-					accent: "text-pink-400",
-				},
-				{
-					id: "CatchAll",
-					name: "Others",
-					iconName: "CreditCard",
-					accent: "text-gray-400",
-				},
 			],
 			customRates: {},
 
@@ -340,9 +376,16 @@ export const useBudgetStore = create<BudgetState>()(
 				}
 			},
 
+			// The UI will call this to build the Bento Box
+			getVisibleCategories: () => {
+				const { activeCategoryIds } = get();
+				// Reattach the icons and colors right before rendering
+				return CATEGORY_DICTIONARY.filter((cat) =>
+					activeCategoryIds.includes(cat.id),
+				);
+			},
+
 			setWalletIds: (ids) => set({ walletIds: ids }),
-			setRewardCategories: (categories) =>
-				set({ rewardCategories: categories }),
 			setCustomRates: (rates) => set({ customRates: rates }),
 			setPreferredCard: async (categoryId, cardId) => {
 				// 1. Get the current state
@@ -657,6 +700,8 @@ export const useBudgetStore = create<BudgetState>()(
 			onRehydrateStorage: () => (state) => {
 				// Sets hydration to true once data is loaded from disk
 				state?.setHasHydrated(true);
+				//FORCE a fetch from Supabase whenever the app rehydrates
+				state?.fetchActiveCategories();
 			},
 			// Optional: Only persist specific fields
 			partialize: (state) => ({
@@ -664,7 +709,6 @@ export const useBudgetStore = create<BudgetState>()(
 				customTags: state.customTags,
 				customCategories: state.customCategories,
 				walletIds: state.walletIds,
-				rewardCategories: state.rewardCategories,
 				customRates: state.customRates,
 				preferredCards: state.preferredCards,
 			}),
