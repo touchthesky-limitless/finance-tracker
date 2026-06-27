@@ -6,17 +6,20 @@ import {
 	X,
 	CheckCircle2,
 	Plus,
-	Settings2,
+	SquarePen,
 	Save,
 	Wallet,
 	Star,
 	Search,
 	Command,
 	Tag,
+	EllipsisVertical,
+	Trash2,
 } from "lucide-react";
 import Image from "next/image";
 import { CATEGORY_DICTIONARY, CategoryId } from "@/config/categoryDictionary";
 import * as Popover from "@radix-ui/react-popover";
+import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 
 export default function WalletRewardsPage() {
 	// --- CONNECT TO ZUSTAND ---
@@ -322,19 +325,37 @@ export default function WalletRewardsPage() {
 							className={`bg-[#0a0a0a] border border-white/5 rounded-3xl p-6 relative overflow-hidden group flex flex-col min-h-37.5 hover:border-white/10 transition-all ${isHidden ? "h-20 opacity-50" : ""}`}
 						>
 							{/* Action Bar - Fixed positioning */}
-							<div className="absolute top-4 right-4 z-20 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-								<button
-									onClick={() => openEditModal(item.category.id)}
-									className="bg-black/50 p-1.5 rounded-full hover:text-white text-gray-500 backdrop-blur-md border border-white/5"
-								>
-									<Settings2 size={14} />
-								</button>
-								<button
-									onClick={() => setDeletingCategory(item.category.id)}
-									className="bg-black/50 p-1.5 rounded-full hover:text-white text-gray-500 backdrop-blur-md border border-white/5"
-								>
-									<X size={14} />
-								</button>
+							<div className="absolute top-2 right-2 z-10">
+								<DropdownMenu.Root>
+									<DropdownMenu.Trigger asChild>
+										<button className="p-1.5 rounded-lg bg-black/20 hover:bg-white/10 backdrop-blur-md transition-colors text-white/70">
+											<EllipsisVertical size={12} />
+										</button>
+									</DropdownMenu.Trigger>
+
+									<DropdownMenu.Portal>
+										<DropdownMenu.Content
+											className="bg-[#111] border border-white/10 rounded-xl p-1 shadow-2xl z-50 min-w-25"
+											sideOffset={5}
+										>
+											<DropdownMenu.Item
+												onClick={() => openEditModal(item.category.id)}
+												className="flex items-center gap-2 px-3 py-2 text-xs font-bold text-white hover:bg-white/5 rounded-lg cursor-pointer outline-none"
+											>
+												<SquarePen size={14} /> Edit Rates
+											</DropdownMenu.Item>
+
+											<DropdownMenu.Separator className="h-px bg-white/10 my-1" />
+
+											<DropdownMenu.Item
+												onClick={() => setDeletingCategory(item.category.id)}
+												className="flex items-center gap-2 px-3 py-2 text-xs font-bold text-red-500 hover:bg-red-500/10 rounded-lg cursor-pointer outline-none"
+											>
+												<Trash2 size={14} /> Remove
+											</DropdownMenu.Item>
+										</DropdownMenu.Content>
+									</DropdownMenu.Portal>
+								</DropdownMenu.Root>
 							</div>
 
 							{isHidden ? (
