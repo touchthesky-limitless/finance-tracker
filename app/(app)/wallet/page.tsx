@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { CreditCard, useBudgetStore } from "@/store/useBudgetStore";
 import {
 	X,
@@ -20,6 +20,7 @@ import Image from "next/image";
 import { CATEGORY_DICTIONARY, CategoryId } from "@/config/categoryDictionary";
 import * as Popover from "@radix-ui/react-popover";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
+import * as Dialog from "@radix-ui/react-dialog";
 
 export default function WalletRewardsPage() {
 	// --- CONNECT TO ZUSTAND ---
@@ -97,47 +98,52 @@ export default function WalletRewardsPage() {
 		return { userWallet: user, availableCards: available };
 	}, [globalCards, walletIds]);
 
+	// Get top cards
+	const getTopCardsForCategory = useCallback(
+		(categoryId: string) => {
+			const rankedCards: { card: CreditCard; rate: number }[] = [];
+
+			userWallet.forEach((card) => {
+				const customRate = customRates[categoryId]?.[card.id];
+				const dbRate =
+					card.multipliers[categoryId] || card.multipliers["catchAll"] || 1;
+
+				const finalRate = customRate !== undefined ? customRate : dbRate;
+				rankedCards.push({ card, rate: finalRate });
+			});
+
+			// Sort them (Preferred wins first, then highest rate wins)
+			rankedCards.sort((a, b) => {
+				const preferredId = preferredCards[categoryId];
+
+				if (a.card.id === preferredId) return -1;
+				if (b.card.id === preferredId) return 1;
+
+				return b.rate - a.rate;
+			});
+
+			return {
+				topCard: rankedCards.length > 0 ? rankedCards[0] : null,
+				backupCard: rankedCards.length > 1 ? rankedCards[1] : null,
+			};
+		},
+		[userWallet, customRates, preferredCards],
+	);
+
 	// --- BENTO BOX ENGINE ---
 	const optimizedCategories = useMemo(() => {
 		return unifiedCategories
 			.filter((cat) => activeCategoryIds.includes(cat.id))
 			.map((category) => {
-				const rankedCards: { card: CreditCard; rate: number }[] = [];
-
-				userWallet.forEach((card) => {
-					const customRate = customRates[category.id]?.[card.id];
-					const dbRate =
-						card.multipliers[category.id] || card.multipliers["catchAll"] || 1;
-
-					const finalRate = customRate !== undefined ? customRate : dbRate;
-					rankedCards.push({ card, rate: finalRate });
-				});
-
-				// 3. Sort them (Preferred wins first, then highest rate wins)
-				rankedCards.sort((a, b) => {
-					const preferredId = preferredCards[category.id];
-
-					// ABSOLUTE OVERRIDE: Starred card wins instantly
-					if (a.card.id === preferredId) return -1;
-					if (b.card.id === preferredId) return 1;
-
-					// Otherwise, highest math wins
-					return b.rate - a.rate;
-				});
+				const { topCard, backupCard } = getTopCardsForCategory(category.id);
 
 				return {
 					category,
-					topCard: rankedCards.length > 0 ? rankedCards[0] : null,
-					backupCard: rankedCards.length > 1 ? rankedCards[1] : null,
+					topCard,
+					backupCard,
 				};
 			});
-	}, [
-		activeCategoryIds,
-		userWallet,
-		preferredCards,
-		customRates,
-		unifiedCategories,
-	]);
+	}, [activeCategoryIds, unifiedCategories, getTopCardsForCategory]);
 
 	// --- HANDLERS ---
 	const handleRemoveCard = (id: string) => {
@@ -199,10 +205,30 @@ export default function WalletRewardsPage() {
 		if (!searchQuery.trim()) return [];
 
 		const query = searchQuery.toLowerCase();
-		return optimizedCategories.filter((item) =>
-			item.category.name.toLowerCase().includes(query),
-		);
-	}, [searchQuery, optimizedCategories]);
+
+		return unifiedCategories
+			.filter(
+				(cat) =>
+					cat.name.toLowerCase().includes(query) ||
+					cat.id.toLowerCase().includes(query),
+			)
+			.map((category) => {
+				// Use the new helper function!
+				const { topCard } = getTopCardsForCategory(category.id);
+				const isTracked = activeCategoryIds.includes(category.id);
+
+				return {
+					category,
+					topCard,
+					isTracked,
+				};
+			});
+	}, [
+		searchQuery,
+		unifiedCategories,
+		activeCategoryIds,
+		getTopCardsForCategory,
+	]);
 
 	if (!hasHydrated) {
 		return <div className="min-h-screen bg-[#050505]" />;
@@ -628,27 +654,36 @@ export default function WalletRewardsPage() {
 			)}
 
 			{/* --- WALLET MANAGER MODAL --- */}
-			{isWalletManagerOpen && (
-				<div className="fixed inset-0 z-100 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-					<div className="bg-[#0a0a0a] border border-white/10 rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col max-h-[85vh]">
-						<div className="p-6 border-b border-white/5 flex items-center justify-between shrink-0">
+			<Dialog.Root
+				open={isWalletManagerOpen}
+				onOpenChange={setIsWalletManagerOpen}
+			>
+				<Dialog.Portal>
+					{/* OVERLAY */}
+					<Dialog.Overlay className="fixed inset-0 z-100 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200" />
+
+					{/* CONTENT */}
+					<Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-100 w-[calc(100%-2rem)] max-w-2xl max-h-[85vh] bg-[#0a0a0a] border border-white/10 rounded-3xl overflow-hidden shadow-2xl flex flex-col outline-none animate-in fade-in zoom-in-95 duration-200">
+						{/* HEADER */}
+						<div className="p-6 border-b border-white/5 flex items-center justify-between shrink-0 bg-[#111]">
 							<div>
-								<h3 className="text-lg font-black tracking-tight">
+								<Dialog.Title className="text-lg font-black tracking-tight text-white">
 									Manage Wallet
-								</h3>
-								<p className="text-xs font-medium text-gray-500 mt-1">
+								</Dialog.Title>
+								<Dialog.Description className="text-xs font-medium text-gray-500 mt-1">
 									Add or remove cards from your active loadout.
-								</p>
+								</Dialog.Description>
 							</div>
-							<button
-								onClick={() => setIsWalletManagerOpen(false)}
-								className="text-gray-500 hover:text-white p-2"
-							>
-								<X size={20} />
-							</button>
+							<Dialog.Close asChild>
+								<button className="text-gray-500 hover:text-white p-2 transition-colors">
+									<X size={20} />
+								</button>
+							</Dialog.Close>
 						</div>
 
+						{/* BODY */}
 						<div className="p-6 overflow-y-auto space-y-8 grow custom-scrollbar">
+							{/* ACTIVE CARDS SECTION */}
 							<div className="space-y-3">
 								<h4 className="text-[10px] font-black uppercase tracking-widest text-gray-500">
 									Active Cards ({userWallet.length})
@@ -675,7 +710,7 @@ export default function WalletRewardsPage() {
 														className={`w-8 h-5 rounded shadow-sm border border-white/20 bg-linear-to-br ${card.color}`}
 													/>
 												)}
-												<p className="text-sm font-bold truncate max-w-50">
+												<p className="text-sm font-bold truncate max-w-50 text-white">
 													{card.name}
 												</p>
 											</div>
@@ -690,6 +725,7 @@ export default function WalletRewardsPage() {
 								</div>
 							</div>
 
+							{/* AVAILABLE CARDS SECTION */}
 							{availableCards.length > 0 && (
 								<div className="space-y-3 pt-4 border-t border-white/5">
 									<h4 className="text-[10px] font-black uppercase tracking-widest text-gray-500">
@@ -700,7 +736,7 @@ export default function WalletRewardsPage() {
 											<button
 												key={card.id}
 												onClick={() => handleAddCard(card.id)}
-												className="flex items-center justify-between p-3 rounded-xl bg-[#111] border border-white/10 hover:border-emerald-500/50 hover:bg-emerald-500/5 transition-all text-left"
+												className="flex items-center justify-between p-3 rounded-xl bg-[#111] border border-white/10 hover:border-emerald-500/50 hover:bg-emerald-500/5 transition-all text-left group"
 											>
 												<div className="flex items-center gap-3">
 													{card.image_url ? (
@@ -710,15 +746,15 @@ export default function WalletRewardsPage() {
 															width={32}
 															height={20}
 															sizes="(max-width: 768px) 200px, 200px"
-															className="w-8 h-5 rounded shadow-sm object-cover border border-white/20 opacity-50"
+															className="w-8 h-5 rounded shadow-sm object-cover border border-white/20 opacity-50 group-hover:opacity-100 transition-opacity"
 															priority={true}
 														/>
 													) : (
 														<div
-															className={`w-8 h-5 rounded shadow-sm border border-white/20 bg-linear-to-br ${card.color}`}
+															className={`w-8 h-5 rounded shadow-sm border border-white/20 bg-linear-to-br ${card.color} opacity-50 group-hover:opacity-100 transition-opacity`}
 														/>
 													)}
-													<p className="text-sm font-bold text-gray-400 truncate max-w-35">
+													<p className="text-sm font-bold text-gray-400 truncate max-w-35 group-hover:text-white transition-colors">
 														{card.name}
 													</p>
 												</div>
@@ -729,14 +765,27 @@ export default function WalletRewardsPage() {
 								</div>
 							)}
 						</div>
-					</div>
-				</div>
-			)}
+					</Dialog.Content>
+				</Dialog.Portal>
+			</Dialog.Root>
 
 			{/* --- QUICK SEARCH MODAL --- */}
-			{isSearchOpen && (
-				<div className="fixed inset-0 z-100 flex items-start justify-center bg-black/80 backdrop-blur-sm p-4 pt-[10vh] animate-in fade-in duration-200">
-					<div className="bg-[#0a0a0a] border border-white/10 rounded-2xl w-full max-w-xl overflow-hidden shadow-[0_0_50px_rgba(0,0,0,0.5)]">
+			<Dialog.Root
+				open={isSearchOpen}
+				onOpenChange={(open) => {
+					setIsSearchOpen(open);
+					if (!open) setSearchQuery("");
+				}}
+			>
+				<Dialog.Portal>
+					{/* OVERLAY (Replaces the fixed backdrop wrapper) */}
+					<Dialog.Overlay className="fixed inset-0 z-100 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200" />
+
+					{/* CONTENT (Replaces the flex-centered container) */}
+					<Dialog.Content className="fixed top-[10vh] left-1/2 -translate-x-1/2 z-100 w-[calc(100%-2rem)] max-w-xl bg-[#0a0a0a] border border-white/10 rounded-2xl overflow-hidden shadow-[0_0_50px_rgba(0,0,0,0.5)] outline-none animate-in fade-in zoom-in-95 duration-200">
+						{/* Required for Radix accessibility, hidden from UI */}
+						<Dialog.Title className="sr-only">Search Categories</Dialog.Title>
+
 						<div className="flex items-center gap-3 px-4 py-4 border-b border-white/10 bg-[#111]">
 							<Search size={20} className="text-emerald-500" />
 							<input
@@ -747,15 +796,16 @@ export default function WalletRewardsPage() {
 								placeholder="Type a category (e.g., Dining, Gas)..."
 								className="w-full bg-transparent border-none outline-none text-lg placeholder:text-gray-600 font-medium text-white"
 							/>
-							<button
-								onClick={() => {
-									setIsSearchOpen(false);
-									setSearchQuery("");
-								}}
-								className="bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white text-[10px] font-black tracking-widest uppercase px-2 py-1 rounded transition-colors"
-							>
-								Esc
-							</button>
+
+							{/* Close Button wrapped in Radix primitive */}
+							<Dialog.Close asChild>
+								<button
+									onClick={() => setSearchQuery("")}
+									className="bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white text-[10px] font-black tracking-widest uppercase px-2 py-1 rounded transition-colors"
+								>
+									Esc
+								</button>
+							</Dialog.Close>
 						</div>
 
 						{searchQuery.trim() !== "" && (
@@ -769,6 +819,7 @@ export default function WalletRewardsPage() {
 													key={item.category.id}
 													className="flex items-center justify-between p-3 rounded-xl hover:bg-white/5 transition-colors cursor-default"
 												>
+													{/* Left Side: Icon & Category Name */}
 													<div className="flex items-center gap-4">
 														<div
 															className={`p-2 rounded-lg bg-white/5 ${item.category.accent}`}
@@ -778,6 +829,20 @@ export default function WalletRewardsPage() {
 														<div>
 															<p className="text-sm font-bold text-gray-300">
 																{item.category.name}
+																{"  "}
+																{/* THE NEW UX WIN: Show a badge or button if not tracked */}
+																{!item.isTracked && (
+																	<button
+																		onClick={() =>
+																			addActiveCategory(
+																				item.category.id as CategoryId,
+																			)
+																		}
+																		className="px-1.5 py-0.5 rounded text-[9px] font-black tracking-wider uppercase bg-white/10 text-gray-400 hover:text-white hover:bg-emerald-500/20 transition-colors"
+																	>
+																		+ Pin to Board
+																	</button>
+																)}
 															</p>
 															<p className="text-xs text-gray-500 font-medium">
 																{item.topCard
@@ -786,7 +851,7 @@ export default function WalletRewardsPage() {
 															</p>
 														</div>
 													</div>
-
+													{/* Right Side: Multiplier & Card Image */}
 													{item.topCard && (
 														<div className="flex items-center gap-4">
 															<div
@@ -841,9 +906,9 @@ export default function WalletRewardsPage() {
 								</div>
 							</div>
 						)}
-					</div>
-				</div>
-			)}
+					</Dialog.Content>
+				</Dialog.Portal>
+			</Dialog.Root>
 		</div>
 	);
 }
