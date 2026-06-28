@@ -446,37 +446,41 @@ export default function WalletRewardsPage() {
 								</div>
 							)}
 							{/* --- DELETE CONFIRMATION MODAL (GLASS STYLE) --- */}
-							{deletingCategory && (
-								<div className="fixed inset-0 z-100 flex items-center justify-center p-4">
-									{/* Backdrop overlay */}
-									<div className="absolute inset-0 bg-black/20 backdrop-blur-sm" />
+							<Dialog.Root
+								open={!!deletingCategory}
+								onOpenChange={(open) => !open && setDeletingCategory(null)}
+							>
+								<Dialog.Portal>
+									<Dialog.Overlay className="fixed inset-0 z-100 bg-black/20 backdrop-blur-sm animate-in fade-in duration-200" />
 
-									{/* Glass Modal Card */}
-									<div className="relative bg-white/3 border border-white/10 backdrop-blur-xl rounded-2xl p-6 w-full max-w-sm shadow-2xl">
+									<Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-100 w-full max-w-sm p-6 bg-white/3 border border-white/10 backdrop-blur-xl rounded-2xl shadow-2xl outline-none animate-in fade-in zoom-in-95 duration-200">
 										<h3 className="text-lg font-black text-white">
 											Remove Category?
 										</h3>
+
 										<p className="text-sm text-gray-400 mt-2">
 											This will remove{" "}
-											<strong>
+											<strong className="text-white">
 												{
 													unifiedCategories.find(
 														(c) => c.id === deletingCategory,
 													)?.name
 												}
 											</strong>{" "}
-											from your dashboard.
+											category from dashboard.
 										</p>
+
 										<div className="flex gap-3 mt-6">
-											<button
-												onClick={() => setDeletingCategory(null)}
-												className="flex-1 px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-sm font-bold transition-colors"
-											>
-												Cancel
-											</button>
+											<Dialog.Close asChild>
+												<button className="flex-1 px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-sm font-bold transition-colors text-white">
+													Cancel
+												</button>
+											</Dialog.Close>
+
 											<button
 												onClick={() => {
-													removeActiveCategory(deletingCategory);
+													if (deletingCategory)
+														removeActiveCategory(deletingCategory);
 													setDeletingCategory(null);
 												}}
 												className="flex-1 px-4 py-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-500 text-sm font-bold transition-colors"
@@ -484,18 +488,24 @@ export default function WalletRewardsPage() {
 												Confirm
 											</button>
 										</div>
-									</div>
-								</div>
-							)}
+									</Dialog.Content>
+								</Dialog.Portal>
+							</Dialog.Root>
 						</div>
 					);
 				})}
 			</div>
 
 			{/* --- EDIT MULTIPLIERS MODAL --- */}
-			{editingCategory && (
-				<div className="fixed inset-0 z-100 flex items-center justify-center bg-black/70 backdrop-blur-md p-4 animate-in fade-in duration-200">
-					<div className="bg-[#0a0a0a] border border-white/10 rounded-3xl w-full max-w-lg flex flex-col shadow-2xl max-h-[65vh]">
+			<Dialog.Root
+				open={!!editingCategory}
+				onOpenChange={(open) => !open && setEditingCategory(null)}
+			>
+				<Dialog.Portal>
+					<Dialog.Overlay className="fixed inset-0 z-100 bg-black/70 backdrop-blur-md animate-in fade-in duration-200" />
+
+					<Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-100 w-full max-w-lg bg-[#0a0a0a] border border-white/10 rounded-3xl shadow-2xl flex flex-col max-h-[65vh] outline-none animate-in fade-in zoom-in-95 duration-200">
+						{/* Header */}
 						<div className="p-6 border-b border-white/5 flex items-center justify-between shrink-0">
 							<div>
 								{(() => {
@@ -503,9 +513,7 @@ export default function WalletRewardsPage() {
 										(c) => c.id === editingCategory,
 									);
 									if (!category) return null;
-
 									const Icon = category.icon as React.ElementType;
-
 									return (
 										<div className="flex items-center gap-3 mb-6">
 											<div
@@ -514,7 +522,7 @@ export default function WalletRewardsPage() {
 												<Icon size={20} />
 											</div>
 											<div>
-												<h3 className="text-xl font-black tracking-tight">
+												<h3 className="text-xl font-black tracking-tight text-gray-300 dark:text-gray-100">
 													Edit Multipliers
 												</h3>
 												<p className="flex items-center gap-2 text-xs font-medium text-gray-500 mt-0.5">
@@ -529,18 +537,18 @@ export default function WalletRewardsPage() {
 									);
 								})()}
 							</div>
-							<button
-								onClick={() => setEditingCategory(null)}
-								className="text-gray-500 hover:text-white p-2 rounded-full hover:bg-white/5 transition-colors"
-							>
-								<X size={20} />
-							</button>
+							<Dialog.Close asChild>
+								<button className="text-gray-500 hover:text-white p-2 rounded-full hover:bg-white/5 transition-colors">
+									<X size={20} />
+								</button>
+							</Dialog.Close>
 						</div>
 
+						{/* Body */}
 						<div className="p-4 sm:p-6 overflow-y-auto space-y-1.5 custom-scrollbar">
 							{[...userWallet]
 								.sort((a, b) => {
-									const catId = editingCategory;
+									const catId = editingCategory || "";
 									const rateA =
 										customRates[catId]?.[a.id] ??
 										a.multipliers[catId] ??
@@ -554,13 +562,13 @@ export default function WalletRewardsPage() {
 									return rateB - rateA;
 								})
 								.map((card) => {
-									const catId = editingCategory;
-									// Get default rate using clean ID
+									const catId = editingCategory || "";
 									const defaultRate =
 										card.multipliers[catId] ??
 										card.multipliers["CatchAll"] ??
 										1;
 									const isPreferred = preferredCards[catId] === card.id;
+
 									return (
 										<div
 											key={card.id}
@@ -573,9 +581,8 @@ export default function WalletRewardsPage() {
 														alt={card.name}
 														width={40}
 														height={24}
-														sizes="(max-width: 768px) 200px, 200px"
 														className="w-8 h-5 rounded shadow-sm object-cover border border-white/20"
-														priority={true}
+														priority
 													/>
 												) : (
 													<div
@@ -583,10 +590,10 @@ export default function WalletRewardsPage() {
 													/>
 												)}
 												<div className="truncate">
-													<p className="text-sm font-bold truncate">
+													<p className="text-sm font-bold truncate text-gray-300 dark:text-gray-100">
 														{card.name}
 													</p>
-													<p className="text-[10px] uppercase tracking-widest text-gray-500">
+													<p className="text-[10px] uppercase tracking-widest text-gray-400">
 														Default: {defaultRate}x
 													</p>
 												</div>
@@ -596,12 +603,11 @@ export default function WalletRewardsPage() {
 												<button
 													onClick={() =>
 														setPreferredCard(
-															editingCategory,
+															catId,
 															isPreferred ? null : card.id,
 														)
 													}
 													className={`transition-colors p-1.5 rounded-md hover:bg-white/5 ${isPreferred ? "text-yellow-500 opacity-100" : "text-gray-600 hover:text-yellow-500/50 opacity-0 group-hover:opacity-100"}`}
-													title="Set as tie-breaker"
 												>
 													<Star
 														size={16}
@@ -623,7 +629,7 @@ export default function WalletRewardsPage() {
 															});
 														}}
 														placeholder={`${defaultRate}`}
-														className="w-12 sm:w-16 bg-transparent text-sm text-right outline-none font-medium placeholder:text-gray-600"
+														className="w-12 sm:w-16 bg-transparent text-sm text-right outline-none font-medium placeholder:text-gray-400"
 													/>
 													<span className="text-gray-500 font-bold text-xs select-none">
 														x
@@ -635,6 +641,7 @@ export default function WalletRewardsPage() {
 								})}
 						</div>
 
+						{/* Footer */}
 						<div className="p-5 sm:p-6 border-t border-white/5 bg-[#050505] shrink-0 flex justify-between items-center rounded-b-3xl">
 							<button
 								onClick={() => setTempRates({})}
@@ -642,16 +649,18 @@ export default function WalletRewardsPage() {
 							>
 								Reset Form
 							</button>
-							<button
-								onClick={saveCustomRates}
-								className="flex items-center gap-2 bg-emerald-500 text-black px-6 py-2.5 rounded-xl text-sm font-black uppercase tracking-widest hover:bg-emerald-400 transition-colors shadow-[0_0_15px_rgba(16,185,129,0.15)]"
-							>
-								<Save size={16} /> Save
-							</button>
+							<Dialog.Close asChild>
+								<button
+									onClick={saveCustomRates}
+									className="flex items-center gap-2 bg-emerald-500 text-black px-6 py-2.5 rounded-xl text-sm font-black uppercase tracking-widest hover:bg-emerald-400 transition-colors shadow-[0_0_15px_rgba(16,185,129,0.15)]"
+								>
+									<Save size={16} /> Save
+								</button>
+							</Dialog.Close>
 						</div>
-					</div>
-				</div>
-			)}
+					</Dialog.Content>
+				</Dialog.Portal>
+			</Dialog.Root>
 
 			{/* --- WALLET MANAGER MODAL --- */}
 			<Dialog.Root
