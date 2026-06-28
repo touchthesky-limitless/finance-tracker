@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { useBudgetStore } from "@/store/useBudgetStore";
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase";
 
 export default function StoreInitializer() {
     const fetchTransactions = useBudgetStore((state) => state.fetchTransactions);
@@ -13,6 +13,8 @@ export default function StoreInitializer() {
     const isHydrated = useBudgetStore((state) => state.hasHydrated);
     
     const initialized = useRef(false);
+
+    const supabase = createClient();
 
     useEffect(() => {
         // 2. Only attempt the initial fetch once the store IS hydrated.
@@ -33,7 +35,7 @@ export default function StoreInitializer() {
 
         return () => subscription.unsubscribe();
         
-    }, [fetchTransactions, setTransactions, isHydrated]); // Add isHydrated to deps
+    }, [fetchTransactions, setTransactions, isHydrated, supabase.auth]); // Add isHydrated to deps
 
     return null;
 }

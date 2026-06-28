@@ -1,10 +1,11 @@
-import { supabase } from "@/lib/supabase";
+import { createClient } from '@/lib/supabase';
 import { useState } from "react";
 import { getURL } from "@/utils/getURL";
 
 export function useAuth() {
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
+	const supabase = createClient();
 
 	const handleAuth = async (
 		type: "LOGIN" | "SIGNUP",

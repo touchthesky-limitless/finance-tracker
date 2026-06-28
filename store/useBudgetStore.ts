@@ -1,9 +1,11 @@
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase";
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import { CATEGORY_HIERARCHY } from "@/constants";
 import { CATEGORY_DICTIONARY } from "@/config/categoryDictionary";
 import { DEFAULT_CATEGORIES } from "@/config/categoryDictionary";
+
+const supabase = createClient();
 
 export interface Transaction {
 	[key: string]: string | number | boolean | string[] | undefined;

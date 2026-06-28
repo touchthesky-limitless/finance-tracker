@@ -36,8 +36,9 @@ export async function middleware(request: NextRequest) {
   const isSignupSuccess = path === "/signup-success";
   const isLoginPage = path === "/login";
   const isLandingPage = path === "/";
+  const isForgotPassword = path === "/forgot-password";
   const isPublicAsset = path.includes(".");
-  const isPublicPage = isLoginPage || isLandingPage || isSignupSuccess;
+  const isPublicPage = isLoginPage || isLandingPage || isSignupSuccess || isForgotPassword;
 
   // 2. The Guard: If NOT logged in and NOT on a public page, go to login
   if (!user && !isPublicPage && !isPublicAsset) {

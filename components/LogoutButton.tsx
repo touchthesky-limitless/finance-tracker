@@ -1,12 +1,13 @@
 "use client";
 
 import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@/lib/supabase';
 import { useBudgetStore } from '@/store/useBudgetStore';
 import { LogOut } from 'lucide-react';
 import { useState } from 'react';
 
 export function LogoutButton() {
+  const supabase = createClient();
   const router = useRouter();
   const [isPending, setIsPending] = useState(false);
   
