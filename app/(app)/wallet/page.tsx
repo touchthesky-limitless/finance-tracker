@@ -169,6 +169,9 @@ export default function WalletRewardsPage() {
 				onClose={setIsWalletManagerOpen}
 				userWallet={userWallet}
 				availableCards={availableCards}
+				globalCards={globalCards}
+				unifiedCategories={unifiedCategories}
+				customRates={customRates}
 				onAddCard={(id) => setWalletIds([...walletIds, id])}
 				onRemoveCard={(id) =>
 					setWalletIds(walletIds.filter((wId) => wId !== id))
