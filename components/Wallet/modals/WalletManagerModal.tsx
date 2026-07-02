@@ -74,7 +74,6 @@ export function WalletManagerModal({
 	const groupedActive = groupCardsByIssuer(userWallet);
 	// const groupedAvailable = groupCardsByIssuer(availableCards);
 	const [searchQuery, setSearchQuery] = useState("");
-	console.log("Current query:", searchQuery); // Add this
 
 	// Step 1: Normalize the search query by removing accidental spaces and converting to lowercase
 	const safeQuery = searchQuery.toLowerCase().trim();
@@ -109,14 +108,9 @@ export function WalletManagerModal({
 
 		return false;
 	});
-	console.log("Filtered cards:", filteredAvailable.length); // Add this
 
 	// 2. Group the filtered results
 	const groupedAvailable = groupCardsByIssuer(filteredAvailable);
-	console.log(
-		"All available cards:",
-		availableCards.map((c) => c.name),
-	);
 
 	return (
 		<Dialog.Root open={isOpen} onOpenChange={onClose}>
@@ -135,7 +129,7 @@ export function WalletManagerModal({
 						<div className="mt-4">
 							<input
 								type="text"
-								placeholder="Search 100+ cards..."
+								placeholder="Search..."
 								className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500/50 transition-colors"
 								value={searchQuery}
 								onChange={(e) => setSearchQuery(e.target.value)}
@@ -193,7 +187,7 @@ export function WalletManagerModal({
 													<div className="flex items-center gap-1 shrink-0">
 														<Dialog.Root>
 															<Dialog.Trigger asChild>
-																<button className="relative group text-gray-500 hover:text-blue-400 transition-colors p-1.5 rounded-md hover:bg-white/5">
+																<button className="relative group text-gray-500 hover:text-blue-400 transition-colors rounded-md hover:bg-white/5">
 																	<Info size={16} />
 																	<span className="absolute -top-8 left-1/2 -translate-x-1/2 px-2 py-1 bg-[#222] border border-white/10 text-gray-200 text-[10px] font-bold tracking-wide rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50 shadow-xl">
 																		See rates
