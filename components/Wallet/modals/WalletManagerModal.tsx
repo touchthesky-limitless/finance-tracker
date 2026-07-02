@@ -71,43 +71,25 @@ export function WalletManagerModal({
 	onAddCard,
 	onRemoveCard,
 }: Props) {
-	const groupedActive = groupCardsByIssuer(userWallet);
-	// const groupedAvailable = groupCardsByIssuer(availableCards);
 	const [searchQuery, setSearchQuery] = useState("");
 
 	// Step 1: Normalize the search query by removing accidental spaces and converting to lowercase
 	const safeQuery = searchQuery.toLowerCase().trim();
 
-	// Step 2: Filter the available cards using explicit variable assignments
-	const filteredAvailable = availableCards.filter(function (card) {
-		// Step 3: Safely extract and normalize the card name
-		let cardName = card.name;
-		if (cardName === undefined) {
-			cardName = "";
-		}
-		const safeName = cardName.toLowerCase();
+	// 1. Filter the ACTIVE cards
+	const filteredActive = userWallet.filter(
+		(card) =>
+			card.name.toLowerCase().includes(safeQuery) ||
+			(card.issuer?.toLowerCase() || "").includes(safeQuery),
+	);
+	const groupedActive = groupCardsByIssuer(filteredActive);
 
-		// Step 4: Safely extract and normalize the issuer
-		let cardIssuer = card.issuer;
-		if (cardIssuer === undefined) {
-			cardIssuer = "";
-		}
-		const safeIssuer = cardIssuer.toLowerCase();
-
-		// Step 5: Check if the query exists in either the name or the issuer
-		const matchesName = safeName.includes(safeQuery);
-		const matchesIssuer = safeIssuer.includes(safeQuery);
-
-		// Step 6: Return true if either condition is met
-		if (matchesName === true) {
-			return true;
-		}
-		if (matchesIssuer === true) {
-			return true;
-		}
-
-		return false;
-	});
+	// 2. Filter the AVAILABLE cards
+	const filteredAvailable = availableCards.filter(
+		(card) =>
+			card.name.toLowerCase().includes(safeQuery) ||
+			(card.issuer?.toLowerCase() || "").includes(safeQuery),
+	);
 
 	// 2. Group the filtered results
 	const groupedAvailable = groupCardsByIssuer(filteredAvailable);
@@ -116,7 +98,10 @@ export function WalletManagerModal({
 		<Dialog.Root open={isOpen} onOpenChange={onClose}>
 			<Dialog.Portal>
 				<Dialog.Overlay className="fixed inset-0 z-100 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200" />
-				<Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-100 w-[90vw] max-w-2xl max-h-[85vh] bg-[#0a0a0a] border border-white/10 rounded-3xl overflow-hidden shadow-2xl flex flex-col outline-none animate-in fade-in zoom-in-95 duration-200">
+				<Dialog.Content
+					onOpenAutoFocus={(e) => e.preventDefault()}
+					className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-100 w-[90vw] max-w-2xl max-h-[85vh] bg-[#0a0a0a] border border-white/10 rounded-3xl overflow-hidden shadow-2xl flex flex-col outline-none animate-in fade-in zoom-in-95 duration-200"
+				>
 					<div className="p-6 border-b border-white/5 flex items-center justify-between shrink-0 bg-[#111]">
 						<div>
 							<Dialog.Title className="text-lg font-black tracking-tight text-white">
@@ -126,14 +111,24 @@ export function WalletManagerModal({
 								Add or remove cards from your active loadout.
 							</Dialog.Description>
 						</div>
-						<div className="mt-4">
+						<div className="mt-4 relative">
 							<input
 								type="text"
 								placeholder="Search..."
-								className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500/50 transition-colors"
+								className="w-full pr-10 bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500/50 transition-colors"
 								value={searchQuery}
 								onChange={(e) => setSearchQuery(e.target.value)}
 							/>
+							{/* Conditional Clear Button */}
+							{searchQuery.length > 0 && (
+								<button
+									onClick={() => setSearchQuery("")}
+									className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white transition-colors p-1 rounded-md"
+									aria-label="Clear search"
+								>
+									<X size={16} />
+								</button>
+							)}
 						</div>
 						<Dialog.Close asChild>
 							<button className="text-gray-500 hover:text-white p-2 transition-colors">
@@ -271,7 +266,7 @@ export function WalletManagerModal({
 									<input
 										type="text"
 										placeholder="Search cards..."
-										className="w-40 bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-emerald-500/50 transition-colors"
+										className="w-40 pr-10 bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-emerald-500/50 transition-colors"
 										value={searchQuery}
 										onChange={(e) => setSearchQuery(e.target.value)}
 									/>
