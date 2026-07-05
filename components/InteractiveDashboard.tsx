@@ -811,12 +811,18 @@ export default function InteractiveDashboard({
 								paddingAngle={2}
 								dataKey="value"
 								stroke="none"
-								onClick={(data) =>
-									setSelectedCategory((prev) =>
-										prev === data.name ? null : data.name,
-									)
-								}
 								className="outline-none cursor-pointer"
+								onClick={(data) => {
+									// Use nullish coalescing to guarantee a string or null
+									const categoryName = data.name ?? null;
+
+									setSelectedCategory((prev) => {
+										if (prev === categoryName) {
+											return null;
+										}
+										return categoryName;
+									});
+								}}
 							/>
 							<Tooltip
 								formatter={(value: number | undefined) =>
