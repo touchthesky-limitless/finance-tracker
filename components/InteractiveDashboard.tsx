@@ -108,6 +108,7 @@ function CategoryPicker({
 					/>
 				</div>
 				<button
+					aria-label="Close"
 					onClick={onClose}
 					className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
 				>
@@ -257,7 +258,7 @@ function TagPicker({
 		<div className="absolute inset-0 bg-white dark:bg-gray-900 z-20 flex flex-col animate-in slide-in-from-right duration-200">
 			<div className="p-4 border-b border-gray-100 dark:border-gray-800 flex items-center gap-3">
 				<h3 className="text-lg font-bold flex-1">Manage Tags</h3>
-				<button onClick={onClose}>
+				<button aria-label="Close" onClick={onClose}>
 					<X size={20} className="text-gray-500" />
 				</button>
 			</div>
@@ -305,6 +306,7 @@ function TagPicker({
 								</button>
 								{!isDefault && (
 									<button
+										aria-label="Close"
 										onClick={(e) => {
 											e.stopPropagation();
 											handleDeleteTag(tag);
@@ -409,10 +411,14 @@ function TransactionModal({
 				)}
 
 				<div className="absolute top-4 right-4 flex items-center gap-2 z-10">
-					<button className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 transition-colors">
+					<button
+						aria-label="More"
+						className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 transition-colors"
+					>
 						<MoreHorizontal size={20} />
 					</button>
 					<button
+						aria-label="Close"
 						onClick={onClose}
 						className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 transition-colors"
 					>
@@ -783,6 +789,7 @@ export default function InteractiveDashboard({
 				</h2>
 				<div className="relative min-w-50">
 					<select
+						aria-label="Choose month"
 						value={currentMonth}
 						onChange={(e) => setSelectedMonthKey(e.target.value)}
 						className="w-full appearance-none bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white py-2 pl-4 pr-10 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium transition-all"
@@ -825,9 +832,25 @@ export default function InteractiveDashboard({
 								}}
 							/>
 							<Tooltip
-								formatter={(value: number | undefined) =>
-									`$${(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-								}
+								formatter={(
+									value:
+										| number
+										| string
+										| readonly (number | string)[]
+										| undefined,
+								) => {
+									// Safely extract the first value if Recharts passes a stacked/range array
+									const safeValue = Array.isArray(value) ? value[0] : value;
+
+									// Cast to Number and format with commas
+									return `$${(Number(safeValue) || 0).toLocaleString(
+										undefined,
+										{
+											minimumFractionDigits: 2,
+											maximumFractionDigits: 2,
+										},
+									)}`;
+								}}
 								contentStyle={{
 									borderRadius: "12px",
 									border: "none",
