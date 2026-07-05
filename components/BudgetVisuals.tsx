@@ -98,9 +98,18 @@ export default function BudgetVisuals({
 								stroke="none"
 							></Pie>
 							<Tooltip
-								formatter={(value: number | string | undefined) =>
-									`$${(Number(value) || 0).toFixed(2)}`
-								}
+								formatter={(
+									value:
+										| number
+										| string
+										| readonly (number | string)[]
+										| undefined,
+								) => {
+									// If Recharts passes a range/stacked array, grab the first value. Otherwise, use the value.
+									const safeValue = Array.isArray(value) ? value[0] : value;
+
+									return `$${(Number(safeValue) || 0).toFixed(2)}`;
+								}}
 								contentStyle={{
 									borderRadius: "12px",
 									border: "none",
