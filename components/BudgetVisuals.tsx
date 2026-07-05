@@ -98,8 +98,8 @@ export default function BudgetVisuals({
 								stroke="none"
 							></Pie>
 							<Tooltip
-								formatter={(value: number | undefined) =>
-									`$${(value || 0).toFixed(2)}`
+								formatter={(value: number | string | undefined) =>
+									`$${(Number(value) || 0).toFixed(2)}`
 								}
 								contentStyle={{
 									borderRadius: "12px",
