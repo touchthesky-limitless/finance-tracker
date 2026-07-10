@@ -1,37 +1,42 @@
-"use client";
+import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
+import { createServerClient } from "@supabase/ssr";
+import React from "react";
+import ClientDashboardLayout from "@/components/ClientDashboardLayout";
 
-import Sidebar from "@/components/Sidebar";
-import StoreInitializer from "@/components/StoreInitializer";
-import GlobalShimmer from "@/components/GlobalShimmer";
-import { useBudgetStore } from "@/store/useBudgetStore";
-import WelcomeNotification from "@/components/WelcomeNotification";
+export default async function ProtectedAppLayout({
+    children,
+}: {
+    children: React.ReactNode;
+}) {
+    // 1. Initialize the cookie store
+    const cookieStore = await cookies();
 
-export default function AppLayout({ children }: { children: React.ReactNode }) {
-	const hasHydrated = useBudgetStore((state) => state.hasHydrated);
-	const isLoading = useBudgetStore((state) => state.isLoading);
-    const transactions = useBudgetStore((state) => state.transactions);
+    // 2. Create the server-side Supabase client
+    const supabase = createServerClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        {
+            cookies: {
+                getAll() {
+                    return cookieStore.getAll();
+                },
+            },
+        }
+    );
 
-	// Show shimmer ONLY on the very first load
-	const showShimmer = !hasHydrated || (isLoading && transactions.length === 0);
+    // 3. Verify the user session securely on the server
+    const { data: { user } } = await supabase.auth.getUser();
 
-	return (
-		<div className="flex min-h-screen bg-white dark:bg-[#050505]">
-			{/* Keeps your Zustand state synced with the server */}
-			<StoreInitializer />
+    // 4. The Master Lock: If no user is found, boot them to login before the client loads
+    if (!user) {
+        redirect("/login");
+    }
 
-            <WelcomeNotification />
-            
-			{/* Sidebar is fixed width or responsive drawer */}
-			<Sidebar />
-
-			{/* Content area takes remaining width */}
-			<div className="flex-1 flex flex-col min-w-0 overflow-x-hidden">
-				{showShimmer ? (
-					<GlobalShimmer />
-				) : (
-					<main className="pt-16 lg:pt-0">{children}</main>
-				)}
-			</div>
-		</div>
-	);
+    // 5. If authorized, render your beautiful Zustand client layout!
+    return (
+        <ClientDashboardLayout>
+            {children}
+        </ClientDashboardLayout>
+    );
 }
