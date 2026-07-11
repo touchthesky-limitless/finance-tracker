@@ -104,6 +104,8 @@ export function EditRatesModal({
 
 				<div className="flex items-center gap-2 shrink-0">
 					<button
+						type="button"
+						aria-label="Star"
 						onClick={() =>
 							onSetPreferred(categoryId, isPreferred ? null : card.id)
 						}
@@ -166,7 +168,11 @@ export function EditRatesModal({
 							</div>
 						</div>
 						<Dialog.Close asChild>
-							<button className="text-gray-500 hover:text-gray-900 dark:hover:text-white p-2 rounded-full hover:bg-gray-100 dark:hover:bg-white/5">
+							<button
+								type="button"
+								aria-label="Close"
+								className="text-gray-500 hover:text-gray-900 dark:hover:text-white p-2 rounded-full hover:bg-gray-100 dark:hover:bg-white/5"
+							>
 								<X size={20} />
 							</button>
 						</Dialog.Close>
@@ -178,12 +184,16 @@ export function EditRatesModal({
 
 					<div className="p-5 sm:p-6 border-t border-gray-200 dark:border-white/5 bg-gray-50 dark:bg-[#050505] shrink-0 flex justify-between items-center rounded-b-3xl">
 						<button
+							type="button"
+							aria-label="Reset"
 							onClick={() => setTempRates({})}
 							className="text-[10px] font-black text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 uppercase tracking-widest"
 						>
 							Reset Form
 						</button>
 						<button
+							type="button"
+							aria-label="Save"
 							onClick={() => onSave(categoryId, tempRates)}
 							className="flex items-center gap-2 bg-emerald-500 text-white dark:text-black px-6 py-2.5 rounded-xl text-sm font-black uppercase tracking-widest hover:bg-emerald-400"
 						>

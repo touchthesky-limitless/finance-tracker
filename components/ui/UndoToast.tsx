@@ -45,7 +45,7 @@ export function UndoToast({
 
 	return createPortal(
 		<div
-			className={`fixed bottom-8 left-1/2 -translate-x-1/2 z-[9999] transition-all duration-500 ${
+			className={`fixed bottom-8 left-1/2 -translate-x-1/2 z-9999 transition-all duration-500 ${
 				show
 					? "opacity-100 translate-y-0 pointer-events-auto"
 					: "opacity-0 translate-y-10 pointer-events-none"
@@ -89,6 +89,7 @@ export function UndoToast({
 
 				<button
 					type="button"
+					aria-label="Close"
 					onClick={onClose}
 					className="p-1 hover:bg-gray-100 dark:hover:bg-white/10 rounded-md transition-colors text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
 				>

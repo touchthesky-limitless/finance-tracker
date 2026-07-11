@@ -100,7 +100,11 @@ function SidebarItem({
 			</Link>
 
 			{item.hasAdd && (
-				<button className="absolute right-4 p-1 opacity-0 group-hover:opacity-100 text-gray-500 hover:text-orange-500 transition-all">
+				<button
+					type="button"
+					aria-label="Add"
+					className="absolute right-4 p-1 opacity-0 group-hover:opacity-100 text-gray-500 hover:text-orange-500 transition-all"
+				>
 					<PlusCircle size={14} />
 				</button>
 			)}

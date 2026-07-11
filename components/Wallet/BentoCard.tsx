@@ -33,7 +33,11 @@ export function BentoCard({
 			<div className="absolute top-2 right-2 z-10">
 				<DropdownMenu.Root>
 					<DropdownMenu.Trigger asChild>
-						<button className="p-1.5 rounded-lg bg-gray-100 dark:bg-black/20 hover:bg-gray-200 dark:hover:bg-white/10 backdrop-blur-md transition-colors text-gray-600 dark:text-white/70">
+						<button
+							type="button"
+							aria-label="More"
+							className="p-1.5 rounded-lg bg-gray-100 dark:bg-black/20 hover:bg-gray-200 dark:hover:bg-white/10 backdrop-blur-md transition-colors text-gray-600 dark:text-white/70"
+						>
 							<EllipsisVertical size={12} />
 						</button>
 					</DropdownMenu.Trigger>

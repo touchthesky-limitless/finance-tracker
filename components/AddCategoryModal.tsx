@@ -126,6 +126,8 @@ export function AddCategoryModal({
 						)}
 					</div>
 					<button
+						type="button"
+						aria-label="Close"
 						onClick={handleClose}
 						className="p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded-full text-gray-500 hover:text-gray-900 dark:hover:text-white transition-colors"
 					>
@@ -167,8 +169,9 @@ export function AddCategoryModal({
 							<div className="bg-gray-50 dark:bg-black border border-black/10 dark:border-white/10 rounded-xl p-4 h-48 overflow-y-auto scrollbar-hide grid grid-cols-4 gap-3">
 								{iconOptions.map((icon) => (
 									<button
-										key={icon}
 										type="button"
+										aria-label="Select"
+										key={icon}
 										onClick={() => setSelectedIcon(icon)}
 										className={`p-2 rounded-lg flex items-center justify-center transition-all ${
 											selectedIcon === icon

@@ -163,6 +163,8 @@ export default function CategoriesPage() {
 						Categories
 					</span>
 					<button
+						type="button"
+						aria-label="Close"
 						onClick={() => setIsSidebarOpen(false)}
 						className="lg:hidden p-1 text-gray-900 dark:text-white"
 					>
@@ -256,6 +258,8 @@ export default function CategoriesPage() {
 				<div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 sm:p-6 border-b border-black/5 dark:border-white/5 bg-white dark:bg-[#121212] gap-4">
 					<div className="flex items-center justify-between sm:justify-start gap-4">
 						<button
+							type="button"
+							aria-label="Menu"
 							onClick={() => setIsSidebarOpen(true)}
 							className="lg:hidden p-2 bg-black/5 dark:bg-white/5 rounded-lg border border-black/10 dark:border-white/10 text-gray-900 dark:text-white"
 						>
@@ -314,6 +318,8 @@ export default function CategoriesPage() {
 
 						<div className="flex items-center gap-1 sm:gap-2">
 							<button
+								type="button"
+								aria-label="Refresh"
 								onClick={handleRefresh}
 								disabled={isRefreshing}
 								className="p-2 text-gray-600 dark:text-gray-500 hover:text-black dark:hover:text-white bg-black/5 dark:bg-white/2 sm:bg-transparent rounded-xl border border-transparent hover:border-black/10 dark:hover:border-white/10 disabled:opacity-30"
@@ -445,6 +451,8 @@ export default function CategoriesPage() {
 											{editingId === cat.id ? (
 												<div className="flex flex-col flex-1 max-w-30 sm:max-w-50">
 													<input
+														type="text"
+														aria-label="Edit category name"
 														autoFocus
 														value={tempName}
 														onChange={(e) => setTempName(e.target.value)}
@@ -482,6 +490,8 @@ export default function CategoriesPage() {
 											editingId === cat.id ? (
 												<div className="flex items-center gap-1 animate-in fade-in zoom-in duration-200">
 													<button
+														type="button"
+														aria-label="Check"
 														disabled={isRowDuplicate || !tempName.trim()}
 														onClick={(e) => {
 															e.stopPropagation();
@@ -492,6 +502,8 @@ export default function CategoriesPage() {
 														<Check size={16} />
 													</button>
 													<button
+														type="button"
+														aria-label="Close"
 														onClick={(e) => {
 															e.stopPropagation();
 															setEditingId(null);
@@ -528,6 +540,8 @@ export default function CategoriesPage() {
 											) : (
 												<>
 													<button
+														type="button"
+														aria-label="Edit"
 														onClick={(e) => {
 															e.stopPropagation();
 															setEditingId(cat.id || null);
@@ -538,6 +552,8 @@ export default function CategoriesPage() {
 														<Edit3 size={16} />
 													</button>
 													<button
+														type="button"
+														aria-label="Remove"
 														onClick={(e) => {
 															e.stopPropagation();
 															setDeletingCategory(cat.name);

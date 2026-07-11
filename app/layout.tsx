@@ -25,13 +25,14 @@ export const metadata: Metadata = {
 
 export default function RootLayout({
 	children,
-}: Readonly<{
+}: {
 	children: React.ReactNode;
-}>) {
+}) {
 	return (
-		<html lang="en" className="dark" suppressHydrationWarning>
+		// Removed hardcoded 'dark' class
+		<html lang="en" suppressHydrationWarning>
 			<body
-				className={`${geistSans.variable} ${geistMono.variable} ${robotoMono.variable} antialiased bg-black`}
+				className={`${geistSans.variable} ${geistMono.variable} ${robotoMono.variable} antialiased bg-white dark:bg-black text-gray-900 dark:text-white`}
 			>
 				<ThemeProvider
 					attribute="class"

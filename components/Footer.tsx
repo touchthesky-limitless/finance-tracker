@@ -35,7 +35,7 @@ export default function Footer() {
 						<a
 							href="https://api-ninjas.com"
 							target="_blank"
-							rel="noreferrer"
+							rel="noopener noreferrer"
 							className="hover:text-orange-600 dark:hover:text-orange-500 transition-colors"
 						>
 							API Ninjas
@@ -43,7 +43,7 @@ export default function Footer() {
 						<a
 							href="https://finnhub.io"
 							target="_blank"
-							rel="noreferrer"
+							rel="noopener noreferrer"
 							className="hover:text-orange-600 dark:hover:text-orange-500 transition-colors"
 						>
 							Finnhub

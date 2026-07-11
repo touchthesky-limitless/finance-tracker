@@ -732,7 +732,11 @@ const Card = memo(function Card({
 					{title}
 				</div>
 				{action || (
-					<button className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors p-1 border border-gray-100 dark:border-gray-800 rounded-full">
+					<button
+						type="button"
+						aria-label="More"
+						className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors p-1 border border-gray-100 dark:border-gray-800 rounded-full"
+					>
 						<MoreHorizontal size={16} />
 					</button>
 				)}

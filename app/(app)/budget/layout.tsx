@@ -70,6 +70,8 @@ function ProLayoutShell({ children }: { children: React.ReactNode }) {
 					<div className="fixed inset-y-0 left-0 w-64 bg-gray-50 dark:bg-[#0d0d0d] shadow-2xl border-r border-gray-200 dark:border-gray-800 animate-in slide-in-from-left duration-300">
 						<div className="flex justify-end p-4">
 							<button
+								type="button"
+								aria-label="Close"
 								onClick={closeMobileSidebar}
 								className="text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors"
 							>
@@ -85,6 +87,8 @@ function ProLayoutShell({ children }: { children: React.ReactNode }) {
 				{/* 3. Mobile Header */}
 				<header className="lg:hidden h-16 border-b border-gray-200 dark:border-gray-800 flex items-center px-4 justify-between shrink-0 transform-gpu bg-white dark:bg-[#0d0d0d]">
 					<button
+						type="button"
+						aria-label="Menu"
 						onClick={() => setIsMobileOpen(true)}
 						className="p-2 text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors"
 					>

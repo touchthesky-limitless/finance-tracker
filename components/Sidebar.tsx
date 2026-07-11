@@ -84,6 +84,8 @@ const Sidebar = memo(function Sidebar() {
 					Budget Pro
 				</div>
 				<button
+					type="button"
+					aria-label="Menu"
 					onClick={toggleMobile}
 					className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
 				>
@@ -114,6 +116,8 @@ const Sidebar = memo(function Sidebar() {
 						Budget Pro
 					</div>
 					<button
+						type="button"
+						aria-label="Close"
 						className="lg:hidden text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
 						onClick={closeMobile}
 					>

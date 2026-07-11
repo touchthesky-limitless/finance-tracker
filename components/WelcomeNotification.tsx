@@ -57,6 +57,8 @@ export default function WelcomeNotification() {
 						</div>
 
 						<button
+							type="button"
+							aria-label="Close"
 							onClick={() => setShow(false)}
 							className="p-1 hover:bg-gray-200 dark:hover:bg-white/5 rounded-md text-gray-500 dark:text-gray-600 hover:text-gray-900 dark:hover:text-white transition-all"
 						>

@@ -138,7 +138,11 @@ export default function RecurringPage() {
 							{numberFormatter.format(bill.amount)}
 						</p>
 					</div>
-					<button className="p-3 bg-black/5 dark:bg-white/5 rounded-2xl hover:bg-black dark:hover:bg-white text-gray-500 hover:text-white dark:hover:text-black transition-all">
+					<button
+						type="button"
+						aria-label="Up"
+						className="p-3 bg-black/5 dark:bg-white/5 rounded-2xl hover:bg-black dark:hover:bg-white text-gray-500 hover:text-white dark:hover:text-black transition-all"
+					>
 						<ArrowUpRight size={20} />
 					</button>
 				</div>
@@ -287,6 +291,8 @@ export default function RecurringPage() {
 						{numberFormatter.format(Math.abs(sub.amount))}
 					</span>
 					<button
+						type="button"
+						aria-label="Confirm"
 						onClick={() => handleConfirm(sub.merchant)}
 						className="text-[10px] font-black uppercase tracking-widest px-3 py-1.5 bg-orange-600 hover:bg-orange-500 dark:bg-orange-500 dark:hover:bg-orange-400 text-white rounded-lg active:scale-95 transition-all shadow-lg shadow-orange-500/20"
 					>
@@ -307,6 +313,8 @@ export default function RecurringPage() {
 					</h1>
 					<div className="flex bg-gray-100 dark:bg-[#0d0d0d] p-1 rounded-xl border border-black/5 dark:border-white/5 w-fit">
 						<button
+							type="button"
+							aria-label="Grid"
 							onClick={() => setView("grid")}
 							className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${
 								view === "grid"
@@ -317,6 +325,8 @@ export default function RecurringPage() {
 							<LayoutGrid size={14} /> Grid
 						</button>
 						<button
+							type="button"
+							aria-label="Calendar"
 							onClick={() => setView("calendar")}
 							className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${
 								view === "calendar"
@@ -332,6 +342,8 @@ export default function RecurringPage() {
 				{view === "calendar" && (
 					<div className="flex items-center gap-4 bg-gray-50 dark:bg-[#0d0d0d] border border-black/5 dark:border-white/5 px-4 py-2 rounded-2xl">
 						<button
+							type="button"
+							aria-label="Left"
 							onClick={() =>
 								setViewDate(
 									new Date(viewDate.setMonth(viewDate.getMonth() - 1)),
@@ -347,6 +359,8 @@ export default function RecurringPage() {
 							{calendar.monthName} {calendar.year}
 						</span>
 						<button
+							type="button"
+							aria-label="Right"
 							onClick={() =>
 								setViewDate(
 									new Date(viewDate.setMonth(viewDate.getMonth() + 1)),
