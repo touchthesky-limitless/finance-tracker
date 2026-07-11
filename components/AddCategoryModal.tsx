@@ -19,7 +19,6 @@ export function AddCategoryModal({
 	onClose,
 	parentCategory,
 }: AddCategoryModalProps) {
-	// const iconOptions = useMemo(() => Object.keys(CATEGORY_HIERARCHY), []);
 	const iconOptions = useMemo(() => AVAILABLE_ICONS, []);
 	const colorOptions = useMemo(() => Object.keys(CATEGORY_COLORS), []);
 
@@ -29,16 +28,22 @@ export function AddCategoryModal({
 	const addCustomCategory = useBudgetStore((state) => state.addCustomCategory);
 	const { allUnifiedCategories } = useUnifiedCategories("Expense", "All");
 
-	// Find the parent category's metadata
+	// Find the parent category's metadata using explicit loops
 	const parentData = useMemo(() => {
-		return allUnifiedCategories.find((cat) => cat.name === parentCategory);
+		for (let i = 0; i < allUnifiedCategories.length; i++) {
+			const cat = allUnifiedCategories[i];
+			if (cat.name === parentCategory) {
+				return cat;
+			}
+		}
+		return undefined;
 	}, [allUnifiedCategories, parentCategory]);
 
 	const [selectedIcon, setSelectedIcon] = useState(
 		() => parentData?.icon || iconOptions[0] || "Banknote",
 	);
 
-    // TODO: Fix selected icon and color
+	// TODO: Fix selected icon and color
 	const [selectedColor, setSelectedColor] = useState(
 		() => parentData?.theme?.colorKey || colorOptions[0] || "Gray",
 	);
@@ -47,11 +52,20 @@ export function AddCategoryModal({
 	const trimmedName = name.trim();
 	const isSubCategory = !!parentCategory;
 
+	// Check for duplicates using explicit conditional block
 	const isDuplicate = useMemo(() => {
-		if (!trimmedName) return false;
-		return allUnifiedCategories.some(
-			(cat) => cat.name.toLowerCase() === trimmedName.toLowerCase(),
-		);
+		if (!trimmedName) {
+			return false;
+		}
+
+		for (let i = 0; i < allUnifiedCategories.length; i++) {
+			const cat = allUnifiedCategories[i];
+			if (cat.name.toLowerCase() === trimmedName.toLowerCase()) {
+				return true;
+			}
+		}
+
+		return false;
 	}, [trimmedName, allUnifiedCategories]);
 
 	const uiContent = useMemo(
@@ -94,16 +108,18 @@ export function AddCategoryModal({
 	if (!isOpen) return null;
 
 	return (
-		<div className="fixed inset-0 z-110 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-			<div className="bg-[#0d0d0d] border border-white/10 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
+		<div className="fixed inset-0 z-110 flex items-center justify-center p-4 bg-gray-900/50 dark:bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+			<div className="bg-white dark:bg-[#0d0d0d] border border-black/10 dark:border-white/10 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
 				{/* Header */}
-				<div className="p-6 border-b border-white/5 flex justify-between items-center">
+				<div className="p-6 border-b border-black/5 dark:border-white/5 flex justify-between items-center">
 					<div>
-						<h2 className="text-xl font-bold text-white">{uiContent.title}</h2>
+						<h2 className="text-xl font-bold text-gray-900 dark:text-white">
+							{uiContent.title}
+						</h2>
 						{isSubCategory && (
 							<p className="text-xs text-gray-500 mt-1">
 								Creating under{" "}
-								<span className="text-orange-500 font-bold">
+								<span className="text-orange-600 dark:text-orange-500 font-bold">
 									{parentCategory}
 								</span>
 							</p>
@@ -111,7 +127,7 @@ export function AddCategoryModal({
 					</div>
 					<button
 						onClick={handleClose}
-						className="p-2 hover:bg-white/5 rounded-full text-gray-500 hover:text-white transition-colors"
+						className="p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded-full text-gray-500 hover:text-gray-900 dark:hover:text-white transition-colors"
 					>
 						<X size={20} />
 					</button>
@@ -128,10 +144,10 @@ export function AddCategoryModal({
 							onChange={(e) => setName(e.target.value)}
 							placeholder={uiContent.placeholder}
 							disabled={isLoading}
-							className={`w-full bg-black border rounded-xl px-4 py-3 text-white outline-none transition-all placeholder:text-gray-700 ${
+							className={`w-full bg-gray-50 dark:bg-black border rounded-xl px-4 py-3 text-gray-900 dark:text-white outline-none transition-all placeholder:text-gray-400 dark:placeholder:text-gray-700 ${
 								isDuplicate
 									? "border-red-500 focus:border-red-500"
-									: "border-white/10 focus:border-orange-500/50"
+									: "border-black/10 dark:border-white/10 focus:border-orange-500/50"
 							}`}
 							autoFocus
 						/>
@@ -148,7 +164,7 @@ export function AddCategoryModal({
 							<label className="text-[10px] font-black uppercase tracking-widest text-gray-500">
 								Visual Icon
 							</label>
-							<div className="bg-black border border-white/10 rounded-xl p-4 h-48 overflow-y-auto scrollbar-hide grid grid-cols-4 gap-3">
+							<div className="bg-gray-50 dark:bg-black border border-black/10 dark:border-white/10 rounded-xl p-4 h-48 overflow-y-auto scrollbar-hide grid grid-cols-4 gap-3">
 								{iconOptions.map((icon) => (
 									<button
 										key={icon}
@@ -157,7 +173,7 @@ export function AddCategoryModal({
 										className={`p-2 rounded-lg flex items-center justify-center transition-all ${
 											selectedIcon === icon
 												? "bg-orange-600/20 border border-orange-500/50 shadow-[0_0_15px_rgba(234,88,12,0.1)]"
-												: "hover:bg-white/5 border border-transparent"
+												: "hover:bg-black/5 dark:hover:bg-white/5 border border-transparent"
 										}`}
 									>
 										<CategoryIcon
@@ -165,8 +181,8 @@ export function AddCategoryModal({
 											size={18}
 											colorClass={
 												selectedIcon === icon
-													? "text-orange-500"
-													: "text-gray-400"
+													? "text-orange-600 dark:text-orange-500"
+													: "text-gray-500 dark:text-gray-400"
 											}
 										/>
 									</button>
@@ -179,7 +195,7 @@ export function AddCategoryModal({
 							<label className="text-[10px] font-black uppercase tracking-widest text-gray-500">
 								Theme Color
 							</label>
-							<div className="bg-black border border-white/10 rounded-xl p-4 h-48 overflow-y-auto scrollbar-hide space-y-2">
+							<div className="bg-gray-50 dark:bg-black border border-black/10 dark:border-white/10 rounded-xl p-4 h-48 overflow-y-auto scrollbar-hide space-y-2">
 								{colorOptions.map((colorKey) => (
 									<button
 										key={colorKey}
@@ -187,18 +203,21 @@ export function AddCategoryModal({
 										onClick={() => setSelectedColor(colorKey)}
 										className={`w-full flex items-center gap-3 p-2 rounded-lg transition-all ${
 											selectedColor === colorKey
-												? "bg-white/10"
-												: "hover:bg-white/5"
+												? "bg-black/10 dark:bg-white/10"
+												: "hover:bg-black/5 dark:hover:bg-white/5"
 										}`}
 									>
 										<div
 											className={`w-3 h-3 rounded-full ${CATEGORY_COLORS[colorKey].bg}`}
 										/>
-										<span className="text-[11px] text-gray-400 font-medium">
+										<span className="text-[11px] text-gray-700 dark:text-gray-400 font-medium">
 											{colorKey}
 										</span>
 										{selectedColor === colorKey && (
-											<Check size={12} className="ml-auto text-orange-500" />
+											<Check
+												size={12}
+												className="ml-auto text-orange-600 dark:text-orange-500"
+											/>
 										)}
 									</button>
 								))}
@@ -208,11 +227,11 @@ export function AddCategoryModal({
 				</div>
 
 				{/* Footer Actions */}
-				<div className="p-6 bg-white/2 border-t border-white/5 flex justify-end gap-3">
+				<div className="p-6 bg-black/5 dark:bg-white/2 border-t border-black/5 dark:border-white/5 flex justify-end gap-3">
 					<button
 						onClick={handleClose}
 						disabled={isLoading}
-						className="px-6 py-2 text-sm font-bold text-gray-500 hover:text-white transition-colors disabled:opacity-50"
+						className="px-6 py-2 text-sm font-bold text-gray-500 hover:text-gray-900 dark:hover:text-white transition-colors disabled:opacity-50"
 					>
 						Cancel
 					</button>

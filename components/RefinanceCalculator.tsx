@@ -26,14 +26,14 @@ export default function RefinanceCalculator({
     return (
         <div className="w-full space-y-12">
             {/* INPUT PANEL - THE "COCKPIT" */}
-            <div className="bg-[#121212] border border-white/10 p-8 rounded-4xl shadow-2xl">
+            <div className="bg-white dark:bg-[#121212] border border-black/10 dark:border-white/10 p-8 rounded-4xl shadow-2xl">
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
                     <InputGroup label="Zip Code">
                         <input
                             type="text"
                             value={zip}
                             onChange={(e) => setZip(e.target.value)}
-                            className="w-full bg-black border border-white/10 rounded-xl p-3 text-white font-black focus:border-orange-600 outline-none transition-all"
+                            className="w-full bg-gray-100 dark:bg-black border border-black/10 dark:border-white/10 rounded-xl p-3 text-gray-900 dark:text-white font-black focus:border-orange-600 outline-none transition-all"
                         />
                     </InputGroup>
 
@@ -44,7 +44,7 @@ export default function RefinanceCalculator({
                                 type="number"
                                 value={propertyValue}
                                 onChange={(e) => setPropertyValue(Number(e.target.value))}
-                                className="w-full bg-black border border-white/10 rounded-xl p-3 pl-8 text-white font-black focus:border-orange-600 outline-none transition-all"
+                                className="w-full bg-gray-100 dark:bg-black border border-black/10 dark:border-white/10 rounded-xl p-3 pl-8 text-gray-900 dark:text-white font-black focus:border-orange-600 outline-none transition-all"
                             />
                         </div>
                     </InputGroup>
@@ -56,7 +56,7 @@ export default function RefinanceCalculator({
                                 type="number"
                                 value={mortgageBalance}
                                 onChange={(e) => setMortgageBalance(Number(e.target.value))}
-                                className="w-full bg-black border border-white/10 rounded-xl p-3 pl-8 text-white font-black focus:border-orange-600 outline-none transition-all"
+                                className="w-full bg-gray-100 dark:bg-black border border-black/10 dark:border-white/10 rounded-xl p-3 pl-8 text-gray-900 dark:text-white font-black focus:border-orange-600 outline-none transition-all"
                             />
                         </div>
                     </InputGroup>
@@ -65,7 +65,7 @@ export default function RefinanceCalculator({
                         <select
                             value={creditScore}
                             onChange={(e) => setCreditScore(Number(e.target.value))}
-                            className="w-full bg-black border border-white/10 rounded-xl p-3 text-white font-black focus:border-orange-600 outline-none transition-all cursor-pointer appearance-none"
+                            className="w-full bg-gray-100 dark:bg-black border border-black/10 dark:border-white/10 rounded-xl p-3 text-gray-900 dark:text-white font-black focus:border-orange-600 outline-none transition-all cursor-pointer appearance-none"
                         >
                             <option value={780}>EXCELLENT (780+)</option>
                             <option value={720}>GOOD (720-779)</option>
@@ -89,13 +89,13 @@ export default function RefinanceCalculator({
                 {offers.map((offer, index) => (
                     <div
                         key={index}
-                        className="bg-[#0d0d0d] border border-white/5 p-8 rounded-4xl flex flex-col lg:flex-row items-center justify-between group hover:border-orange-600/30 transition-all"
+                        className="bg-gray-50 dark:bg-[#0d0d0d] border border-black/5 dark:border-white/5 p-8 rounded-4xl flex flex-col lg:flex-row items-center justify-between group hover:border-orange-600/30 transition-all"
                     >
                         {/* Lender Info */}
                         <div className="w-full lg:w-1/4 mb-6 lg:mb-0">
                             <div className="flex items-center gap-3 mb-1">
                                 <div className="w-2 h-2 rounded-full bg-orange-600 shadow-[0_0_8px_rgba(234,88,12,0.6)]" />
-                                <h3 className="text-xl font-black text-white uppercase tracking-tighter">
+                                <h3 className="text-xl font-black text-gray-900 dark:text-white uppercase tracking-tighter">
                                     {offer.name}
                                 </h3>
                             </div>
@@ -115,7 +115,7 @@ export default function RefinanceCalculator({
 
                         {/* CTA */}
                         <div className="w-full lg:w-auto mt-8 lg:mt-0">
-                            <button className="w-full lg:w-auto bg-white text-black hover:bg-orange-600 hover:text-white font-black py-4 px-8 rounded-2xl transition-all flex items-center justify-center gap-2 group/btn">
+                            <button className="w-full lg:w-auto bg-black text-white dark:bg-white dark:text-black hover:bg-orange-600 hover:text-white dark:hover:bg-orange-600 dark:hover:text-white font-black py-4 px-8 rounded-2xl transition-all flex items-center justify-center gap-2 group/btn">
                                 LOCK RATE
                                 <ChevronRight size={18} className="group-hover/btn:translate-x-1 transition-transform" />
                             </button>
@@ -128,7 +128,7 @@ export default function RefinanceCalculator({
 }
 
 /* UI Sub-components for cleaner code */
-function InputGroup({ label, children }: { label: string; children: React.ReactNode }) {
+function InputGroup({ label, children }: { label: string; children: React.ReactNode }) {https://gemini.google.com/app/2c05bbca7b3b0ea2
     return (
         <div className="space-y-2">
             <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">
@@ -143,7 +143,7 @@ function Stat({ label, value, sub, highlight }: { label: string; value: string; 
     return (
         <div className="text-left">
             <p className="text-[10px] font-black text-gray-600 uppercase tracking-widest mb-1">{label}</p>
-            <p className={`text-4xl font-black tracking-tighter ${highlight ? 'text-orange-600' : 'text-white'}`}>
+            <p className={`text-4xl font-black tracking-tighter ${highlight ? 'text-orange-600' : 'text-gray-900 dark:text-white'}`}>
                 {value}
                 {sub && <span className="text-xs font-bold text-gray-600 ml-1">{sub}</span>}
             </p>

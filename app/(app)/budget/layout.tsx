@@ -22,17 +22,25 @@ const MobileHeaderTitle = memo(function MobileHeaderTitle() {
 		"/budget/insights": "Insights Explorer",
 	};
 
-	const currentTitle = PAGE_TITLES[pathname] || "Budget Tracker";
+	let currentTitle = "Budget Tracker";
+
+	// Using a standard loop to evaluate the current route
+	const titleKeys = Object.keys(PAGE_TITLES);
+	for (let i = 0; i < titleKeys.length; i++) {
+		if (pathname === titleKeys[i]) {
+			currentTitle = PAGE_TITLES[titleKeys[i]];
+			break;
+		}
+	}
 
 	return (
-		<h1 className="text-white font-semibold text-sm tracking-tight">
+		<h1 className="text-gray-900 dark:text-white font-semibold text-sm tracking-tight">
 			{currentTitle}
 		</h1>
 	);
 });
 
 function ProLayoutShell({ children }: { children: React.ReactNode }) {
-	// Look mom, no usePathname!
 	const [isMobileOpen, setIsMobileOpen] = useState(false);
 
 	// Zustand selectors remain stable
@@ -44,7 +52,7 @@ function ProLayoutShell({ children }: { children: React.ReactNode }) {
 	const closeMobileSidebar = useCallback(() => setIsMobileOpen(false), []);
 
 	return (
-		<div className="flex h-screen overflow-hidden bg-[#F8F9FB] dark:bg-[#0d0d0d]">
+		<div className="flex h-screen overflow-hidden bg-white dark:bg-[#0d0d0d]">
 			{/* 1. Desktop Sidebar */}
 			<div className="hidden lg:flex shrink-0">
 				<ProSidebar />
@@ -55,15 +63,15 @@ function ProLayoutShell({ children }: { children: React.ReactNode }) {
 				<div className="fixed inset-0 z-50 lg:hidden">
 					{/* Background Overlay */}
 					<div
-						className="fixed inset-0 bg-black/80 backdrop-blur-sm transform-gpu"
+						className="fixed inset-0 bg-gray-900/60 dark:bg-black/80 backdrop-blur-sm transform-gpu"
 						onClick={closeMobileSidebar}
 					/>
 					{/* Drawer Content */}
-					<div className="fixed inset-y-0 left-0 w-64 bg-[#F8F9FB] dark:bg-[#0d0d0d] shadow-2xl border-r border-gray-800 animate-in slide-in-from-left duration-300">
+					<div className="fixed inset-y-0 left-0 w-64 bg-gray-50 dark:bg-[#0d0d0d] shadow-2xl border-r border-gray-200 dark:border-gray-800 animate-in slide-in-from-left duration-300">
 						<div className="flex justify-end p-4">
 							<button
 								onClick={closeMobileSidebar}
-								className="text-gray-400 hover:text-white transition-colors"
+								className="text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors"
 							>
 								<X size={24} />
 							</button>
@@ -75,10 +83,10 @@ function ProLayoutShell({ children }: { children: React.ReactNode }) {
 
 			<div className="flex-1 flex flex-col min-w-0">
 				{/* 3. Mobile Header */}
-				<header className="lg:hidden h-16 border-b border-gray-800 flex items-center px-4 justify-between shrink-0 transform-gpu">
+				<header className="lg:hidden h-16 border-b border-gray-200 dark:border-gray-800 flex items-center px-4 justify-between shrink-0 transform-gpu bg-white dark:bg-[#0d0d0d]">
 					<button
 						onClick={() => setIsMobileOpen(true)}
-						className="p-2 text-gray-400 hover:text-white transition-colors"
+						className="p-2 text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors"
 					>
 						<Menu size={24} />
 					</button>
@@ -88,7 +96,9 @@ function ProLayoutShell({ children }: { children: React.ReactNode }) {
 				</header>
 
 				{/* 4. Main Content Area */}
-				<main className="flex-1 overflow-y-auto transform-gpu">{children}</main>
+				<main className="flex-1 overflow-y-auto transform-gpu bg-white dark:bg-transparent text-gray-900 dark:text-white">
+					{children}
+				</main>
 			</div>
 
 			{/* 5. Render Toast */}

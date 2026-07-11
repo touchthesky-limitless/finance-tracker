@@ -61,13 +61,13 @@ export default function LoginPage() {
 						</label>
 						<div className="relative">
 							<Mail
-								className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-600"
+								className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500"
 								size={18}
 							/>
 							<input
 								type="email"
 								required
-								className="w-full bg-white dark:bg-black border border-gray-300 dark:border-gray-800 rounded-xl py-3 pl-12 pr-4 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-600 outline-none focus:ring-2 focus:ring-orange-500/50 dark:focus:border-orange-500/50 transition-all"
+								className="w-full bg-white dark:bg-black border border-gray-300 dark:border-gray-800 rounded-xl py-3 pl-12 pr-4 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-600 outline-none focus:border-orange-500 dark:focus:border-orange-500 focus:ring-1 focus:ring-orange-500 transition-all"
 								placeholder="name@company.com"
 								value={email}
 								onChange={(e) => setEmail(e.target.value)}
@@ -81,13 +81,13 @@ export default function LoginPage() {
 						</label>
 						<div className="relative">
 							<Lock
-								className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-600"
+								className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500"
 								size={18}
 							/>
 							<input
 								type="password"
 								required
-								className="w-full bg-white dark:bg-black border border-gray-300 dark:border-gray-800 rounded-xl py-3 pl-12 pr-4 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-600 outline-none focus:ring-2 focus:ring-orange-500/50 dark:focus:border-orange-500/50 transition-all"
+								className="w-full bg-white dark:bg-black border border-gray-300 dark:border-gray-800 rounded-xl py-3 pl-12 pr-4 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-600 outline-none focus:border-orange-500 dark:focus:border-orange-500 focus:ring-1 focus:ring-orange-500 transition-all"
 								placeholder="••••••••"
 								value={password}
 								onChange={(e) => setPassword(e.target.value)}
@@ -102,7 +102,7 @@ export default function LoginPage() {
 					<button
 						type="submit"
 						disabled={loading}
-						className="w-full bg-orange-600 hover:bg-orange-700 dark:hover:bg-orange-500 text-white font-black py-4 rounded-xl mt-4 flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+						className="w-full bg-orange-600 hover:bg-orange-500 dark:hover:bg-orange-500 text-white font-black py-4 rounded-xl mt-4 flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-orange-600/20"
 					>
 						{loading ? "Processing..." : isLogin ? "Sign In" : "Create Account"}
 						<ArrowRight size={18} />

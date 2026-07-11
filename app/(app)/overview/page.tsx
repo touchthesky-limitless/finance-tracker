@@ -18,7 +18,7 @@ export default async function OverviewPage() {
     const avgPayment = getAverageMortgagePayment(350000, marketRate);
 
     return (
-        <main className="p-8 space-y-10 bg-black min-h-screen text-white">
+        <main className="p-8 space-y-10 bg-white dark:bg-black min-h-screen text-gray-900 dark:text-white">
             <header>
                 <h1 className="text-4xl font-black tracking-tight">Command Center</h1>
                 <p className="text-gray-500 font-medium">Global market pulse & personal wealth.</p>

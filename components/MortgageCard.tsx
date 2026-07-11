@@ -16,29 +16,28 @@ export default function MortgageCard({
   payment,
   date,
 }: MortgageCardProps) {
-  // We'll keep the logic but override the visual output for the "Pro" theme
   const { color } = getTrendProps(change, "liability");
   const isPositive = change > 0;
 
   return (
-    <div className="bg-[#0d0d0d] border border-white/5 rounded-3xl p-8 flex flex-col justify-between h-full hover:border-orange-500/30 transition-all group">
+    <div className="bg-gray-50 dark:bg-[#0d0d0d] border border-black/5 dark:border-white/5 rounded-3xl p-8 flex flex-col justify-between h-full hover:border-orange-500/30 transition-all group">
       <div>
         {/* HEADER */}
         <div className="flex justify-between items-start mb-8">
           <div className="w-12 h-12 rounded-2xl bg-orange-600/10 flex items-center justify-center text-orange-600 group-hover:bg-orange-600 group-hover:text-white transition-all">
             <Home size={22} strokeWidth={2.5} />
           </div>
-          <div className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 bg-white/5 px-3 py-1 rounded-full">
+          <div className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 bg-black/5 dark:bg-white/5 px-3 py-1 rounded-full">
             Market Live
           </div>
         </div>
 
         <div className="space-y-1">
-          <h2 className="text-sm font-black text-gray-400 uppercase tracking-widest">
+          <h2 className="text-sm font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest">
             {program}
           </h2>
           <div className="flex items-baseline gap-2">
-            <span className="text-6xl font-black tracking-tighter text-white">
+            <span className="text-6xl font-black tracking-tighter text-gray-900 dark:text-white">
               {rate?.toFixed(2) ?? "0.00"}
             </span>
             <span className="text-orange-600 font-bold text-2xl"><Percent/></span>
@@ -51,7 +50,7 @@ export default function MortgageCard({
             <span className="text-xs font-bold text-gray-500 uppercase tracking-tight">
               Monthly Est.
             </span>
-            <span className="text-lg font-black text-white">
+            <span className="text-lg font-black text-gray-900 dark:text-white">
               ${payment}
             </span>
           </div>
@@ -68,11 +67,11 @@ export default function MortgageCard({
         </div>
 
         {/* FOOTER */}
-        <div className="mt-6 pt-6 border-t border-white/5 flex justify-between items-center">
-          <span className="text-[10px] font-bold text-gray-600 uppercase tracking-widest">
+        <div className="mt-6 pt-6 border-t border-black/5 dark:border-white/5 flex justify-between items-center">
+          <span className="text-[10px] font-bold text-gray-500 dark:text-gray-600 uppercase tracking-widest">
             Last Updated
           </span>
-          <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+          <span className="text-[10px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest">
             {date || "Today"}
           </span>
         </div>

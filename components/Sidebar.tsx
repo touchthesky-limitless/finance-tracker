@@ -45,7 +45,7 @@ const NavLink = memo(({ href, name, icon, onClick }: NavLinkProps) => {
 			className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold text-sm transition-all duration-75 transform-gpu ${
 				active
 					? "bg-orange-600 text-white shadow-lg shadow-orange-600/20"
-					: "text-gray-500 hover:text-white hover:bg-white/5"
+					: "text-gray-500 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/5"
 			}`}
 		>
 			{icon}
@@ -60,17 +60,32 @@ const Sidebar = memo(function Sidebar() {
 	const toggleMobile = useCallback(() => setIsOpen((prev) => !prev), []);
 	const closeMobile = useCallback(() => setIsOpen(false), []);
 
+	// Explicitly loop through nav links instead of using inline maps
+	const navLinkElements = [];
+	for (let i = 0; i < NAV_LINKS.length; i++) {
+		const link = NAV_LINKS[i];
+		navLinkElements.push(
+			<NavLink
+				key={link.href}
+				href={link.href}
+				name={link.name}
+				icon={link.icon}
+				onClick={closeMobile}
+			/>,
+		);
+	}
+
 	return (
 		<>
 			{/* MOBILE HEADER */}
-			<header className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-[#050505]/80 backdrop-blur-md transform-gpu border-b border-white/5 px-6 flex justify-between items-center z-40">
-				<div className="flex items-center gap-2 font-black text-white tracking-tighter">
+			<header className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-white/80 dark:bg-[#050505]/80 backdrop-blur-md transform-gpu border-b border-gray-200 dark:border-white/5 px-6 flex justify-between items-center z-40">
+				<div className="flex items-center gap-2 font-black text-gray-900 dark:text-white tracking-tighter">
 					<Zap className="text-orange-600 fill-orange-600" size={20} />
 					Budget Pro
 				</div>
 				<button
 					onClick={toggleMobile}
-					className="p-2 text-gray-400 hover:text-white transition-colors"
+					className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
 				>
 					<Menu size={24} />
 				</button>
@@ -79,7 +94,7 @@ const Sidebar = memo(function Sidebar() {
 			{/* OVERLAY */}
 			{isOpen && (
 				<div
-					className="fixed inset-0 bg-black/60 backdrop-blur-sm transform-gpu z-50 lg:hidden"
+					className="fixed inset-0 bg-gray-900/60 dark:bg-black/60 backdrop-blur-sm transform-gpu z-50 lg:hidden"
 					onClick={closeMobile}
 				/>
 			)}
@@ -87,19 +102,19 @@ const Sidebar = memo(function Sidebar() {
 			{/* SIDEBAR DRAWER */}
 			<aside
 				className={`
-                    fixed inset-y-0 left-0 z-60 w-72 bg-[#050505] border-r border-white/5 
+                    fixed inset-y-0 left-0 z-60 w-72 bg-gray-50 dark:bg-[#050505] border-r border-gray-200 dark:border-white/5 
                     flex flex-col transform-gpu transition-transform duration-200 ease-out
                     lg:translate-x-0 lg:static lg:w-64 lg:z-auto
                     ${isOpen ? "translate-x-0" : "-translate-x-full"}
                 `}
 			>
 				<div className="p-8 flex items-center justify-between lg:block">
-					<div className="flex items-center gap-2 font-black text-xl tracking-tighter text-white">
+					<div className="flex items-center gap-2 font-black text-xl tracking-tighter text-gray-900 dark:text-white">
 						<Zap className="text-orange-600 fill-orange-600" size={24} />
 						Budget Pro
 					</div>
 					<button
-						className="lg:hidden text-gray-400 hover:text-white"
+						className="lg:hidden text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
 						onClick={closeMobile}
 					>
 						<X size={24} />
@@ -107,20 +122,11 @@ const Sidebar = memo(function Sidebar() {
 				</div>
 
 				{/* Navigation */}
-				<nav className="flex-1 px-4 space-y-2">
-					{NAV_LINKS.map((link) => (
-						<NavLink
-							key={link.href}
-							{...link}
-							// Notice we no longer pass `active` from the parent
-							onClick={closeMobile}
-						/>
-					))}
-				</nav>
+				<nav className="flex-1 px-4 space-y-2">{navLinkElements}</nav>
 
-				<div className="p-6 border-t border-white/5 space-y-6">
+				<div className="p-6 border-t border-gray-200 dark:border-white/5 space-y-6">
 					<div className="px-2">
-						<p className="text-[10px] uppercase tracking-[0.2em] text-gray-600 font-black mb-4">
+						<p className="text-[10px] uppercase tracking-[0.2em] text-gray-500 dark:text-gray-600 font-black mb-4">
 							Appearance
 						</p>
 						<ThemeToggle />

@@ -15,7 +15,7 @@ import {
 import { useBudgetData } from "@/hooks/useBudgetData";
 
 // ==========================================
-// STATIC HELPERS (Moved outside to prevent re-allocation)
+// STATIC HELPERS
 // ==========================================
 const formatCurrency = (num: number) => {
 	if (isNaN(num) || num === undefined) return "$0.00";
@@ -38,7 +38,11 @@ const formatYAxis = (num: number) => {
 // ==========================================
 const CURRENT_YEAR = new Date().getFullYear();
 const DEFAULT_YEAR_FILTER = `Year ${CURRENT_YEAR}`;
-const YEARS = Array.from({ length: 3 }, (_, i) => CURRENT_YEAR - 2 + i);
+
+const YEARS: number[] = [];
+for (let i = 0; i < 3; i++) {
+	YEARS.push(CURRENT_YEAR - 2 + i);
+}
 
 const TIME_PRESETS = {
 	TODAY: "Today",
@@ -69,18 +73,19 @@ export default function OverviewPage() {
 		return match ? parseInt(match[0]) : CURRENT_YEAR;
 	}, [timeFilter]);
 
-	// --- CALCULATIONS ---
 	const budgetMetrics = useMemo(() => {
-		const remaining =
-			stats.income > 0
-				? Math.min(
-						Math.round((Math.max(stats.remaining, 0) / stats.income) * 100),
-						100,
-					)
-				: 0;
-		const spent =
-			stats.income > 0 ? Math.round((stats.expenses / stats.income) * 100) : 0;
-		return { remaining, spent: Math.min(spent, 100) };
+		let remaining = 0;
+		let spent = 0;
+
+		if (stats.income > 0) {
+			remaining = Math.min(
+				Math.round((Math.max(stats.remaining, 0) / stats.income) * 100),
+				100,
+			);
+			spent = Math.min(Math.round((stats.expenses / stats.income) * 100), 100);
+		}
+
+		return { remaining, spent };
 	}, [stats.income, stats.remaining, stats.expenses]);
 
 	const yAxisLabels = useMemo(() => {
@@ -93,9 +98,176 @@ export default function OverviewPage() {
 		];
 	}, [maxMonthlyValue]);
 
+	// --- RENDER PREPARATION (Standard Loops) ---
+	const yAxisLabelElements = [];
+	for (let i = 0; i < yAxisLabels.length; i++) {
+		yAxisLabelElements.push(<span key={i}>{yAxisLabels[i]}</span>);
+	}
+
+	const chartBarElements = [];
+	for (let i = 0; i < monthlyData.length; i++) {
+		const d = monthlyData[i];
+		const isYearlyView = monthlyData.length <= 12;
+		const isActive = isYearlyView && timeFilter.includes(d.label);
+
+		chartBarElements.push(
+			<div
+				key={i}
+				onClick={() => {
+					if (isYearlyView) {
+						const newFilter = `${d.label} ${activeYear}`;
+						setTimeFilter(newFilter);
+					}
+				}}
+				className={`relative flex-1 transition-all duration-300 group rounded-t-sm
+                    ${isYearlyView ? "cursor-pointer" : "cursor-default"}
+                    ${
+											isActive
+												? "bg-orange-600 shadow-[0_0_15px_rgba(234,88,12,0.3)]"
+												: "bg-orange-100 dark:bg-orange-500/20 hover:bg-orange-400 dark:hover:bg-orange-500/40"
+										}`}
+				style={{ height: `${d.height}%` }}
+			>
+				<div className="absolute -top-9 left-1/2 -translate-x-1/2 bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-[10px] font-bold py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50 pointer-events-none shadow-lg">
+					{isYearlyView ? d.label : `Day ${d.label}`}: {formatCurrency(d.value)}
+				</div>
+				{isActive && (
+					<div className="absolute -bottom-6 left-1/2 -translate-x-1/2 w-1 h-1 bg-orange-600 rounded-full" />
+				)}
+			</div>,
+		);
+	}
+
+	const xAxisLabelElements = [];
+	for (let i = 0; i < monthlyData.length; i++) {
+		const d = monthlyData[i];
+		const isDaily = monthlyData.length > 12;
+		let shouldShowLabel = true;
+
+		if (isDaily) {
+			if (i % 5 !== 0 && i !== monthlyData.length - 1) {
+				shouldShowLabel = false;
+			}
+		}
+
+		xAxisLabelElements.push(
+			<span
+				key={i}
+				className={`flex-1 text-center ${!shouldShowLabel && isDaily ? "invisible" : ""}`}
+			>
+				{d.label}
+			</span>,
+		);
+	}
+
+	const yearToggleElements = [];
+	for (let i = 0; i < YEARS.length; i++) {
+		const year = YEARS[i];
+		yearToggleElements.push(
+			<button
+				key={year}
+				onClick={() => {
+					const newYearFilter = `Year ${year}`;
+					setTimeFilter(newYearFilter);
+				}}
+				className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${
+					activeYear === year
+						? "bg-white dark:bg-[#121212] text-orange-600 dark:text-orange-500 shadow-sm"
+						: "text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+				}`}
+			>
+				{year}
+			</button>,
+		);
+	}
+
+	const topCategoriesElements = [];
+	const catLimit = categoryData.length > 5 ? 5 : categoryData.length;
+	for (let i = 0; i < catLimit; i++) {
+		const cat = categoryData[i];
+		topCategoriesElements.push(
+			<BudgetProgress
+				key={cat.name}
+				icon={cat.icon || Home}
+				name={cat.name}
+				spent={cat.value}
+				limit={cat.value + 200}
+				color={cat.color}
+			/>,
+		);
+	}
+
+	const topMerchantElements = [];
+	const merchLimit = topMerchants.length > 5 ? 5 : topMerchants.length;
+	for (let i = 0; i < merchLimit; i++) {
+		const m = topMerchants[i];
+		topMerchantElements.push(
+			<div
+				key={m.name}
+				className="flex items-start justify-between group gap-4"
+			>
+				<div className="flex items-start gap-3 min-w-0 flex-1">
+					<div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-xs font-bold text-gray-500 group-hover:bg-orange-100 dark:group-hover:bg-orange-500/20 group-hover:text-orange-600 transition-colors shrink-0">
+						{m.name.charAt(0)}
+					</div>
+					<div className="min-w-0 pt-0.5">
+						<p className="text-sm font-bold text-gray-900 dark:text-white truncate leading-none mb-1">
+							{m.name}
+						</p>
+						<p className="text-[10px] text-gray-500 font-medium leading-none">
+							{m.count} transactions
+						</p>
+					</div>
+				</div>
+				<span className="text-sm font-black text-gray-900 dark:text-white whitespace-nowrap">
+					{formatCurrency(m.total)}
+				</span>
+			</div>,
+		);
+	}
+
+	const largestPurchasesElements = [];
+	const purchLimit = largestPurchases.length > 5 ? 5 : largestPurchases.length;
+	for (let i = 0; i < purchLimit; i++) {
+		const t = largestPurchases[i];
+		largestPurchasesElements.push(
+			<div key={i} className="flex flex-col gap-1">
+				<div className="flex justify-between items-center">
+					<span className="text-sm font-bold text-gray-900 dark:text-white truncate max-w-25">
+						{t.merchant}
+					</span>
+					<span className="text-sm font-black text-gray-700 dark:text-gray-400">
+						-{formatCurrency(Math.abs(t.amount))}
+					</span>
+				</div>
+				<span className="text-[10px] text-gray-500 font-medium italic">
+					{new Date(t.date).toLocaleDateString("en-US", {
+						month: "short",
+						day: "numeric",
+					})}
+				</span>
+			</div>,
+		);
+	}
+
+	const predictedBillsElements = [];
+	for (let i = 0; i < predictedBills.length; i++) {
+		const bill = predictedBills[i];
+		predictedBillsElements.push(
+			<ActionRow
+				key={i}
+				day={bill.dueDate.getDate().toString().padStart(2, "0")}
+				month={bill.dueDate.toLocaleDateString("en-US", { month: "short" })}
+				title={bill.merchant}
+				subtitle={`Estimated based on ${bill.frequency} history`}
+				amount={formatCurrency(bill.amount)}
+				status="upcoming"
+			/>,
+		);
+	}
+
 	return (
 		<div className="flex flex-col min-h-screen">
-			{/* Changed z-100 to z-40 and updated colors to match your Pro theme */}
 			<header className="sticky top-0 z-30 w-full bg-white/80 dark:bg-[#050505]/80 backdrop-blur-md transform-gpu border-b border-gray-200/50 dark:border-white/5">
 				<div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 py-6 px-4 md:px-8">
 					<div className="max-w-2xl">
@@ -217,25 +389,10 @@ export default function OverviewPage() {
 									</button>
 								)}
 
-								{/* Year Toggler (Only show if not drilled down) */}
+								{/* Year Toggler */}
 								{monthlyData.length <= 12 && (
-									<div className="flex bg-[#121212]-100 dark:bg-[#121212]-800 p-1 rounded-lg">
-										{YEARS.map((year) => (
-											<button
-												key={year}
-												onClick={() => {
-													const newYearFilter = `Year ${year}`;
-													setTimeFilter(newYearFilter);
-												}}
-												className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${
-													activeYear === year
-														? "bg-white dark:bg-[#121212] text-orange-600 dark:text-orange-500 shadow-sm"
-														: "text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
-												}`}
-											>
-												{year}
-											</button>
-										))}
+									<div className="flex bg-gray-100 dark:bg-[#0d0d0d] p-1 rounded-lg border border-transparent dark:border-white/5">
+										{yearToggleElements}
 									</div>
 								)}
 							</div>
@@ -250,7 +407,6 @@ export default function OverviewPage() {
 									</span>
 								</span>
 								<span className="text-sm text-gray-500 font-medium mt-1">
-									{/* Dynamic Subtitle based on data length */}
 									{monthlyData.length <= 12
 										? `Total spent in ${activeYear}`
 										: `Daily spending for ${timeFilter}`}
@@ -260,9 +416,7 @@ export default function OverviewPage() {
 
 						<div className="flex h-48 w-full mb-2">
 							<div className="flex flex-col justify-between text-[10px] font-bold text-gray-400 text-right pr-3 pb-1 w-10 shrink-0 mt-0.5">
-								{yAxisLabels.map((label, idx) => (
-									<span key={idx}>{label}</span>
-								))}
+								{yAxisLabelElements}
 							</div>
 							<div className="relative flex-1 flex items-end gap-1 sm:gap-2 px-1 border-b border-gray-100 dark:border-gray-800/50">
 								<div className="absolute inset-0 flex flex-col justify-between pointer-events-none pb-1">
@@ -271,74 +425,19 @@ export default function OverviewPage() {
 									<div className="w-full border-t border-gray-100 dark:border-gray-800/30 h-0"></div>
 									<div className="w-full h-0"></div>
 								</div>
-								{monthlyData.map((d, i) => {
-									const isYearlyView = monthlyData.length <= 12;
-									const isActive = isYearlyView && timeFilter.includes(d.label);
-									return (
-										<div
-											key={i}
-											onClick={() => {
-												if (isYearlyView) {
-													const newFilter = `${d.label} ${activeYear}`;
-													setTimeFilter(newFilter);
-												}
-											}}
-											className={`relative flex-1 transition-all duration-300 group rounded-t-sm
-                                ${isYearlyView ? "cursor-pointer" : "cursor-default"}
-                                ${
-																	isActive
-																		? "bg-orange-600 shadow-[0_0_15px_rgba(234,88,12,0.3)]"
-																		: "bg-orange-100 dark:bg-orange-500/20 hover:bg-orange-400 dark:hover:bg-orange-500/40"
-																}`}
-											style={{ height: `${d.height}%` }}
-										>
-											<div className="absolute -top-9 left-1/2 -translate-x-1/2 bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-[10px] font-bold py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50 pointer-events-none shadow-lg">
-												{isYearlyView ? d.label : `Day ${d.label}`}:{" "}
-												{formatCurrency(d.value)}
-											</div>
-											{isActive && (
-												<div className="absolute -bottom-6 left-1/2 -translate-x-1/2 w-1 h-1 bg-orange-600 rounded-full" />
-											)}
-										</div>
-									);
-								})}
+								{chartBarElements}
 							</div>
 						</div>
 						{/* --- X-AXIS LABELS --- */}
 						<div className="flex justify-between text-[10px] sm:text-xs text-gray-400 font-bold tracking-wider pl-12 pr-2 mt-2">
-							{monthlyData.map((d, i) => {
-								const isDaily = monthlyData.length > 12;
-								const shouldShowLabel = isDaily
-									? i % 5 === 0 || i === monthlyData.length - 1
-									: true;
-
-								return (
-									<span
-										key={i}
-										className={`flex-1 text-center ${!shouldShowLabel && isDaily ? "invisible" : ""}`}
-									>
-										{d.label}
-									</span>
-								);
-							})}
+							{xAxisLabelElements}
 						</div>
 					</Card>
 
 					<Card className="xl:col-span-1 flex flex-col" title="Top Budgets">
 						<div className="flex-1 flex flex-col gap-5 mt-4">
 							{categoryData.length > 0 ? (
-								categoryData
-									.slice(0, 5)
-									.map((cat) => (
-										<BudgetProgress
-											key={cat.name}
-											icon={cat.icon || Home}
-											name={cat.name}
-											spent={cat.value}
-											limit={cat.value + 200}
-											color={cat.color}
-										/>
-									))
+								topCategoriesElements
 							) : (
 								<div className="text-sm text-gray-500 italic mt-4 text-center">
 									No transactions found.
@@ -372,56 +471,14 @@ export default function OverviewPage() {
 								<p className="text-[10px] font-black text-gray-400 tracking-widest mb-4">
 									Top Merchants
 								</p>
-								<div className="flex flex-col gap-4">
-									{topMerchants.slice(0, 5).map((m) => (
-										<div
-											key={m.name}
-											className="flex items-start justify-between group gap-4"
-										>
-											<div className="flex items-start gap-3 min-w-0 flex-1">
-												<div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-xs font-bold text-gray-500 group-hover:bg-orange-100 dark:group-hover:bg-orange-500/20 group-hover:text-orange-600 transition-colors shrink-0">
-													{m.name.charAt(0)}
-												</div>
-												<div className="min-w-0 pt-0.5">
-													{" "}
-													<p className="text-sm font-bold text-gray-900 dark:text-white truncate leading-none mb-1">
-														{m.name}
-													</p>
-													<p className="text-[10px] text-gray-500 font-medium leading-none">
-														{m.count} transactions
-													</p>
-												</div>
-											</div>
-											<span className="text-sm font-black text-gray-900 dark:text-white whitespace-nowrap ">
-												{formatCurrency(m.total)}
-											</span>
-										</div>
-									))}
-								</div>
+								<div className="flex flex-col gap-4">{topMerchantElements}</div>
 							</div>
 							<div className="border-l border-gray-100 dark:border-gray-800 pl-8">
 								<p className="text-[10px] font-black text-gray-400 tracking-widest mb-4">
 									Largest Hits
 								</p>
 								<div className="flex flex-col gap-4">
-									{largestPurchases.slice(0, 5).map((t, i) => (
-										<div key={i} className="flex flex-col gap-1">
-											<div className="flex justify-between items-center">
-												<span className="text-sm font-bold text-gray-900 dark:text-white truncate max-w-25">
-													{t.merchant}
-												</span>
-												<span className="text-sm font-black text-white-600 dark:text-white-400">
-													-{formatCurrency(Math.abs(t.amount))}
-												</span>
-											</div>
-											<span className="text-[10px] text-gray-500 font-medium italic">
-												{new Date(t.date).toLocaleDateString("en-US", {
-													month: "short",
-													day: "numeric",
-												})}
-											</span>
-										</div>
-									))}
+									{largestPurchasesElements}
 								</div>
 							</div>
 						</div>
@@ -430,19 +487,7 @@ export default function OverviewPage() {
 					<Card title="Predicted Bills & Subscriptions">
 						<div className="flex flex-col gap-1 mt-4">
 							{predictedBills.length > 0 ? (
-								predictedBills.map((bill, i) => (
-									<ActionRow
-										key={i}
-										day={bill.dueDate.getDate().toString().padStart(2, "0")}
-										month={bill.dueDate.toLocaleDateString("en-US", {
-											month: "short",
-										})}
-										title={bill.merchant}
-										subtitle={`Estimated based on ${bill.frequency} history`}
-										amount={formatCurrency(bill.amount)}
-										status="upcoming"
-									/>
-								))
+								predictedBillsElements
 							) : (
 								<div className="py-12 text-center">
 									<p className="text-sm text-gray-400 italic">
@@ -506,7 +551,6 @@ const DateRangeDropdown = memo(function DateRangeDropdown({
 
 		let filterValue = preset;
 
-		// Add Year context to specific presets to prevent "All Years" filtering
 		if (preset === TIME_PRESETS.TODAY || preset === TIME_PRESETS.THIS_WEEK) {
 			filterValue = `${preset}:${CURRENT_YEAR}`;
 		} else if (preset === TIME_PRESETS.THIS_YEAR) {
@@ -518,7 +562,7 @@ const DateRangeDropdown = memo(function DateRangeDropdown({
 
 	const handleMonthSelect = (month: string) => {
 		setTempMonth(month);
-		setActivePreset(""); // Clear preset highlight because we are being specific
+		setActivePreset("");
 	};
 
 	const handleApply = () => {
@@ -530,6 +574,59 @@ const DateRangeDropdown = memo(function DateRangeDropdown({
 			onApply(filterValue);
 		}
 	};
+
+	const presetElements = [];
+	for (let i = 0; i < presets.length; i++) {
+		const p = presets[i];
+		presetElements.push(
+			<button
+				key={p}
+				onClick={() => handlePresetClick(p)}
+				className={`text-left px-3 py-2 text-xs font-semibold rounded-lg transition-colors
+                    ${activePreset === p ? "bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-400" : "text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-800"}
+                `}
+			>
+				{p}
+			</button>,
+		);
+	}
+
+	const yearOptionsElements = [];
+	for (let i = 0; i < YEARS.length; i++) {
+		const year = YEARS[i];
+		yearOptionsElements.push(
+			<button
+				key={year}
+				onClick={() => {
+					setTempYear(year);
+					setActivePreset("");
+				}}
+				className={`px-2.5 py-1 rounded-md text-[10px] font-black transition-all ${tempYear === year ? "bg-orange-500 text-white shadow-sm" : "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400"}`}
+			>
+				{year}
+			</button>,
+		);
+	}
+
+	const monthGridElements = [];
+	for (let i = 0; i < months.length; i++) {
+		const m = months[i];
+		monthGridElements.push(
+			<button
+				key={m}
+				onClick={() => handleMonthSelect(m)}
+				className={`py-2 rounded-xl text-xs font-semibold transition-all border
+                    ${
+											tempMonth === m
+												? "bg-orange-500 border-orange-500 text-white shadow-md"
+												: "bg-white dark:bg-[#1a1a1a] border-gray-100 dark:border-gray-800 text-gray-700 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600"
+										}
+                `}
+			>
+				{m}
+			</button>,
+		);
+	}
 
 	return (
 		<div className="relative">
@@ -567,17 +664,7 @@ const DateRangeDropdown = memo(function DateRangeDropdown({
 							<p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider px-3 pt-2 pb-1">
 								Presets
 							</p>
-							{presets.map((p) => (
-								<button
-									key={p}
-									onClick={() => handlePresetClick(p)}
-									className={`text-left px-3 py-2 text-xs font-semibold rounded-lg transition-colors
-                                        ${activePreset === p ? "bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-400" : "text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-800"}
-                                    `}
-								>
-									{p}
-								</button>
-							))}
+							{presetElements}
 						</div>
 
 						{/* --- RIGHT: DYNAMIC SELECTOR --- */}
@@ -587,40 +674,11 @@ const DateRangeDropdown = memo(function DateRangeDropdown({
 								<span className="text-[10px] font-bold text-gray-400 uppercase">
 									Custom Year
 								</span>
-								<div className="flex gap-1.5">
-									{YEARS.map((year) => (
-										<button
-											key={year}
-											onClick={() => {
-												setTempYear(year);
-												setActivePreset("");
-											}}
-											className={`px-2.5 py-1 rounded-md text-[10px] font-black transition-all ${tempYear === year ? "bg-orange-500 text-white shadow-sm" : "bg-gray-100 dark:bg-gray-800 text-gray-500"}`}
-										>
-											{year}
-										</button>
-									))}
-								</div>
+								<div className="flex gap-1.5">{yearOptionsElements}</div>
 							</div>
 
 							{/* MONTH GRID */}
-							<div className="grid grid-cols-3 gap-2">
-								{months.map((m) => (
-									<button
-										key={m}
-										onClick={() => handleMonthSelect(m)}
-										className={`py-2 rounded-xl text-xs font-semibold transition-all border
-                                            ${
-																							tempMonth === m
-																								? "bg-orange-500 border-orange-500 text-white shadow-md"
-																								: "bg-white dark:bg-[#1a1a1a] border-gray-100 dark:border-gray-800 text-gray-700 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600"
-																						}
-                                        `}
-									>
-										{m}
-									</button>
-								))}
-							</div>
+							<div className="grid grid-cols-3 gap-2">{monthGridElements}</div>
 
 							<div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-800 flex justify-between items-center">
 								<button
@@ -792,12 +850,11 @@ const BudgetProgress = memo(function BudgetProgress({
 	limit,
 	color,
 }: BudgetProgressProps) {
-	const router = useRouter(); // Initialize router
+	const router = useRouter();
 	const percentage = Math.min((spent / limit) * 100, 100);
 	const isWarning = percentage > 90;
 
 	const handleClick = () => {
-		// Navigate to transactions page with the category in the URL
 		router.push(`/budget/transactions?category=${encodeURIComponent(name)}`);
 	};
 
