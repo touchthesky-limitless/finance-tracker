@@ -36,7 +36,7 @@ export default function WelcomeNotification() {
 					exit={{ y: -20, opacity: 0 }}
 					className="fixed top-20 right-8 z-100 max-w-sm w-full"
 				>
-					<div className="bg-[#0d0d0d]/80 backdrop-blur-xl transform-gpu border border-white/10 rounded-2xl p-4 shadow-[0_20px_50px_rgba(0,0,0,0.5)] flex items-center gap-4 relative overflow-hidden group">
+					<div className="bg-white/90 dark:bg-[#0d0d0d]/80 backdrop-blur-xl transform-gpu border border-gray-200 dark:border-white/10 rounded-2xl p-4 shadow-[0_20px_50px_rgba(0,0,0,0.1)] dark:shadow-[0_20px_50px_rgba(0,0,0,0.5)] flex items-center gap-4 relative overflow-hidden group">
 						{/* Ambient Orange Glow */}
 						<div className="absolute -left-4 -top-4 w-12 h-12 bg-orange-600/20 blur-2xl rounded-full group-hover:bg-orange-600/40 transition-all" />
 
@@ -48,17 +48,17 @@ export default function WelcomeNotification() {
 							<h4 className="text-[10px] font-black text-orange-600 uppercase tracking-[0.2em] mb-0.5">
 								System Auth
 							</h4>
-							<p className="text-sm font-bold text-white tracking-tight">
+							<p className="text-sm font-bold text-gray-900 dark:text-white tracking-tight">
 								Welcome back,{" "}
-								<span className="text-gray-400 font-medium italic">
-									My broke friend
+								<span className="text-gray-500 dark:text-gray-400 font-medium italic">
+									My friend
 								</span>
 							</p>
 						</div>
 
 						<button
 							onClick={() => setShow(false)}
-							className="p-1 hover:bg-white/5 rounded-md text-gray-600 hover:text-white transition-all"
+							className="p-1 hover:bg-gray-200 dark:hover:bg-white/5 rounded-md text-gray-500 dark:text-gray-600 hover:text-gray-900 dark:hover:text-white transition-all"
 						>
 							<X size={16} />
 						</button>
