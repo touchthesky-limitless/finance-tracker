@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { CreditCard, useBudgetStore } from "@/store/useBudgetStore";
-import { CATEGORY_DICTIONARY } from "@/config/categoryDictionary";
+import { CATEGORY_DICTIONARY, CategoryId } from "@/config/categoryDictionary";
 import { Tag } from "lucide-react";
 import { WalletHeader } from "@/components/Wallet/Header";
 import { BentoCard } from "@/components/Wallet/BentoCard";
@@ -54,40 +54,56 @@ export default function WalletRewardsPage() {
 
 	// Derived Data
 	const unifiedCategories = useMemo(() => {
-		const formattedCustom = customCategories.map((c) => ({
-			id: c.id,
-			name: c.name,
-			icon: Tag,
-			accent: c.color_key || "text-emerald-400",
-		}));
-		return [...CATEGORY_DICTIONARY, ...formattedCustom];
+		const categories = [...CATEGORY_DICTIONARY];
+		for (let i = 0; i < customCategories.length; i++) {
+			const c = customCategories[i];
+			categories.push({
+				id: c.id as CategoryId,
+				name: c.name,
+				icon: Tag,
+				accent: c.color_key || "text-emerald-400",
+			});
+		}
+		return categories;
 	}, [customCategories]);
 
 	const { userWallet, availableCards } = useMemo(() => {
 		const user: CreditCard[] = [];
 		const available: CreditCard[] = [];
-		globalCards.forEach((card) =>
-			walletIds.includes(card.id) ? user.push(card) : available.push(card),
-		);
+
+		for (let i = 0; i < globalCards.length; i++) {
+			const card = globalCards[i];
+			if (walletIds.includes(card.id)) {
+				user.push(card);
+			} else {
+				available.push(card);
+			}
+		}
 		return { userWallet: user, availableCards: available };
 	}, [globalCards, walletIds]);
 
 	const getTopCardsForCategory = useCallback(
 		(categoryId: string) => {
-			const rankedCards = userWallet.map((card) => ({
-				card,
-				rate:
-					customRates[categoryId]?.[card.id] ??
-					card.multipliers[categoryId] ??
-					card.multipliers["catchAll"] ??
-					1,
-			}));
+			const rankedCards = [];
+			for (let i = 0; i < userWallet.length; i++) {
+				const card = userWallet[i];
+				rankedCards.push({
+					card,
+					rate:
+						customRates[categoryId]?.[card.id] ??
+						card.multipliers[categoryId] ??
+						card.multipliers["catchAll"] ??
+						1,
+				});
+			}
+
 			rankedCards.sort((a, b) => {
 				const pref = preferredCards[categoryId];
 				if (a.card.id === pref) return -1;
 				if (b.card.id === pref) return 1;
 				return b.rate - a.rate;
 			});
+
 			return {
 				topCard: rankedCards[0] || null,
 				backupCard: rankedCards[1] || null,
@@ -97,12 +113,17 @@ export default function WalletRewardsPage() {
 	);
 
 	const optimizedCategories = useMemo(() => {
-		return unifiedCategories
-			.filter((cat) => activeCategoryIds.includes(cat.id))
-			.map((category) => ({
-				category,
-				...getTopCardsForCategory(category.id),
-			}));
+		const result = [];
+		for (let i = 0; i < unifiedCategories.length; i++) {
+			const category = unifiedCategories[i];
+			if (activeCategoryIds.includes(category.id)) {
+				result.push({
+					category,
+					...getTopCardsForCategory(category.id),
+				});
+			}
+		}
+		return result;
 	}, [activeCategoryIds, unifiedCategories, getTopCardsForCategory]);
 
 	// Handlers
@@ -112,11 +133,16 @@ export default function WalletRewardsPage() {
 	) => {
 		const finalRates = { ...customRates };
 		if (!finalRates[id]) finalRates[id] = {};
-		Object.keys(rates).forEach((cardId) =>
-			rates[cardId] === undefined
-				? delete finalRates[id][cardId]
-				: (finalRates[id][cardId] = rates[cardId]),
-		);
+
+		const cardIds = Object.keys(rates);
+		for (let i = 0; i < cardIds.length; i++) {
+			const cardId = cardIds[i];
+			if (rates[cardId] === undefined) {
+				delete finalRates[id][cardId];
+			} else {
+				finalRates[id][cardId] = rates[cardId] as number;
+			}
+		}
 		setCustomRates(finalRates);
 		setEditingCategory(null);
 	};
@@ -132,10 +158,11 @@ export default function WalletRewardsPage() {
 		return () => window.removeEventListener("keydown", handleKeyDown);
 	}, []);
 
-	if (!hasHydrated) return <div className="min-h-screen bg-[#050505]" />;
+	if (!hasHydrated)
+		return <div className="min-h-screen bg-white dark:bg-[#050505]" />;
 
 	return (
-		<div className="p-8 max-w-7xl mx-auto space-y-12 min-h-screen text-white bg-[#050505] relative">
+		<div className="p-8 max-w-7xl mx-auto space-y-12 min-h-screen text-gray-900 dark:text-white bg-white dark:bg-[#050505] relative transition-colors duration-300">
 			<WalletHeader
 				userWalletCount={userWallet.length}
 				unifiedCategories={unifiedCategories}
