@@ -79,10 +79,12 @@ const Sidebar = memo(function Sidebar() {
 		<>
 			{/* MOBILE HEADER */}
 			<header className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-white/80 dark:bg-[#050505]/80 backdrop-blur-md transform-gpu border-b border-gray-200 dark:border-white/5 px-6 flex justify-between items-center z-40">
-				<div className="flex items-center gap-2 font-black text-gray-900 dark:text-white tracking-tighter">
-					<Zap className="text-orange-600 fill-orange-600" size={20} />
-					Budget Pro
-				</div>
+				<Link href="/overview">
+					<div className="flex items-center gap-2 font-black text-gray-900 dark:text-white tracking-tighter cursor-pointer transition-opacity hover:opacity-80">
+						<Zap className="text-orange-600 fill-orange-600" size={20} />
+						Budget Pro
+					</div>
+				</Link>
 				<button
 					type="button"
 					aria-label="Menu"
@@ -111,10 +113,12 @@ const Sidebar = memo(function Sidebar() {
                 `}
 			>
 				<div className="p-8 flex items-center justify-between lg:block">
-					<div className="flex items-center gap-2 font-black text-xl tracking-tighter text-gray-900 dark:text-white">
-						<Zap className="text-orange-600 fill-orange-600" size={24} />
-						Budget Pro
-					</div>
+					<Link href="/overview">
+						<div className="flex items-center gap-2 font-black text-gray-900 dark:text-white tracking-tighter cursor-pointer transition-opacity hover:opacity-80">
+							<Zap className="text-orange-600 fill-orange-600" size={20} />
+							Budget Pro
+						</div>
+					</Link>
 					<button
 						type="button"
 						aria-label="Close"

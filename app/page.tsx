@@ -8,10 +8,12 @@ export default function LandingPage() {
 		<div className="min-h-screen bg-white dark:bg-black text-gray-900 dark:text-white selection:bg-orange-500/30 transition-colors duration-300">
 			{/* Hero Section */}
 			<nav className="flex justify-between items-center p-6 max-w-7xl mx-auto">
-				<div className="flex items-center gap-2 font-black text-xl tracking-tighter">
-					<Zap className="text-orange-600 fill-orange-600" size={24} />
-					BUDGET PRO
-				</div>
+				<Link href="/overview">
+					<div className="flex items-center gap-2 font-black text-xl tracking-tighter cursor-pointer transition-opacity hover:opacity-80">
+						<Zap className="text-orange-600 fill-orange-600" size={24} />
+						BUDGET PRO
+					</div>
+				</Link>
 				<Link
 					href="/login"
 					className="px-5 py-2 rounded-full border border-gray-200 dark:border-white/10 hover:bg-gray-100 dark:hover:bg-white/5 transition-all text-sm font-bold"
@@ -19,7 +21,6 @@ export default function LandingPage() {
 					Sign In
 				</Link>
 			</nav>
-
 			<main className="max-w-4xl mx-auto pt-24 px-6 text-center">
 				<h1 className="text-6xl md:text-8xl font-black tracking-tight mb-6 bg-linear-to-b from-gray-900 dark:from-white to-gray-500 bg-clip-text text-transparent">
 					Wealth tracking <br /> for the 1%.
