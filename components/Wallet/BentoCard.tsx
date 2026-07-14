@@ -1,7 +1,7 @@
 import { CheckCircle2 } from "lucide-react";
 import Image from "next/image";
 import { OptimizedCategory } from "@/types/wallet";
-import { CardActionsMenu } from "@/components/Wallet/CardActionMenu";
+import { CardActionsMenu } from "@/components/Wallet/CardActionsMenu";
 
 interface Props {
 	item: OptimizedCategory;
