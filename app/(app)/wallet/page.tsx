@@ -263,29 +263,31 @@ export default function WalletRewardsPage() {
 				onOpenWallet={() => setIsWalletManagerOpen(true)}
 				onAddCategory={(id) => addActiveCategory(id)}
 			/>
-			<div className="flex items-center gap-1 bg-gray-100 dark:bg-[#0a0a0a] p-1 rounded-xl w-fit mb-4 md:mb-8 border border-gray-200 dark:border-white/5">
-				<button
-					type="button"
-					onClick={() => setViewMode("grid")}
-					className={`p-2 rounded-lg flex items-center gap-2 text-xs font-bold transition-all ${
-						viewMode === "grid"
-							? "bg-white dark:bg-[#1a1a1a] text-gray-900 dark:text-white shadow-xs"
-							: "text-gray-500 hover:text-gray-900 dark:hover:text-white"
-					}`}
-				>
-					<LayoutGrid size={16} />
-				</button>
-				<button
-					type="button"
-					onClick={() => setViewMode("stack")}
-					className={`p-2 rounded-lg flex items-center gap-2 text-xs font-bold transition-all ${
-						viewMode === "stack"
-							? "bg-white dark:bg-[#1a1a1a] text-gray-900 dark:text-white shadow-xs"
-							: "text-gray-500 hover:text-gray-900 dark:hover:text-white"
-					}`}
-				>
-					<Layers size={16} />
-				</button>
+			<div className="flex w-full justify-end">
+				<div className="flex items-center gap-1 bg-gray-100 dark:bg-[#0a0a0a] p-1 rounded-xl w-fit mb-4 md:mb-8 border border-gray-200 dark:border-white/5">
+					<button
+						type="button"
+						onClick={() => setViewMode("grid")}
+						className={`p-2 rounded-lg flex items-center gap-2 text-xs font-bold transition-all ${
+							viewMode === "grid"
+								? "bg-white dark:bg-[#1a1a1a] text-gray-900 dark:text-white shadow-xs"
+								: "text-gray-500 hover:text-gray-900 dark:hover:text-white"
+						}`}
+					>
+						<LayoutGrid size={16} />
+					</button>
+					<button
+						type="button"
+						onClick={() => setViewMode("stack")}
+						className={`p-2 rounded-lg flex items-center gap-2 text-xs font-bold transition-all ${
+							viewMode === "stack"
+								? "bg-white dark:bg-[#1a1a1a] text-gray-900 dark:text-white shadow-xs"
+								: "text-gray-500 hover:text-gray-900 dark:hover:text-white"
+						}`}
+					>
+						<Layers size={16} />
+					</button>
+				</div>
 			</div>
 
 			<DndContext

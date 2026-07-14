@@ -18,19 +18,37 @@ import { useBudgetData } from "@/hooks/useBudgetData";
 // STATIC HELPERS
 // ==========================================
 const formatCurrency = (num: number) => {
-	if (isNaN(num) || num === undefined) return "$0.00";
-	return `$${num.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+	if (isNaN(num) || num === undefined) {
+		return "$0.00";
+	}
+	const sign = num < 0 ? "-" : "";
+	const absNum = Math.abs(num);
+	return `${sign}$${absNum.toLocaleString("en-US", {
+		minimumFractionDigits: 2,
+		maximumFractionDigits: 2,
+	})}`;
 };
 
 const formatCompact = (num: number) => {
-	if (isNaN(num) || num === undefined) return "$0k";
-	return `$${(num / 1000).toFixed(1)}k`;
+	if (isNaN(num) || num === undefined) {
+		return "$0k";
+	}
+	const sign = num < 0 ? "-" : "";
+	const absNum = Math.abs(num);
+	return `${sign}$${(absNum / 1000).toFixed(1)}k`;
 };
 
 const formatYAxis = (num: number) => {
-	if (num === 0) return "0";
-	if (num >= 1000) return `$${Math.round(num / 1000)}k`;
-	return `$${Math.round(num)}`;
+	if (num === 0) {
+		return "0";
+	}
+	const sign = num < 0 ? "-" : "";
+	const absNum = Math.abs(num);
+
+	if (absNum >= 1000) {
+		return `${sign}$${Math.round(absNum / 1000)}k`;
+	}
+	return `${sign}$${Math.round(absNum)}`;
 };
 
 // ==========================================
@@ -70,7 +88,10 @@ export default function OverviewPage() {
 	// --- MEMOIZED CALCULATIONS ---
 	const activeYear = useMemo(() => {
 		const match = timeFilter.match(/\d{4}/);
-		return match ? parseInt(match[0]) : CURRENT_YEAR;
+		if (match) {
+			return parseInt(match[0]);
+		}
+		return CURRENT_YEAR;
 	}, [timeFilter]);
 
 	const budgetMetrics = useMemo(() => {
@@ -98,7 +119,7 @@ export default function OverviewPage() {
 		];
 	}, [maxMonthlyValue]);
 
-	// --- RENDER PREPARATION (Standard Loops) ---
+	// --- RENDER PREPARATION ---
 	const yAxisLabelElements = [];
 	for (let i = 0; i < yAxisLabels.length; i++) {
 		yAxisLabelElements.push(<span key={i}>{yAxisLabels[i]}</span>);
@@ -182,7 +203,10 @@ export default function OverviewPage() {
 	}
 
 	const topCategoriesElements = [];
-	const catLimit = categoryData.length > 5 ? 5 : categoryData.length;
+	let catLimit = categoryData.length;
+	if (catLimit > 5) {
+		catLimit = 5;
+	}
 	for (let i = 0; i < catLimit; i++) {
 		const cat = categoryData[i];
 		topCategoriesElements.push(
@@ -198,7 +222,10 @@ export default function OverviewPage() {
 	}
 
 	const topMerchantElements = [];
-	const merchLimit = topMerchants.length > 5 ? 5 : topMerchants.length;
+	let merchLimit = topMerchants.length;
+	if (merchLimit > 5) {
+		merchLimit = 5;
+	}
 	for (let i = 0; i < merchLimit; i++) {
 		const m = topMerchants[i];
 		topMerchantElements.push(
@@ -219,7 +246,7 @@ export default function OverviewPage() {
 						</p>
 					</div>
 				</div>
-				<span className="text-sm font-black text-gray-900 dark:text-white whitespace-nowrap">
+				<span className="text-sm md:text-base font-black text-gray-900 dark:text-white whitespace-nowrap shrink-0">
 					{formatCurrency(m.total)}
 				</span>
 			</div>,
@@ -227,17 +254,22 @@ export default function OverviewPage() {
 	}
 
 	const largestPurchasesElements = [];
-	const purchLimit = largestPurchases.length > 5 ? 5 : largestPurchases.length;
+	let purchLimit = largestPurchases.length;
+	if (purchLimit > 5) {
+		purchLimit = 5;
+	}
 	for (let i = 0; i < purchLimit; i++) {
 		const t = largestPurchases[i];
+		const amountVal = -Math.abs(t.amount);
+
 		largestPurchasesElements.push(
 			<div key={i} className="flex flex-col gap-1">
-				<div className="flex justify-between items-center">
-					<span className="text-sm font-bold text-gray-900 dark:text-white truncate max-w-25">
+				<div className="flex justify-between items-center gap-2">
+					<span className="text-sm font-bold text-gray-900 dark:text-white truncate">
 						{t.merchant}
 					</span>
-					<span className="text-sm font-black text-gray-700 dark:text-gray-400">
-						-{formatCurrency(Math.abs(t.amount))}
+					<span className="text-sm font-black text-gray-700 dark:text-gray-400 shrink-0">
+						{formatCurrency(amountVal)}
 					</span>
 				</div>
 				<span className="text-[10px] text-gray-500 font-medium italic">
@@ -286,7 +318,10 @@ export default function OverviewPage() {
 					<div className="flex flex-wrap items-center gap-3 shrink-0">
 						<DateRangeDropdown
 							onApply={(val) => {
-								const selectedDate = val || FALL_BACK_DATE;
+								let selectedDate = val;
+								if (!selectedDate) {
+									selectedDate = FALL_BACK_DATE;
+								}
 								setTimeFilter(selectedDate);
 							}}
 						/>
@@ -298,10 +333,11 @@ export default function OverviewPage() {
 				</div>
 			</header>
 
-			<main className="flex-1 max-w-400 w-full mx-auto px-4 md:px-8 py-8 pb-24">
+			<main className="flex-1 w-full max-w-[1600px] mx-auto px-4 md:px-8 py-8 pb-24">
 				{/* --- TOP ROW: Hero Summary --- */}
-				<div className="bg-white dark:bg-[#121212] border border-gray-100 dark:border-gray-800/80 rounded-3xl p-6 shadow-sm mb-6 flex flex-col lg:flex-row items-center gap-8 relative z-10">
-					<div className="flex items-center gap-6 w-full lg:w-[35%] lg:border-r border-gray-100 dark:border-gray-800 lg:pr-8 shrink-0">
+				<div className="bg-white dark:bg-[#121212] border border-gray-100 dark:border-gray-800/80 rounded-3xl p-6 shadow-sm mb-6 flex flex-col xl:flex-row items-center gap-8 relative z-10">
+					{/* Left Side (Donut Chart) */}
+					<div className="flex items-center justify-center sm:justify-start gap-6 w-full xl:w-[35%] xl:border-r border-gray-100 dark:border-gray-800 xl:pr-8 shrink-0">
 						<div
 							className="relative w-28 h-28 shrink-0 rounded-full flex items-center justify-center drop-shadow-sm"
 							style={{
@@ -317,7 +353,7 @@ export default function OverviewPage() {
 								</span>
 							</div>
 						</div>
-						<div className="flex flex-col gap-3 w-full">
+						<div className="flex flex-col gap-3 w-full min-w-0">
 							<DonutLegend
 								color="bg-green-500"
 								label="Remaining"
@@ -339,7 +375,8 @@ export default function OverviewPage() {
 						</div>
 					</div>
 
-					<div className="w-full lg:w-[65%] grid grid-cols-1 sm:grid-cols-3 gap-6 lg:gap-8">
+					{/* Right Side (Sparklines) */}
+					<div className="w-full xl:w-[65%] grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6 xl:gap-8">
 						<SparklineStat
 							title="Total Spent"
 							amount={formatCurrency(stats.expenses)}
@@ -350,7 +387,7 @@ export default function OverviewPage() {
 						/>
 						<SparklineStat
 							title="Total Debt"
-							amount="$12,340"
+							amount="$12,340.00"
 							trend="+0.8%"
 							isPositive={false}
 							sparklineColor="#f59e0b"
@@ -358,7 +395,7 @@ export default function OverviewPage() {
 						/>
 						<SparklineStat
 							title="Net Worth"
-							amount="$142,500"
+							amount="$142,500.00"
 							trend="+2.4%"
 							isPositive={true}
 							sparklineColor="#10b981"
@@ -375,7 +412,6 @@ export default function OverviewPage() {
 						title="Spending Trends"
 						action={
 							<div className="flex items-center gap-3">
-								{/* Reset / Drill-up Button */}
 								{monthlyData.length > 12 && (
 									<button
 										onClick={() => {
@@ -389,7 +425,6 @@ export default function OverviewPage() {
 									</button>
 								)}
 
-								{/* Year Toggler */}
 								{monthlyData.length <= 12 && (
 									<div className="flex bg-gray-100 dark:bg-[#0d0d0d] p-1 rounded-lg border border-transparent dark:border-white/5">
 										{yearToggleElements}
@@ -399,14 +434,14 @@ export default function OverviewPage() {
 						}
 					>
 						<div className="flex items-center justify-between mt-4 mb-8">
-							<div className="flex flex-col">
-								<span className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white tracking-tight">
+							<div className="flex flex-col overflow-hidden">
+								<span className="text-3xl md:text-4xl xl:text-5xl font-bold text-gray-900 dark:text-white tracking-tight truncate">
 									{formatCurrency(stats.expenses).split(".")[0]}
-									<span className="text-gray-400 text-2xl">
+									<span className="text-gray-400 text-xl md:text-2xl xl:text-3xl">
 										.{formatCurrency(stats.expenses).split(".")[1]}
 									</span>
 								</span>
-								<span className="text-sm text-gray-500 font-medium mt-1">
+								<span className="text-sm text-gray-500 font-medium mt-1 truncate">
 									{monthlyData.length <= 12
 										? `Total spent in ${activeYear}`
 										: `Daily spending for ${timeFilter}`}
@@ -466,14 +501,14 @@ export default function OverviewPage() {
 				{/* --- BOTTOM ROW: SPENDING INTELLIGENCE --- */}
 				<div className="grid grid-cols-1 xl:grid-cols-2 gap-6 relative z-10">
 					<Card title="Merchant Insights">
-						<div className="grid grid-cols-1 sm:grid-cols-2 gap-8 mt-4">
-							<div>
+						<div className="grid grid-cols-1 xl:grid-cols-2 gap-8 mt-4">
+							<div className="min-w-0">
 								<p className="text-[10px] font-black text-gray-400 tracking-widest mb-4">
 									Top Merchants
 								</p>
 								<div className="flex flex-col gap-4">{topMerchantElements}</div>
 							</div>
-							<div className="border-l border-gray-100 dark:border-gray-800 pl-8">
+							<div className="pt-8 xl:pt-0 border-t xl:border-t-0 xl:border-l border-gray-100 dark:border-gray-800 xl:pl-8 min-w-0">
 								<p className="text-[10px] font-black text-gray-400 tracking-widest mb-4">
 									Largest Hits
 								</p>
@@ -509,7 +544,6 @@ export default function OverviewPage() {
 // ==========================================
 // DATE RANGE DROPDOWN COMPONENT
 // ==========================================
-
 interface DateRangeDropdownProps {
 	compact?: boolean;
 	onApply?: (month: string | null) => void;
@@ -521,7 +555,6 @@ const DateRangeDropdown = memo(function DateRangeDropdown({
 }: DateRangeDropdownProps) {
 	const [isOpen, setIsOpen] = useState(false);
 
-	// Track both Month and Year locally until "Apply" is clicked
 	const [tempYear, setTempYear] = useState<number>(CURRENT_YEAR);
 	const [tempMonth, setTempMonth] = useState<string | null>(null);
 	const [activePreset, setActivePreset] = useState<string>(
@@ -557,7 +590,9 @@ const DateRangeDropdown = memo(function DateRangeDropdown({
 			filterValue = DEFAULT_YEAR_FILTER;
 		}
 
-		if (onApply) onApply(filterValue);
+		if (onApply) {
+			onApply(filterValue);
+		}
 	};
 
 	const handleMonthSelect = (month: string) => {
@@ -658,7 +693,7 @@ const DateRangeDropdown = memo(function DateRangeDropdown({
 						className="fixed inset-0 z-40"
 						onClick={() => setIsOpen(false)}
 					/>
-					<div className="absolute right-0 mt-2 w-[320px] sm:w-120 bg-white dark:bg-[#121212] border border-gray-200 dark:border-gray-800 rounded-2xl shadow-2xl z-50 flex flex-col sm:flex-row overflow-hidden animate-in fade-in slide-in-from-top-2">
+					<div className="absolute right-0 mt-2 w-80 bg-white dark:bg-[#121212] border border-gray-200 dark:border-gray-800 rounded-2xl shadow-2xl z-50 flex flex-col sm:flex-row overflow-hidden animate-in fade-in slide-in-from-top-2">
 						{/* --- LEFT: PRESETS --- */}
 						<div className="w-full sm:w-1/3 bg-gray-50 dark:bg-[#0d0d0d] border-b sm:border-b-0 sm:border-r border-gray-200 dark:border-gray-800 p-2 flex flex-col gap-1">
 							<p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider px-3 pt-2 pb-1">
@@ -669,15 +704,12 @@ const DateRangeDropdown = memo(function DateRangeDropdown({
 
 						{/* --- RIGHT: DYNAMIC SELECTOR --- */}
 						<div className="w-full sm:w-2/3 p-4">
-							{/* YEAR PICKER */}
 							<div className="flex items-center justify-between mb-4 border-b border-gray-100 dark:border-gray-800 pb-3">
 								<span className="text-[10px] font-bold text-gray-400 uppercase">
 									Custom Year
 								</span>
 								<div className="flex gap-1.5">{yearOptionsElements}</div>
 							</div>
-
-							{/* MONTH GRID */}
 							<div className="grid grid-cols-3 gap-2">{monthGridElements}</div>
 
 							<div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-800 flex justify-between items-center">
@@ -708,7 +740,6 @@ const DateRangeDropdown = memo(function DateRangeDropdown({
 // ==========================================
 // TYPED SUB-COMPONENTS
 // ==========================================
-
 interface CardProps {
 	title: string;
 	children: ReactNode;
@@ -724,18 +755,18 @@ const Card = memo(function Card({
 }: CardProps) {
 	return (
 		<div
-			className={`bg-white dark:bg-[#121212] border border-gray-100 dark:border-gray-800/80 rounded-3xl p-6 shadow-sm ${className}`}
+			className={`bg-white dark:bg-[#121212] border border-gray-100 dark:border-gray-800/80 rounded-3xl p-6 shadow-sm min-w-0 ${className}`}
 		>
 			<div className="flex items-center justify-between mb-2">
-				<div className="flex items-center gap-2 text-gray-900 dark:text-white font-bold">
-					<span className="w-1 h-4 bg-orange-500 rounded-full"></span>
-					{title}
+				<div className="flex items-center gap-2 text-gray-900 dark:text-white font-bold truncate">
+					<span className="w-1 h-4 bg-orange-500 rounded-full shrink-0"></span>
+					<span className="truncate">{title}</span>
 				</div>
 				{action || (
 					<button
 						type="button"
 						aria-label="More"
-						className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors p-1 border border-gray-100 dark:border-gray-800 rounded-full"
+						className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors p-1 border border-gray-100 dark:border-gray-800 rounded-full shrink-0"
 					>
 						<MoreHorizontal size={16} />
 					</button>
@@ -760,17 +791,19 @@ const DonutLegend = memo(function DonutLegend({
 	amount,
 }: DonutLegendProps) {
 	return (
-		<div className="flex items-center justify-between text-sm">
-			<div className="flex items-center gap-2">
-				<div className={`w-2.5 h-2.5 rounded-full ${color}`}></div>
-				<span className="text-gray-500 dark:text-gray-400 font-medium">
+		<div className="flex items-center justify-between text-sm gap-2">
+			<div className="flex items-center gap-2 truncate">
+				<div className={`w-2.5 h-2.5 rounded-full shrink-0 ${color}`}></div>
+				<span className="text-gray-500 dark:text-gray-400 font-medium truncate">
 					{label}
 				</span>
-				<span className="text-[10px] font-bold text-gray-400 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">
+				<span className="text-[10px] font-bold text-gray-400 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded shrink-0">
 					{value}
 				</span>
 			</div>
-			<span className="font-bold text-gray-900 dark:text-white">{amount}</span>
+			<span className="font-bold text-gray-900 dark:text-white shrink-0">
+				{amount}
+			</span>
 		</div>
 	);
 });
@@ -795,13 +828,13 @@ const SparklineStat = memo(function SparklineStat({
 	const gradId = `grad-${title.replace(/\s/g, "")}`;
 
 	return (
-		<div className="flex flex-col">
-			<div className="flex justify-between items-start mb-1">
-				<p className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+		<div className="flex flex-col min-w-0">
+			<div className="flex justify-between items-start mb-1 gap-2">
+				<p className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider truncate">
 					{title}
 				</p>
 				<span
-					className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+					className={`text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0 ${
 						isPositive
 							? "bg-green-50 text-green-700 dark:bg-green-500/10 dark:text-green-400"
 							: "bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-400"
@@ -810,13 +843,13 @@ const SparklineStat = memo(function SparklineStat({
 					{trend}
 				</span>
 			</div>
-			<h3 className="text-2xl font-black text-gray-900 dark:text-white">
+			<h3 className="text-2xl md:text-3xl font-black text-gray-900 dark:text-white truncate">
 				{amount}
 			</h3>
 
 			<svg
 				viewBox="0 0 100 30"
-				className="w-full h-8 mt-3"
+				className="w-full h-8 mt-3 shrink-0"
 				preserveAspectRatio="none"
 			>
 				<defs>
@@ -855,7 +888,11 @@ const BudgetProgress = memo(function BudgetProgress({
 	color,
 }: BudgetProgressProps) {
 	const router = useRouter();
-	const percentage = Math.min((spent / limit) * 100, 100);
+
+	let percentage = 0;
+	if (limit > 0) {
+		percentage = Math.min((spent / limit) * 100, 100);
+	}
 	const isWarning = percentage > 90;
 
 	const handleClick = () => {
@@ -867,24 +904,24 @@ const BudgetProgress = memo(function BudgetProgress({
 			onClick={handleClick}
 			className="group cursor-pointer p-2 -m-2 rounded-xl hover:bg-gray-50 dark:hover:bg-white/5 transition-all active:scale-[0.98]"
 		>
-			<div className="flex justify-between items-center mb-2">
-				<div className="flex items-center gap-2">
+			<div className="flex justify-between items-center mb-2 gap-2">
+				<div className="flex items-center gap-2 truncate">
 					<div
-						className={`p-1.5 rounded-md text-white shadow-sm transition-transform group-hover:scale-110 ${color}`}
+						className={`p-1.5 rounded-md text-white shadow-sm transition-transform group-hover:scale-110 shrink-0 ${color}`}
 					>
 						<Icon size={12} />
 					</div>
-					<span className="text-sm font-black text-gray-900 dark:text-white group-hover:text-orange-500 transition-colors">
+					<span className="text-sm font-black text-gray-900 dark:text-white group-hover:text-orange-500 transition-colors truncate">
 						{name}
 					</span>
 				</div>
-				<div className="text-xs">
+				<div className="text-xs shrink-0">
 					<span className="font-mono tabular-nums font-bold text-gray-900 dark:text-white">
-						${spent}
+						{formatCurrency(spent)}
 					</span>
 					<span className="font-mono tabular-nums text-gray-400 font-medium">
 						{" "}
-						/ ${Number(limit.toFixed(2))}
+						/ {formatCurrency(limit)}
 					</span>
 				</div>
 			</div>
@@ -916,10 +953,10 @@ const ActionRow = memo(function ActionRow({
 	status,
 }: ActionRowProps) {
 	return (
-		<div className="flex items-center justify-between p-3 hover:bg-gray-50 dark:hover:bg-[#1a1a1a] rounded-xl cursor-pointer group transition-colors">
-			<div className="flex items-center gap-4">
+		<div className="flex items-center justify-between p-3 hover:bg-gray-50 dark:hover:bg-[#1a1a1a] rounded-xl cursor-pointer group transition-colors gap-2">
+			<div className="flex items-center gap-4 min-w-0">
 				<div
-					className={`flex flex-col items-center justify-center w-12 h-12 rounded-xl border ${status === "alert" ? "bg-red-50 border-red-100 dark:bg-red-500/10 dark:border-red-500/20 text-red-600" : "bg-white border-gray-200 dark:bg-[#121212] dark:border-gray-800 text-gray-900 dark:text-white"}`}
+					className={`flex flex-col items-center justify-center w-12 h-12 rounded-xl border shrink-0 ${status === "alert" ? "bg-red-50 border-red-100 dark:bg-red-500/10 dark:border-red-500/20 text-red-600" : "bg-white border-gray-200 dark:bg-[#121212] dark:border-gray-800 text-gray-900 dark:text-white"}`}
 				>
 					{status === "alert" ? (
 						<AlertCircle size={20} />
@@ -932,15 +969,17 @@ const ActionRow = memo(function ActionRow({
 						</>
 					)}
 				</div>
-				<div>
-					<h4 className="text-sm font-bold text-gray-900 dark:text-white group-hover:text-orange-500 transition-colors">
+				<div className="truncate">
+					<h4 className="text-sm font-bold text-gray-900 dark:text-white group-hover:text-orange-500 transition-colors truncate">
 						{title}
 					</h4>
-					<p className="text-xs text-gray-500 font-medium mt-0.5">{subtitle}</p>
+					<p className="text-xs text-gray-500 font-medium mt-0.5 truncate">
+						{subtitle}
+					</p>
 				</div>
 			</div>
 			<div
-				className={`text-sm font-bold ${status === "alert" ? "text-orange-500" : "text-gray-900 dark:text-white"}`}
+				className={`text-sm md:text-base font-bold shrink-0 ${status === "alert" ? "text-orange-500" : "text-gray-900 dark:text-white"}`}
 			>
 				{amount}
 			</div>
