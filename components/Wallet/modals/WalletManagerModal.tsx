@@ -163,6 +163,7 @@ export function WalletManagerModal({
 								alt={card.name}
 								width={40}
 								height={24}
+								loading="lazy"
 								className="w-10 h-6 rounded shadow-sm object-cover border border-gray-200 dark:border-white/20 shrink-0"
 							/>
 						) : (
@@ -270,6 +271,7 @@ export function WalletManagerModal({
 								alt={card.name}
 								width={28}
 								height={18}
+								loading="lazy"
 								className="w-7 h-4 rounded shadow-sm object-cover opacity-50"
 							/>
 						) : (

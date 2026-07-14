@@ -85,6 +85,7 @@ export function EditRatesModal({
 							alt={card.name}
 							width={40}
 							height={24}
+							loading="lazy"
 							className="w-8 h-5 rounded shadow-sm object-cover border border-gray-200 dark:border-white/20"
 						/>
 					) : (

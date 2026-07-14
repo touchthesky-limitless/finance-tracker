@@ -119,6 +119,7 @@ export function QuickSearchModal({
 								alt={item.topCard.card.name}
 								width={48}
 								height={30}
+								loading="lazy"
 								className="rounded shadow-sm object-cover border border-gray-200 dark:border-white/20"
 							/>
 						) : (
