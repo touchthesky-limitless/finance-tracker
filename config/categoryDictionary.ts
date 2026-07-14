@@ -74,7 +74,7 @@ export const CATEGORY_DICTIONARY: CategoryDictItem[] = [
 		id: "ads",
 		name: "Advertising",
 		icon: Megaphone,
-		accent: "text-red-500",
+		accent: "text-yellow-500",
 	},
 	{
 		id: "alaska",
@@ -92,13 +92,13 @@ export const CATEGORY_DICTIONARY: CategoryDictItem[] = [
 		id: "cable",
 		name: "Cable",
 		icon: Tv,
-		accent: "text-purple-400",
+		accent: "text-green-400",
 	},
 	{
 		id: "cap1Flights",
 		name: "Capital One Flights",
 		icon: Plane,
-		accent: "text-blue-500",
+		accent: "text-yellow-500",
 	},
 	{
 		id: "cap1Hotels",
@@ -206,7 +206,7 @@ export const CATEGORY_DICTIONARY: CategoryDictItem[] = [
 		id: "rentals",
 		name: "Rentals",
 		icon: Key,
-		accent: "text-yellow-500",
+		accent: "text-cyan-500",
 	},
 	{
 		id: "shipping",
@@ -224,13 +224,13 @@ export const CATEGORY_DICTIONARY: CategoryDictItem[] = [
 		id: "transit",
 		name: "Transit",
 		icon: Car,
-		accent: "text-pink-400",
+		accent: "text-purple-400",
 	},
 	{
 		id: "transportation",
 		name: "Transportation",
 		icon: Train,
-		accent: "text-orange-400",
+		accent: "text-pink-400",
 	},
 	{
 		id: "travel",

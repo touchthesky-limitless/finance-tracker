@@ -1,12 +1,7 @@
-import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import {
-	EllipsisVertical,
-	SquarePen,
-	Trash2,
-	CheckCircle2,
-} from "lucide-react";
+import { CheckCircle2 } from "lucide-react";
 import Image from "next/image";
 import { OptimizedCategory } from "@/types/wallet";
+import { CardActionsMenu } from "@/components/Wallet/CardActionMenu";
 
 interface Props {
 	item: OptimizedCategory;
@@ -28,41 +23,15 @@ export function BentoCard({
 
 	return (
 		<div
-			className={`bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-white/5 rounded-3xl p-6 relative overflow-hidden group flex flex-col min-h-37.5 hover:border-gray-300 dark:hover:border-white/10 transition-all ${isHidden ? "h-20 opacity-50" : ""}`}
+			className={`bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-white/5 rounded-3xl p-6 relative overflow-hidden group flex flex-col min-h-37.5 hover:border-gray-300 dark:hover:border-white/10 transition-all ${
+				isHidden ? "h-20 opacity-50" : ""
+			}`}
 		>
-			<div className="absolute top-2 right-2 z-10">
-				<DropdownMenu.Root>
-					<DropdownMenu.Trigger asChild>
-						<button
-							type="button"
-							aria-label="More"
-							className="p-1.5 rounded-lg bg-gray-100 dark:bg-black/20 hover:bg-gray-200 dark:hover:bg-white/10 backdrop-blur-md transition-colors text-gray-600 dark:text-white/70"
-						>
-							<EllipsisVertical size={12} />
-						</button>
-					</DropdownMenu.Trigger>
-					<DropdownMenu.Portal>
-						<DropdownMenu.Content
-							className="bg-white dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl p-1 shadow-2xl z-50 min-w-25"
-							sideOffset={5}
-						>
-							<DropdownMenu.Item
-								onClick={() => onEdit(item.category.id)}
-								className="flex items-center gap-2 px-3 py-2 text-xs font-bold text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-white/5 rounded-lg cursor-pointer outline-none"
-							>
-								<SquarePen size={14} /> Edit Rates
-							</DropdownMenu.Item>
-							<DropdownMenu.Separator className="h-px bg-gray-200 dark:bg-white/10 my-1" />
-							<DropdownMenu.Item
-								onClick={() => onDelete(item.category.id)}
-								className="flex items-center gap-2 px-3 py-2 text-xs font-bold text-red-600 dark:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg cursor-pointer outline-none"
-							>
-								<Trash2 size={14} /> Remove
-							</DropdownMenu.Item>
-						</DropdownMenu.Content>
-					</DropdownMenu.Portal>
-				</DropdownMenu.Root>
-			</div>
+			<CardActionsMenu
+				categoryId={item.category.id}
+				onEdit={onEdit}
+				onDelete={onDelete}
+			/>
 
 			{isHidden ? (
 				<div className="flex items-center justify-between h-full px-2">
