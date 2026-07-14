@@ -106,6 +106,7 @@ interface BudgetState {
 	setCustomRates: (rates: Record<string, Record<string, number>>) => void;
 	fetchActiveCategories: () => Promise<void>;
 	removeActiveCategory: (id: string) => void;
+	reorderActiveCategories: (newOrder: string[]) => void;
 }
 
 const applyRulesToTransaction = (
@@ -153,6 +154,23 @@ export const useBudgetStore = create<BudgetState>()(
 
 			// The state only holds strings now
 			activeCategoryIds: DEFAULT_CATEGORIES,
+
+			reorderActiveCategories: async (newOrder) => {
+				// 1. Instantly update UI
+				set({ activeCategoryIds: newOrder });
+
+				// 2. Save new order to Supabase
+				const {
+					data: { session },
+				} = await supabase.auth.getSession();
+
+				if (session) {
+					await supabase.from("user_preferences").upsert({
+						user_id: session.user.id,
+						active_categories: newOrder,
+					});
+				}
+			},
 
 			addActiveCategory: async (categoryId) => {
 				const current = get().activeCategoryIds;
@@ -203,7 +221,6 @@ export const useBudgetStore = create<BudgetState>()(
 			},
 
 			fetchActiveCategories: async () => {
-				set({ activeCategoryIds: [] });
 				const {
 					data: { session },
 				} = await supabase.auth.getSession();
@@ -713,6 +730,7 @@ export const useBudgetStore = create<BudgetState>()(
 				walletIds: state.walletIds,
 				customRates: state.customRates,
 				preferredCards: state.preferredCards,
+				activeCategoryIds: state.activeCategoryIds,
 			}),
 		},
 	),

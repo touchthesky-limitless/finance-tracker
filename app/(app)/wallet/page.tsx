@@ -18,6 +18,25 @@ import { EditRatesModal } from "@/components/Wallet/modals/EditRatesModal";
 import { QuickSearchModal } from "@/components/Wallet/modals/QuickSearchModal";
 import { DeleteCategoryModal } from "@/components/Wallet/modals/DeleteCategoryModal";
 import Image from "next/image";
+import {
+	DndContext,
+	closestCenter,
+	KeyboardSensor,
+	MouseSensor,
+	TouchSensor,
+	useSensor,
+	useSensors,
+	DragEndEvent,
+} from "@dnd-kit/core";
+import {
+	arrayMove,
+	SortableContext,
+	sortableKeyboardCoordinates,
+	rectSortingStrategy,
+	verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { SortableItem } from "@/components/Wallet/SortableItem";
+import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
 
 export default function WalletRewardsPage() {
 	const {
@@ -37,6 +56,7 @@ export default function WalletRewardsPage() {
 		addActiveCategory,
 		fetchActiveCategories,
 		removeActiveCategory,
+		reorderActiveCategories,
 	} = useBudgetStore();
 
 	useEffect(() => {
@@ -124,15 +144,27 @@ export default function WalletRewardsPage() {
 
 	const optimizedCategories = useMemo(() => {
 		const result = [];
-		for (let i = 0; i < unifiedCategories.length; i++) {
-			const category = unifiedCategories[i];
-			if (activeCategoryIds.includes(category.id)) {
+
+		for (let i = 0; i < activeCategoryIds.length; i++) {
+			const currentId = activeCategoryIds[i];
+			let foundCategory = null;
+
+			// Find the matching category object
+			for (let j = 0; j < unifiedCategories.length; j++) {
+				if (unifiedCategories[j].id === currentId) {
+					foundCategory = unifiedCategories[j];
+					break;
+				}
+			}
+
+			if (foundCategory) {
 				result.push({
-					category,
-					...getTopCardsForCategory(category.id),
+					category: foundCategory,
+					...getTopCardsForCategory(foundCategory.id),
 				});
 			}
 		}
+
 		return result;
 	}, [activeCategoryIds, unifiedCategories, getTopCardsForCategory]);
 
@@ -156,6 +188,45 @@ export default function WalletRewardsPage() {
 		setCustomRates(finalRates);
 		setEditingCategory(null);
 	};
+
+	// Initialize DND Sensors (requires holding for 150ms on mobile so scrolling still works)
+	const sensors = useSensors(
+		useSensor(MouseSensor, {
+			activationConstraint: {
+				distance: 8, // Requires moving the mouse 8px before drag starts (prevents accidental drags on click)
+			},
+		}),
+		useSensor(TouchSensor, {
+			activationConstraint: {
+				delay: 150, // User must hold their finger down for 250ms to "pick up" the card
+				tolerance: 8, // Allows the user's finger to wiggle up to 8px while holding without canceling the drag
+			},
+		}),
+		useSensor(KeyboardSensor, {
+			coordinateGetter: sortableKeyboardCoordinates,
+		}),
+	);
+
+	const handleDragEnd = (event: DragEndEvent) => {
+		const { active, over } = event;
+
+		if (over && active.id !== over.id) {
+			const oldIndex = activeCategoryIds.indexOf(active.id as string);
+			const newIndex = activeCategoryIds.indexOf(over.id as string);
+
+			// This MUST update the store, which the persist middleware then saves
+			const newOrder = arrayMove(activeCategoryIds, oldIndex, newIndex);
+			reorderActiveCategories(newOrder);
+		}
+	};
+
+	useEffect(() => {
+		// Only fetch if we don't have categories yet
+		if (activeCategoryIds.length === 0) {
+			fetchActiveCategories();
+		}
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []); // Empty array ensures this only runs once on mount
 
 	useEffect(() => {
 		// Push the state update to the next tick to avoid React's synchronous render warning
@@ -219,136 +290,157 @@ export default function WalletRewardsPage() {
 				</button>
 			</div>
 
-			{viewMode === "grid" ? (
-				// Your existing Grid Layout
-				<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-					{optimizedCategories.map((item) => (
-						<BentoCard
-							key={item.category.id}
-							item={item}
-							isHidden={hiddenCategories.includes(item.category.id)}
-							onToggleHide={(id) =>
-								setHiddenCategories((prev) =>
-									prev.includes(id)
-										? prev.filter((c) => c !== id)
-										: [...prev, id],
-								)
-							}
-							onEdit={setEditingCategory}
-							onDelete={setDeletingCategory}
-						/>
-					))}
-				</div>
-			) : (
-				// The New Apple Wallet Stack Layout
-				<div className="flex flex-col max-w-md mx-auto -space-y-30 md:-space-y-32 pb-40">
-					{optimizedCategories.map((item, index) => {
-						const Icon = item.category.icon as React.ElementType;
-						const isActive = activeStackId === item.category.id;
+			<DndContext
+				sensors={sensors}
+				collisionDetection={closestCenter}
+				onDragEnd={handleDragEnd}
+				// Dynamically apply the vertical lock only if we are in Stack view
+				modifiers={viewMode === "stack" ? [restrictToVerticalAxis] : []}
+			>
+				{viewMode === "grid" ? (
+					<SortableContext
+						items={optimizedCategories.map((i) => i.category.id)}
+						strategy={rectSortingStrategy}
+					>
+						<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+							{optimizedCategories.map((item, index) => (
+								<SortableItem key={item.category.id} id={item.category.id}>
+									<BentoCard
+										item={item}
+										priority={index < 3}
+										isHidden={hiddenCategories.includes(item.category.id)}
+										onToggleHide={(id) =>
+											setHiddenCategories((prev) =>
+												prev.includes(id)
+													? prev.filter((c) => c !== id)
+													: [...prev, id],
+											)
+										}
+										onEdit={setEditingCategory}
+										onDelete={setDeletingCategory}
+									/>
+								</SortableItem>
+							))}
+						</div>
+					</SortableContext>
+				) : (
+					// The New Apple Wallet Stack Layout (Now wrapped with DND Context)
+					<SortableContext
+						items={optimizedCategories.map((i) => i.category.id)}
+						strategy={verticalListSortingStrategy}
+					>
+						<div className="flex flex-col max-w-md mx-auto -space-y-30 md:-space-y-32 pb-40">
+							{optimizedCategories.map((item, index) => {
+								const Icon = item.category.icon as React.ElementType;
+								const isActive = activeStackId === item.category.id;
 
-						return (
-							<div
-								key={item.category.id}
-								className="relative transition-all duration-500 ease-out flex flex-col"
-								// Dynamically pop the active card to the absolute front
-								style={{ zIndex: isActive ? 100 : index }}
-							>
-								{/* 1. The Physical Card */}
-								<div
-									onClick={() =>
-										setActiveStackId(isActive ? null : item.category.id)
-									}
-									className={`relative z-10 w-full aspect-[1.58/1] rounded-2xl overflow-hidden border-t border-white/20 transition-all duration-500 cursor-pointer drop-shadow-2xl ${
-										isActive
-											? "-translate-y-4 scale-105 shadow-2xl shadow-black/40"
-											: "hover:-translate-y-8 hover:pb-8"
-									}`}
-								>
-									{item.topCard?.card.image_url ? (
-										<Image
-											src={item.topCard.card.image_url}
-											alt="card"
-											fill
-											className="object-cover"
-										/>
-									) : (
+								return (
+									<SortableItem
+										key={item.category.id}
+										id={item.category.id}
+										className="relative transition-all duration-500 ease-out flex flex-col"
+										// Dynamically pop the active card to the absolute front
+										style={{ zIndex: isActive ? 100 : index }}
+									>
+										{/* 1. The Physical Card */}
 										<div
-											className={`w-full h-full bg-linear-to-br ${item.category.accent}`}
-										/>
-									)}
-
-									{/* The iOS Glass Badge */}
-									<div className="absolute top-4 right-4 flex items-center gap-2.5 px-3 py-1.5 rounded-full bg-white/50 dark:bg-white/10 backdrop-blur-2xl backdrop-saturate-150 border border-white/60 dark:border-white/20 shadow-xl shadow-black/10">
-										<div className="flex items-center gap-1.5 text-gray-900 dark:text-white/90">
-											<Icon size={12} className={item.category.accent} />
-											<span className="text-[10px] uppercase font-bold tracking-widest mt-px">
-												{item.category.name}
-											</span>
-										</div>
-										<div className="w-px h-3 bg-gray-900/10 dark:bg-white/10" />
-										<span
-											className={`text-sm font-black drop-shadow-sm ${item.category.accent}`}
+											onClick={() =>
+												setActiveStackId(isActive ? null : item.category.id)
+											}
+											className={`relative z-10 w-full aspect-[1.58/1] rounded-2xl overflow-hidden border-t border-white/20 transition-all duration-500 cursor-pointer drop-shadow-2xl ${
+												isActive
+													? "-translate-y-4 scale-105 shadow-2xl shadow-black/40"
+													: "hover:-translate-y-8 hover:pb-8"
+											}`}
 										>
-											{item.topCard?.rate}x
-										</span>
-									</div>
-								</div>
+											{item.topCard?.card.image_url ? (
+												<Image
+													src={item.topCard.card.image_url}
+													alt="card"
+													fill
+													className="object-cover"
+													priority={index === 0}
+												/>
+											) : (
+												<div
+													className={`w-full h-full bg-linear-to-br ${item.category.accent}`}
+												/>
+											)}
 
-								{/* 2. The Hidden Control Panel */}
-								<div
-									className={`relative -z-10 transition-all duration-500 ease-in-out overflow-hidden mx-4 rounded-b-2xl bg-white dark:bg-[#111] border border-gray-200 dark:border-white/10 shadow-xl ${
-										isActive
-											? "max-h-48 opacity-100 -mt-4 pt-8 pb-4 px-4 translate-y-0 mb-8"
-											: "max-h-0 opacity-0 -mt-16 pt-0 pb-0 px-4 -translate-y-8 mb-0 border-t-0"
-									}`}
-								>
-									{/* Backup Card Info */}
-									{item.backupCard && (
-										<div className="flex items-center justify-between mb-4 pb-4 border-b border-gray-100 dark:border-white/5">
-											<div className="flex items-center gap-1.5 text-gray-500">
-												<CheckCircle2 size={12} />
-												<span className="text-[10px] uppercase font-black tracking-widest">
-													Backup
+											{/* The iOS Glass Badge */}
+											<div className="absolute top-4 right-4 flex items-center gap-2.5 px-3 py-1.5 rounded-full bg-white/50 dark:bg-white/10 backdrop-blur-2xl backdrop-saturate-150 border border-white/60 dark:border-white/20 shadow-xl shadow-black/10">
+												<div className="flex items-center gap-1.5 text-gray-900 dark:text-white/90">
+													<Icon size={12} className={item.category.accent} />
+													<span className="text-[10px] uppercase font-bold tracking-widest mt-px">
+														{item.category.name}
+													</span>
+												</div>
+												<div className="w-px h-3 bg-gray-900/10 dark:bg-white/10" />
+												<span
+													className={`text-sm font-black drop-shadow-sm ${item.category.accent}`}
+												>
+													{item.topCard?.rate}x
 												</span>
 											</div>
-											<p className="text-xs font-bold text-gray-900 dark:text-white">
-												{item.backupCard.card.name}
-												<span className="text-gray-400 dark:text-white/40 ml-1 font-medium">
-													({item.backupCard.rate}x)
-												</span>
-											</p>
 										</div>
-									)}
 
-									{/* Action Buttons */}
-									<div className="flex gap-2">
-										<button
-											type="button"
-											onClick={(e) => {
-												e.stopPropagation(); // Prevents the card from closing when clicked
-												setEditingCategory(item.category.id);
-											}}
-											className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-gray-100 dark:bg-white/5 hover:bg-gray-200 dark:hover:bg-white/10 rounded-xl text-xs font-bold text-gray-900 dark:text-white transition-colors"
+										{/* 2. The Hidden Control Panel */}
+										<div
+											className={`relative -z-10 transition-all duration-500 ease-in-out overflow-hidden mx-4 rounded-b-2xl bg-white dark:bg-[#111] border border-gray-200 dark:border-white/10 shadow-xl ${
+												isActive
+													? "max-h-48 opacity-100 -mt-4 pt-8 pb-4 px-4 translate-y-0 mb-8"
+													: "max-h-0 opacity-0 -mt-16 pt-0 pb-0 px-4 -translate-y-8 mb-0 border-t-0"
+											}`}
 										>
-											<SquarePen size={14} /> Edit Rates
-										</button>
-										<button
-											type="button"
-											onClick={(e) => {
-												e.stopPropagation(); // Prevents the card from closing when clicked
-												setDeletingCategory(item.category.id);
-											}}
-											className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-red-50 dark:bg-red-500/10 hover:bg-red-100 dark:hover:bg-red-500/20 rounded-xl text-xs font-bold text-red-600 dark:text-red-500 transition-colors"
-										>
-											<Trash2 size={14} /> Remove
-										</button>
-									</div>
-								</div>
-							</div>
-						);
-					})}
-				</div>
-			)}
+											{/* Backup Card Info */}
+											{item.backupCard && (
+												<div className="flex items-center justify-between mb-4 pb-4 border-b border-gray-100 dark:border-white/5">
+													<div className="flex items-center gap-1.5 text-gray-500">
+														<CheckCircle2 size={12} />
+														<span className="text-[10px] uppercase font-black tracking-widest">
+															Backup
+														</span>
+													</div>
+													<p className="text-xs font-bold text-gray-900 dark:text-white">
+														{item.backupCard.card.name}
+														<span className="text-gray-400 dark:text-white/40 ml-1 font-medium">
+															({item.backupCard.rate}x)
+														</span>
+													</p>
+												</div>
+											)}
+
+											{/* Action Buttons */}
+											<div className="flex gap-2">
+												<button
+													type="button"
+													onClick={(e) => {
+														e.stopPropagation(); // Prevents the card from closing when clicked
+														setEditingCategory(item.category.id);
+													}}
+													className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-gray-100 dark:bg-white/5 hover:bg-gray-200 dark:hover:bg-white/10 rounded-xl text-xs font-bold text-gray-900 dark:text-white transition-colors"
+												>
+													<SquarePen size={14} /> Edit Rates
+												</button>
+												<button
+													type="button"
+													onClick={(e) => {
+														e.stopPropagation(); // Prevents the card from closing when clicked
+														setDeletingCategory(item.category.id);
+													}}
+													className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-red-50 dark:bg-red-500/10 hover:bg-red-100 dark:hover:bg-red-500/20 rounded-xl text-xs font-bold text-red-600 dark:text-red-500 transition-colors"
+												>
+													<Trash2 size={14} /> Remove
+												</button>
+											</div>
+										</div>
+									</SortableItem>
+								);
+							})}
+						</div>
+					</SortableContext>
+				)}
+			</DndContext>
 			<WalletManagerModal
 				isOpen={isWalletManagerOpen}
 				onClose={setIsWalletManagerOpen}

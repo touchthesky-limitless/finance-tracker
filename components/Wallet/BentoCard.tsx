@@ -9,6 +9,7 @@ interface Props {
 	onToggleHide: (id: string) => void;
 	onEdit: (id: string) => void;
 	onDelete: (id: string) => void;
+	priority?: boolean;
 }
 
 export function BentoCard({
@@ -17,6 +18,7 @@ export function BentoCard({
 	onToggleHide,
 	onEdit,
 	onDelete,
+	priority = false,
 }: Props) {
 	const hasCards = item.topCard !== null;
 	const Icon = item.category.icon as React.ElementType;
@@ -79,7 +81,7 @@ export function BentoCard({
 										fill
 										sizes="(max-width: 768px) 200px, 200px"
 										className="object-contain drop-shadow-2xl"
-										priority
+										priority={priority}
 									/>
 								) : (
 									<div
