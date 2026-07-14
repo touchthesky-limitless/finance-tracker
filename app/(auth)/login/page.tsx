@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { Zap, Mail, Lock, ArrowRight } from "lucide-react";
+import { Zap, Mail, Lock, ArrowRight, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
@@ -104,8 +104,17 @@ export default function LoginPage() {
 						disabled={loading}
 						className="w-full bg-orange-600 hover:bg-orange-500 dark:hover:bg-orange-500 text-white font-black py-4 rounded-xl mt-4 flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-orange-600/20"
 					>
-						{loading ? "Processing..." : isLogin ? "Sign In" : "Create Account"}
-						<ArrowRight size={18} />
+						{loading ? (
+							<>
+								<Loader2 className="animate-spin" size={18} />{" "}
+								Processing...{" "}
+							</>
+						) : (
+							<>
+								{isLogin ? "Sign In" : "Create Account"}
+								<ArrowRight size={18} />
+							</>
+						)}
 					</button>
 				</form>
 
