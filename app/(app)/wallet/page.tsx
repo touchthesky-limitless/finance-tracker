@@ -274,7 +274,6 @@ export default function WalletRewardsPage() {
 					}`}
 				>
 					<LayoutGrid size={16} />
-					GRID
 				</button>
 				<button
 					type="button"
@@ -286,7 +285,6 @@ export default function WalletRewardsPage() {
 					}`}
 				>
 					<Layers size={16} />
-					STACK
 				</button>
 			</div>
 
@@ -329,7 +327,7 @@ export default function WalletRewardsPage() {
 						items={optimizedCategories.map((i) => i.category.id)}
 						strategy={verticalListSortingStrategy}
 					>
-						<div className="flex flex-col max-w-md mx-auto -space-y-30 md:-space-y-32 pb-40">
+						<div className="flex flex-col max-w-md mx-auto -space-y-20 md:-space-y-32 pb-40">
 							{optimizedCategories.map((item, index) => {
 								const Icon = item.category.icon as React.ElementType;
 								const isActive = activeStackId === item.category.id;
@@ -358,6 +356,7 @@ export default function WalletRewardsPage() {
 													src={item.topCard.card.image_url}
 													alt="card"
 													fill
+													sizes="(max-width: 768px) 90vw, 448px"
 													className="object-cover"
 													priority={index === 0}
 												/>

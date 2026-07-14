@@ -79,7 +79,7 @@ export function BentoCard({
 										src={item.topCard.card.image_url}
 										alt={item.topCard.card.name}
 										fill
-										sizes="(max-width: 768px) 200px, 200px"
+										sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
 										className="object-contain drop-shadow-2xl"
 										priority={priority}
 									/>
