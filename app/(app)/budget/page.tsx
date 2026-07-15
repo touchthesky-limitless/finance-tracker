@@ -246,7 +246,7 @@ export default function OverviewPage() {
 						</p>
 					</div>
 				</div>
-				<span className="text-sm md:text-base font-black text-gray-900 dark:text-white whitespace-nowrap shrink-0">
+				<span className="text-sm @2xl:text-base font-black text-gray-900 dark:text-white whitespace-nowrap shrink-0">
 					{formatCurrency(m.total)}
 				</span>
 			</div>,
@@ -333,11 +333,13 @@ export default function OverviewPage() {
 				</div>
 			</header>
 
-			<main className="flex-1 w-full max-w-[1600px] mx-auto px-4 md:px-8 py-8 pb-24">
+			{/* Added @container to the main wrapper to enable container queries */}
+			<main className="@container flex-1 w-full max-w-[1600px] mx-auto px-4 md:px-8 py-8 pb-24">
 				{/* --- TOP ROW: Hero Summary --- */}
-				<div className="bg-white dark:bg-[#121212] border border-gray-100 dark:border-gray-800/80 rounded-3xl p-6 shadow-sm mb-6 flex flex-col xl:flex-row items-center gap-8 relative z-10">
+				{/* Switched lg:flex-row to @4xl:flex-row */}
+				<div className="bg-white dark:bg-[#121212] border border-gray-100 dark:border-gray-800/80 rounded-3xl p-6 shadow-sm mb-6 flex flex-col @4xl:flex-row items-center gap-8 relative z-10">
 					{/* Left Side (Donut Chart) */}
-					<div className="flex items-center justify-center sm:justify-start gap-6 w-full xl:w-[35%] xl:border-r border-gray-100 dark:border-gray-800 xl:pr-8 shrink-0">
+					<div className="flex items-center gap-6 w-full @4xl:w-[35%] @4xl:border-r border-gray-100 dark:border-gray-800 @4xl:pr-8 shrink-0">
 						<div
 							className="relative w-28 h-28 shrink-0 rounded-full flex items-center justify-center drop-shadow-sm"
 							style={{
@@ -376,7 +378,7 @@ export default function OverviewPage() {
 					</div>
 
 					{/* Right Side (Sparklines) */}
-					<div className="w-full xl:w-[65%] grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6 xl:gap-8">
+					<div className="w-full @4xl:w-[65%] grid grid-cols-1 @2xl:grid-cols-3 gap-6 @4xl:gap-8">
 						<SparklineStat
 							title="Total Spent"
 							amount={formatCurrency(stats.expenses)}
@@ -405,10 +407,11 @@ export default function OverviewPage() {
 				</div>
 
 				{/* --- MIDDLE ROW --- */}
-				<div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-6 relative z-10">
+				{/* Switched xl:grid-cols-3 to @5xl:grid-cols-3 */}
+				<div className="grid grid-cols-1 @5xl:grid-cols-3 gap-6 mb-6 relative z-10">
 					{/* DYNAMIC SPENDING CHART */}
 					<Card
-						className="xl:col-span-2 flex flex-col"
+						className="@5xl:col-span-2 flex flex-col"
 						title="Spending Trends"
 						action={
 							<div className="flex items-center gap-3">
@@ -435,9 +438,10 @@ export default function OverviewPage() {
 					>
 						<div className="flex items-center justify-between mt-4 mb-8">
 							<div className="flex flex-col overflow-hidden">
-								<span className="text-3xl md:text-4xl xl:text-5xl font-bold text-gray-900 dark:text-white tracking-tight truncate">
+								{/* Switched sizing to use @ container queries to prevent overflow */}
+								<span className="text-3xl @2xl:text-4xl @4xl:text-5xl font-bold text-gray-900 dark:text-white tracking-tight truncate">
 									{formatCurrency(stats.expenses).split(".")[0]}
-									<span className="text-gray-400 text-xl md:text-2xl xl:text-3xl">
+									<span className="text-gray-400 text-xl @2xl:text-2xl @4xl:text-3xl">
 										.{formatCurrency(stats.expenses).split(".")[1]}
 									</span>
 								</span>
@@ -469,7 +473,7 @@ export default function OverviewPage() {
 						</div>
 					</Card>
 
-					<Card className="xl:col-span-1 flex flex-col" title="Top Budgets">
+					<Card className="@5xl:col-span-1 flex flex-col" title="Top Budgets">
 						<div className="flex-1 flex flex-col gap-5 mt-4">
 							{categoryData.length > 0 ? (
 								topCategoriesElements
@@ -499,16 +503,20 @@ export default function OverviewPage() {
 				</div>
 
 				{/* --- BOTTOM ROW: SPENDING INTELLIGENCE --- */}
-				<div className="grid grid-cols-1 xl:grid-cols-2 gap-6 relative z-10">
+				{/* Switched xl:grid-cols-2 to @4xl:grid-cols-2 */}
+				<div className="grid grid-cols-1 @4xl:grid-cols-2 gap-6 relative z-10">
 					<Card title="Merchant Insights">
-						<div className="grid grid-cols-1 xl:grid-cols-2 gap-8 mt-4">
+						{/* Switched sm:grid-cols-2 to @2xl:grid-cols-2 */}
+						<div className="grid grid-cols-1 @2xl:grid-cols-2 gap-8 mt-4">
 							<div className="min-w-0">
 								<p className="text-[10px] font-black text-gray-400 tracking-widest mb-4">
 									Top Merchants
 								</p>
 								<div className="flex flex-col gap-4">{topMerchantElements}</div>
 							</div>
-							<div className="pt-8 xl:pt-0 border-t xl:border-t-0 xl:border-l border-gray-100 dark:border-gray-800 xl:pl-8 min-w-0">
+
+							{/* Dynamically swaps from top-border to left-border when side-by-side */}
+							<div className="pt-8 @2xl:pt-0 border-t @2xl:border-t-0 @2xl:border-l border-gray-100 dark:border-gray-800 @2xl:pl-8 min-w-0">
 								<p className="text-[10px] font-black text-gray-400 tracking-widest mb-4">
 									Largest Hits
 								</p>
@@ -843,7 +851,7 @@ const SparklineStat = memo(function SparklineStat({
 					{trend}
 				</span>
 			</div>
-			<h3 className="text-2xl md:text-3xl font-black text-gray-900 dark:text-white truncate">
+			<h3 className="text-2xl @2xl:text-3xl font-black text-gray-900 dark:text-white truncate">
 				{amount}
 			</h3>
 
@@ -979,7 +987,7 @@ const ActionRow = memo(function ActionRow({
 				</div>
 			</div>
 			<div
-				className={`text-sm md:text-base font-bold shrink-0 ${status === "alert" ? "text-orange-500" : "text-gray-900 dark:text-white"}`}
+				className={`text-sm @2xl:text-base font-bold shrink-0 ${status === "alert" ? "text-orange-500" : "text-gray-900 dark:text-white"}`}
 			>
 				{amount}
 			</div>
