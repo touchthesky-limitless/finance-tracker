@@ -20,36 +20,42 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
 		}, [ref, props.autoFocus]);
 
 		return (
-			<div className="relative group">
-				{" "}
-				{/* Added group for the icon focus effect */}
-				<Search
-					size={14}
-					className={cn(
-						"absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-orange-500 transition-colors pointer-events-none",
-						searchIconClassName,
-					)}
-				/>
+			<div className="relative group w-full flex items-center">
+				{/* Left Icon Wrapper: Spans full height and perfectly centers the SVG */}
+				<div className="absolute left-3 inset-y-0 flex items-center justify-center pointer-events-none">
+					<Search
+						size={16}
+						className={cn(
+							"text-gray-500 group-focus-within:text-orange-500 transition-colors",
+							searchIconClassName,
+						)}
+					/>
+				</div>
+
 				<input
 					ref={ref}
 					value={value}
 					{...props}
 					className={cn(
-						"w-full outline-none transition-all pl-9 pr-8", // Added padding to prevent text overlap
+						"w-full outline-none transition-all pl-10 pr-10",
 						inputClassName,
 					)}
 				/>
+
+				{/* Right Button Wrapper: Spans full height and perfectly centers the Button */}
 				{value && (
-					<button
-						type="button"
-						onClick={onClear}
-						className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-gray-200 dark:hover:bg-gray-800 rounded-md transition-colors"
-					>
-						<X
-							size={14}
-							className="text-gray-500 hover:text-gray-900 dark:hover:text-white"
-						/>
-					</button>
+					<div className="absolute right-2 inset-y-0 flex items-center justify-center">
+						<button
+							type="button"
+							onClick={onClear}
+							className="p-1 flex items-center justify-center hover:bg-gray-200 dark:hover:bg-gray-800 rounded-md transition-colors"
+						>
+							<X
+								size={16}
+								className="text-gray-500 hover:text-gray-900 dark:hover:text-white"
+							/>
+						</button>
+					</div>
 				)}
 			</div>
 		);

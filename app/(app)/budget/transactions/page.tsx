@@ -337,7 +337,7 @@ export default function TransactionsPage() {
 							onChange={(e) => {
 								setSearchQuery(e.target.value);
 							}}
-							placeholder="Search transactions..."
+							placeholder="Search transactions"
 						/>
 						{/* Extracted Category Filter for Mobile Accessibility */}
 						<div className="flex items-center gap-2 w-full sm:w-auto bg-white dark:bg-[#121212] border border-gray-200 dark:border-white/10 rounded-xl px-2 py-1">
