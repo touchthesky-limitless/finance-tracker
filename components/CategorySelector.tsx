@@ -1,6 +1,5 @@
 import { useState, useMemo, memo, useDeferredValue, useRef } from "react";
 import {
-	ChevronRight,
 	Search,
 	Check,
 	X,
@@ -323,7 +322,7 @@ export function CategorySelector({
 						ref={setFloating}
 						style={floatingStyles}
 						{...getFloatingProps()}
-						className="z-[200] bg-white dark:bg-[#121212] shadow-[0_10px_40px_rgba(0,0,0,0.1)] dark:shadow-[0_10px_40px_rgba(0,0,0,0.5)] rounded-2xl border border-gray-200 dark:border-white/10 overflow-hidden flex flex-col"
+						className="z-200 bg-white dark:bg-[#121212] shadow-[0_10px_40px_rgba(0,0,0,0.1)] dark:shadow-[0_10px_40px_rgba(0,0,0,0.5)] rounded-2xl border border-gray-200 dark:border-white/10 overflow-hidden flex flex-col"
 					>
 						<div className="p-4 border-b border-gray-100 dark:border-white/5 bg-gray-50/50 dark:bg-[#0a0a0a]/50">
 							<div className="flex items-center gap-3 bg-white dark:bg-[#1a1a1a] px-4 py-3 rounded-xl border border-gray-200 dark:border-white/10 focus-within:border-orange-500 focus-within:ring-2 focus-within:ring-orange-500/20 transition-all shadow-sm">
