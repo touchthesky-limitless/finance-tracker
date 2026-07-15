@@ -76,6 +76,7 @@ export default function OverviewPage() {
 								setTimeFilter(selectedDate);
 							}}
 						/>
+						{/* To hide export button: replace flex with hidden sm:flex */}
 						<button className="flex items-center gap-2 px-6 py-2.5 bg-orange-600 hover:bg-orange-500 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-orange-600/20 active:scale-95">
 							<Download size={16} strokeWidth={2.5} />
 							<span className="hidden sm:inline">Export</span>
