@@ -10,11 +10,9 @@ import { useUnifiedCategories } from "@/hooks/useUnifiedCategories";
 // ==========================================
 // 1. GLOBAL CACHE & STATIC HELPERS
 // ==========================================
-// Move expensive calculations OUTSIDE the component so they don't run 500x per render.
 const PARENT_KEYS = Object.keys(CATEGORY_HIERARCHY);
 const PARENT_KEY_SET = new Set(PARENT_KEYS);
 
-// Instantiating this once is ~10x faster than calling .toLocaleString() in a loop
 const numberFormatter = new Intl.NumberFormat("en-US");
 
 interface TransactionRowProps {
@@ -34,12 +32,14 @@ export const TransactionRow = memo(function TransactionRow({
 	onSelect,
 }: TransactionRowProps) {
 	const { allUnifiedCategories } = useUnifiedCategories("Expense", "All");
+
 	const categoryData = useMemo(() => {
 		const transactionCatName = transaction.category.toLowerCase();
 		return allUnifiedCategories.find(
 			(cat) => cat.name.toLowerCase() === transactionCatName,
 		);
 	}, [allUnifiedCategories, transaction.category]);
+
 	const theme = categoryData?.theme || getCategoryTheme("Uncategorized");
 	const iconName = categoryData?.icon || "HelpCircle";
 	const isParentCat = PARENT_KEY_SET.has(transaction.category);
@@ -47,6 +47,25 @@ export const TransactionRow = memo(function TransactionRow({
 
 	const needsReview =
 		transaction.needs_review || isUncategorized || isParentCat;
+
+	// Enforce 10-character limit
+	// let displayMerchant = transaction.merchant;
+	// if (displayMerchant.length > 10) {
+	// 	displayMerchant = displayMerchant.substring(0, 10) + "...";
+	// }
+
+	const isExpense = transaction.amount < 0;
+	const amountColor = isExpense
+		? "text-slate-900 dark:text-slate-100"
+		: "text-emerald-500 dark:text-emerald-400";
+	const formattedAmount = `${isExpense ? "-" : ""}$${numberFormatter.format(
+		Math.abs(transaction.amount),
+	)}`;
+
+	const displayAccount =
+		transaction.account?.length > 10
+			? `${transaction.account.substring(0, 10)}...`
+			: transaction.account;
 
 	return (
 		<tr
@@ -56,10 +75,10 @@ export const TransactionRow = memo(function TransactionRow({
 			}`}
 		>
 			{/* --- CHECKBOX CELL --- */}
-			<td className="py-4 px-3 w-10">
+			<td className="py-4 pl-2 md:pl-3 pr-0 w-8">
 				<div
 					onClick={(e) => {
-						e.stopPropagation(); // Stop row click from firing
+						e.stopPropagation();
 						if (onSelect) onSelect(transaction.id, e);
 					}}
 					className={`w-4 h-4 rounded border flex items-center justify-center transition-all cursor-pointer ${
@@ -87,7 +106,7 @@ export const TransactionRow = memo(function TransactionRow({
 			</td>
 
 			{/* 1. Merchant */}
-			<td className="py-4 px-2 align-middle">
+			<td className="py-4 pl-0 pr-2 align-middle">
 				<div className="flex flex-col min-w-0 w-full">
 					<span className="block w-full font-medium text-xs md:text-sm text-gray-900 dark:text-gray-200 uppercase tracking-tight truncate">
 						{transaction.merchant}
@@ -111,22 +130,13 @@ export const TransactionRow = memo(function TransactionRow({
 			</td>
 
 			{/* 3. AMOUNT */}
-			<td
-				className={`py-4 px-2 text-right font-bold ${
-					transaction.amount < 0
-						? "text-slate-900 dark:text-slate-100"
-						: "text-emerald-500 dark:text-emerald-400"
-				}`}
-			>
-				{transaction.amount < 0 ? "-" : ""}$
-				{numberFormatter.format(Math.abs(transaction.amount))}
+			<td className={`py-4 px-2 text-left font-bold ${amountColor}`}>
+				{formattedAmount}
 			</td>
 
 			{/* 4. ACCOUNT */}
 			<td className="py-4 px-2 text-gray-500 text-xs italic">
-				{transaction.account?.length > 18
-					? `${transaction.account.substring(0, 18)}...`
-					: transaction.account}
+				{displayAccount}
 			</td>
 
 			{/* 5: Tags Column */}

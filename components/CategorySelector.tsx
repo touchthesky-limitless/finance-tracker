@@ -48,55 +48,68 @@ interface SubCategoryRowProps {
 }
 
 // Optimized Left Pane Item
-const ParentTab = memo(({ parent, isActive, onClick }: ParentTabProps) => (
-	<button
-		type="button"
-		onClick={() => onClick(parent)}
-		className={`w-full flex items-center gap-2 p-2.5 rounded-lg text-[11px] mb-1 transition-all ${
-			isActive
-				? "bg-orange-600/10 text-orange-500 font-bold border border-orange-500/20"
-				: "text-gray-500 hover:text-gray-300"
-		}`}
-	>
-		<CategoryIcon
-			name={parent}
-			size={14}
-			colorClass={getCategoryTheme(parent).text}
-		/>
-		<span className="truncate">{parent}</span>
-	</button>
-));
+const ParentTab = memo(({ parent, isActive, onClick }: ParentTabProps) => {
+	return (
+		<button
+			type="button"
+			onClick={() => {
+				onClick(parent);
+			}}
+			className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl text-[11px] mb-1 transition-all ${
+				isActive
+					? "bg-orange-600/10 text-orange-500 font-bold border border-orange-500/20 shadow-sm"
+					: "text-gray-300 hover:text-gray-900 dark:hover:text-gray-200 border border-transparent"
+			}`}
+		>
+			<CategoryIcon
+				name={parent}
+				size={16}
+				colorClass={getCategoryTheme(parent).text}
+			/>
+			<span className="truncate">{parent}</span>
+		</button>
+	);
+});
 ParentTab.displayName = "ParentTab";
 
 // Optimized Right Pane Item
 const SubCategoryRow = memo(
-	({ category, parent, isSelected, onSelect }: SubCategoryRowProps) => (
-		<button
-			type="button"
-			onClick={() => onSelect(category.name, parent)}
-			className="w-full text-left px-4 py-3 rounded-lg flex items-center justify-between transition-colors group"
-		>
-			<div className="flex items-center gap-3">
-				<CategoryIcon
-					name={category.icon || category.name}
-					size={14}
-					colorClass={getCategoryTheme(parent).text}
-				/>
-				<span
-					className={`text-xs ${isSelected ? "text-orange-400 font-bold" : "text-gray-400"}`}
-				>
-					{category.name}
-				</span>
-				{/* Optional: Add the Custom badge here too for clarity */}
-				{category.isCustom && (
-					<span className="text-[8px] bg-orange-500/10 text-orange-500 px-1 rounded uppercase font-black">
-						Custom
+	({ category, parent, isSelected, onSelect }: SubCategoryRowProps) => {
+		return (
+			<button
+				type="button"
+				onClick={() => {
+					onSelect(category.name, parent);
+				}}
+				className="w-full text-left px-4 py-3.5 mb-1 rounded-xl flex items-center justify-between transition-colors group hover:bg-gray-100 dark:hover:bg-white/5"
+			>
+				<div className="flex items-center gap-3 min-w-0">
+					<CategoryIcon
+						name={category.icon || category.name}
+						size={16}
+						colorClass={getCategoryTheme(parent).text}
+					/>
+					<span
+						className={`text-sm truncate ${
+							isSelected
+								? "text-orange-500 font-bold"
+								: "text-gray-700 dark:text-gray-300 font-medium"
+						}`}
+					>
+						{category.name}
 					</span>
+					{category.isCustom && (
+						<span className="text-[9px] bg-orange-500/10 border border-orange-500/20 text-orange-600 dark:text-orange-400 px-1.5 py-0.5 rounded uppercase font-black shrink-0">
+							Custom
+						</span>
+					)}
+				</div>
+				{isSelected && (
+					<Check size={16} className="text-orange-500 shrink-0 ml-2" />
 				)}
-			</div>
-			{isSelected && <Check size={14} className="text-orange-500" />}
-		</button>
-	),
+			</button>
+		);
+	},
 );
 SubCategoryRow.displayName = "SubCategoryRow";
 
@@ -109,138 +122,143 @@ export function CategorySelector({
 	const [catQuery, setCatQuery] = useState("");
 	const inputRef = useRef<HTMLInputElement>(null);
 
-	// Use your unified hook to get the merged list
 	const { allUnifiedCategories } = useUnifiedCategories("Expense", "All");
-
-	// This creates a "low-priority" version of the query
 	const deferredQuery = useDeferredValue(catQuery);
 
-	// Initialize selectedParent based on current category
 	const [selectedParent, setSelectedParent] = useState<string>(() => {
-		const found = Object.keys(CATEGORY_HIERARCHY).find(
-			(parent) =>
+		const found = Object.keys(CATEGORY_HIERARCHY).find((parent) => {
+			return (
 				CATEGORY_HIERARCHY[parent].includes(currentCategory) ||
-				currentCategory.startsWith(parent),
-		);
+				currentCategory.startsWith(parent)
+			);
+		});
 		return found || "Food & drink";
 	});
 
-	// Find the full category object from our master list to get real icon/theme
 	const selectedCategoryData = useMemo(() => {
-		return allUnifiedCategories.find((cat) => cat.name === currentCategory);
+		return allUnifiedCategories.find((cat) => {
+			return cat.name === currentCategory;
+		});
 	}, [allUnifiedCategories, currentCategory]);
 
-	// Determine display values
 	const displayIcon = selectedCategoryData?.icon || currentCategory;
 	const displayColorClass =
 		selectedCategoryData?.theme?.text || "text-gray-400";
 
-	// 1. Build a Dynamic Hierarchy that merges System + Custom
-	// Inside CategorySelector
 	const dynamicHierarchy = useMemo(() => {
-		// We map the static hierarchy into UnifiedCategory-like objects first
 		const base: Record<string, UnifiedCategory[]> = {};
 
-		// Convert static hierarchy to objects
 		Object.keys(CATEGORY_HIERARCHY).forEach((parent) => {
-			base[parent] = CATEGORY_HIERARCHY[parent].map(
-				(subName) =>
-					allUnifiedCategories.find((c) => c.name === subName) ||
-					({
-						name: subName,
-						icon: subName,
-						theme: getCategoryTheme(parent),
-						isCustom: false,
-					} as UnifiedCategory),
-			);
+			base[parent] = CATEGORY_HIERARCHY[parent].map((subName) => {
+				const foundCat = allUnifiedCategories.find((c) => {
+					return c.name === subName;
+				});
+
+				if (foundCat) {
+					return foundCat;
+				}
+
+				return {
+					name: subName,
+					icon: subName,
+					theme: getCategoryTheme(parent),
+					isCustom: false,
+				} as UnifiedCategory;
+			});
 		});
 
-		// Inject Custom Categories
 		allUnifiedCategories.forEach((cat) => {
-			if (!cat.isCustom) return;
+			if (!cat.isCustom) {
+				return;
+			}
 
 			if (cat.parentName && base[cat.parentName]) {
-				// Add custom sub-category object
-				if (!base[cat.parentName].some((c) => c.name === cat.name)) {
+				const exists = base[cat.parentName].some((c) => {
+					return c.name === cat.name;
+				});
+				if (!exists) {
 					base[cat.parentName].push(cat);
 				}
 			} else if (!cat.parentName) {
-				// Add custom primary category entry
-				if (!base[cat.name]) base[cat.name] = [];
+				if (!base[cat.name]) {
+					base[cat.name] = [];
+				}
 			}
 		});
 
 		return base;
 	}, [allUnifiedCategories]);
 
-	// Filtering Logic
 	const visibleParents = useMemo(() => {
 		const query = deferredQuery.toLowerCase().trim();
 		const parents = Object.keys(dynamicHierarchy);
 
-		if (!query) return parents;
+		if (!query) {
+			return parents;
+		}
 
-		return parents.filter(
-			(parent) =>
-				// Check if the Parent name matches the query
-				parent.toLowerCase().includes(query) ||
-				// Check if any Sub-Category object within this parent matches the query
-				dynamicHierarchy[parent].some((cat) =>
-					cat.name.toLowerCase().includes(query),
-				),
-		);
+		return parents.filter((parent) => {
+			const matchesParent = parent.toLowerCase().includes(query);
+			const matchesChild = dynamicHierarchy[parent].some((cat) => {
+				return cat.name.toLowerCase().includes(query);
+			});
+			return matchesParent || matchesChild;
+		});
 	}, [deferredQuery, dynamicHierarchy]);
 
-	// Derived Active Parent (The Auto-Snap Fix)
 	const activeParent = useMemo(() => {
 		const query = deferredQuery.toLowerCase().trim();
-		if (!query) return selectedParent;
+		if (!query) {
+			return selectedParent;
+		}
 
-		const currentHasMatch =
-			selectedParent.toLowerCase().includes(query) ||
-			CATEGORY_HIERARCHY[selectedParent]?.some((s) =>
-				s.toLowerCase().includes(query),
-			);
+		const matchesParent = selectedParent.toLowerCase().includes(query);
+		const matchesChild = CATEGORY_HIERARCHY[selectedParent]?.some((s) => {
+			return s.toLowerCase().includes(query);
+		});
 
-		if (currentHasMatch) return selectedParent;
+		if (matchesParent || matchesChild) {
+			return selectedParent;
+		}
 
-		return visibleParents.length > 0 ? visibleParents[0] : selectedParent;
+		if (visibleParents.length > 0) {
+			return visibleParents[0];
+		}
+
+		return selectedParent;
 	}, [deferredQuery, visibleParents, selectedParent]);
 
-	// 1. Initialize Floating UI logic
 	const {
-		// Destructure these specifically:
 		refs: { setReference, setFloating },
 		floatingStyles,
 		context,
 	} = useFloating({
 		open: isOpen,
 		onOpenChange: setIsOpen,
-		whileElementsMounted: (reference, floating, update) =>
-			autoUpdate(reference, floating, update, {
-				animationFrame: false, // Keep this for maximum smoothness
+		whileElementsMounted: (reference, floating, update) => {
+			return autoUpdate(reference, floating, update, {
+				animationFrame: false,
 				elementResize: true,
-			}),
+			});
+		},
 		middleware: [
-			offset(8), // Gap between button and menu
-			flip(), // Automatically flip up if no room below
-			shift(), // Shift sideways if hitting screen edges
+			offset(8),
+			flip(),
+			shift({ padding: 16 }),
 			size({
 				apply({ rects, elements }) {
 					Object.assign(elements.floating.style, {
-						minWidth: `${Math.max(rects.reference.width, 300)}px`,
+						minWidth: `${Math.max(rects.reference.width, 360)}px`,
+						maxWidth: "90vw",
 					});
 				},
 			}),
 		],
-		// whileElementsMounted: autoUpdate, // Crucial for following scroll
 	});
 
-	// 2. Set up interactions (click to open, esc to close)
-	// const click = useClick(context);
 	const dismiss = useDismiss(context, {
-		outsidePress: true, // Handles "Click Outside"
-		escapeKey: true, // Handles "ESC" key
+		outsidePress: true,
+		escapeKey: true,
 	});
 
 	const { getReferenceProps, getFloatingProps } = useInteractions([
@@ -248,80 +266,78 @@ export function CategorySelector({
 		dismiss,
 	]);
 
-	const bestMatch = useMemo(() => searchCategories(catQuery), [catQuery]);
+	const bestMatch = useMemo(() => {
+		return searchCategories(catQuery);
+	}, [catQuery]);
 
 	return (
 		<div className="relative">
 			{variant === "form" && (
-				<label className="text-[10px] uppercase tracking-[0.2em] text-gray-500 font-black mb-1 block">
+				<label className="text-[10px] uppercase tracking-[0.2em] text-gray-300 font-black mb-1.5 block pl-1">
 					Category
 				</label>
 			)}
 
-			{/* --- TRIGGER BUTTON --- */}
 			<button
 				ref={setReference}
 				{...getReferenceProps()}
 				type="button"
-				onClick={() => setIsOpen(!isOpen)}
+				onClick={() => {
+					setIsOpen(!isOpen);
+				}}
 				className={
 					variant === "filter"
-						? "flex items-center gap-1 text-[10px] font-black text-gray-400 uppercase tracking-widest hover:text-orange-500 transition-colors"
-						: `w-full p-4 bg-[#F8F9FB] dark:bg-[#0d0d0d] border rounded-xl flex items-center justify-between transition-all`
+						? "flex items-center gap-1.5 text-xs font-black text-gray-400 uppercase tracking-widest hover:text-orange-500 transition-colors px-2 py-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/5"
+						: `w-full p-4 bg-[#F8F9FB] dark:bg-[#0d0d0d] border border-gray-200 dark:border-white/5 rounded-2xl flex items-center justify-between transition-all hover:border-gray-300 dark:hover:border-white/10 shadow-sm`
 				}
 			>
-				<div className="flex items-center gap-2">
+				<div className="flex items-center gap-3">
 					{variant === "filter" ? (
 						<span>{currentCategory || "Category"}</span>
 					) : (
 						<>
-							<CategoryIcon
-								name={displayIcon}
-								size={18}
-								colorClass={displayColorClass}
-							/>
-							<span className="text-sm text-gray-900 dark:text-white font-medium">
+							<div className="p-1.5 bg-white dark:bg-[#1a1a1a] rounded-xl shadow-sm border border-gray-100 dark:border-white/5">
+								<CategoryIcon
+									name={displayIcon}
+									size={18}
+									colorClass={displayColorClass}
+								/>
+							</div>
+							<span className="text-sm text-gray-900 dark:text-white font-bold">
 								{currentCategory}
 							</span>
 						</>
 					)}
 				</div>
 				<ChevronDown
-					size={variant === "filter" ? 12 : 18}
-					className={`transition-transform duration-200 shrink-0 ${
-						isOpen ? "rotate-180 text-orange-500" : "text-gray-500"
+					size={variant === "filter" ? 14 : 20}
+					className={`transition-transform duration-300 shrink-0 ${
+						isOpen ? "rotate-180 text-orange-500" : "text-gray-400"
 					}`}
 				/>
-				{variant === "form" && (
-					<ChevronRight
-						size={18}
-						className={isOpen ? "rotate-90 text-orange-500" : ""}
-					/>
-				)}
 			</button>
 
-			{/* --- PORTALED DROPDOWN --- */}
 			{isOpen && (
 				<FloatingPortal>
 					<div
 						ref={setFloating}
 						style={floatingStyles}
 						{...getFloatingProps()}
-						className="z-200 bg-white dark:bg-[#0d0d0d] shadow-2xl rounded-xl border border-slate-200 dark:border-gray-800 overflow-hidden"
+						className="z-[200] bg-white dark:bg-[#121212] shadow-[0_10px_40px_rgba(0,0,0,0.1)] dark:shadow-[0_10px_40px_rgba(0,0,0,0.5)] rounded-2xl border border-gray-200 dark:border-white/10 overflow-hidden flex flex-col"
 					>
-						{/* SEARCH AREA */}
-						<div className="p-3 border-b border-gray-800">
-							<div className="flex items-center gap-2 bg-[#F8F9FB] dark:bg-[#1a1a1a] px-3 py-2 rounded-lg border border-gray-800 focus-within:border-orange-500/50">
-								<Search size={14} className="text-gray-500" />
+						<div className="p-4 border-b border-gray-100 dark:border-white/5 bg-gray-50/50 dark:bg-[#0a0a0a]/50">
+							<div className="flex items-center gap-3 bg-white dark:bg-[#1a1a1a] px-4 py-3 rounded-xl border border-gray-200 dark:border-white/10 focus-within:border-orange-500 focus-within:ring-2 focus-within:ring-orange-500/20 transition-all shadow-sm">
+								<Search size={16} className="text-gray-400" />
 								<input
 									autoFocus
 									ref={inputRef}
-									placeholder="Search all categories..."
-									className="bg-transparent text-xs text-gray-900 dark:text-white outline-none w-full"
+									placeholder="Search categories..."
+									className="bg-transparent text-sm text-gray-900 dark:text-white outline-none w-full placeholder:text-gray-400"
 									value={catQuery}
-									onChange={(e) => setCatQuery(e.target.value)}
+									onChange={(e) => {
+										setCatQuery(e.target.value);
+									}}
 								/>
-								{/* CLEAR BUTTON */}
 								{catQuery && (
 									<button
 										type="button"
@@ -329,82 +345,100 @@ export function CategorySelector({
 											setCatQuery("");
 											inputRef.current?.focus();
 										}}
-										className="p-0.5 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-md transition-colors text-gray-500 hover:text-gray-900 dark:hover:text-white"
+										className="p-1 hover:bg-gray-100 dark:hover:bg-white/10 rounded-lg transition-colors text-gray-400 hover:text-gray-900 dark:hover:text-white"
 									>
-										<X size={14} />
+										<X size={16} />
 									</button>
 								)}
 							</div>
-							{/* SHOW BEST MATCH */}
 							{bestMatch && catQuery && (
-								<div className="mt-2 px-1 text-[10px] text-gray-500 italic">
-									Best match:{" "}
-									<span className="text-orange-500">{bestMatch}</span>
+								<div className="mt-3 px-2 text-xs text-gray-300 font-medium flex items-center gap-1.5">
+									<span>Best match:</span>
+									<span className="text-orange-500 font-bold bg-orange-50 dark:bg-orange-500/10 px-2 py-0.5 rounded-md">
+										{bestMatch}
+									</span>
 								</div>
 							)}
 						</div>
 
 						<div
-							className={`h-80 flex transition-opacity duration-200 ${catQuery !== deferredQuery ? "opacity-50" : "opacity-100"}`}
+							className={`h-96 flex transition-opacity duration-200 ${
+								catQuery !== deferredQuery ? "opacity-50" : "opacity-100"
+							}`}
 						>
-							{/* LEFT PANE */}
-							<div
-								className="w-1/3 border-r border-gray-800 overflow-y-auto p-2 scrollbar-hide"
-								style={{ scrollbarWidth: "none" }}
-							>
-								<button
-									type="button"
-									onClick={() => {
-										onSelect("All", "All"); // Using "All" as both name and parent
-										setIsOpen(false);
-									}}
-									className={`w-full flex items-center gap-2 p-2.5 rounded-lg text-[11px] mb-2 transition-all border ${
-										currentCategory === "All"
-											? "bg-orange-600/10 text-orange-500 font-bold border-orange-500/20"
-											: "text-gray-400 border-transparent hover:bg-white/5"
-									}`}
+							<div className="w-2/5 flex flex-col border-r border-gray-100 dark:border-white/5 bg-white dark:bg-[#121212]">
+								<div className="p-3 border-b border-gray-100 dark:border-white/5 shrink-0">
+									<button
+										type="button"
+										onClick={() => {
+											onSelect("All", "All");
+											setIsOpen(false);
+										}}
+										className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl text-[11px] transition-all ${
+											currentCategory === "All"
+												? "bg-orange-600 text-white font-bold shadow-md shadow-orange-600/20"
+												: "text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-white/5 hover:bg-gray-100 dark:hover:bg-white/10 border border-gray-200 dark:border-white/5"
+										}`}
+									>
+										<LayoutGrid
+											size={16}
+											className={
+												currentCategory === "All"
+													? "text-white"
+													: "text-gray-300"
+											}
+										/>
+										<span className="uppercase tracking-wider">
+											All Categories
+										</span>
+									</button>
+								</div>
+
+								<div
+									className="flex-1 overflow-y-auto p-3 scrollbar-hide"
+									style={{ scrollbarWidth: "none" }}
 								>
-									<div className="w-3.5 h-3.5 flex items-center justify-center">
-										<LayoutGrid size={14} />
-									</div>
-									<span>All Categories</span>
-								</button>
-								<div className="h-px bg-gray-800 my-2 mx-1" />{" "}
-								{/* Visual Divider */}
-								{visibleParents.map((parent) => (
-									<ParentTab
-										key={parent}
-										parent={parent}
-										isActive={activeParent === parent}
-										onClick={setSelectedParent}
-									/>
-								))}
+									{visibleParents.map((parent) => {
+										return (
+											<ParentTab
+												key={parent}
+												parent={parent}
+												isActive={activeParent === parent}
+												onClick={setSelectedParent}
+											/>
+										);
+									})}
+								</div>
 							</div>
 
-							{/* RIGHT PANE */}
 							<div
-								className="flex-1 bg-[#F8F9FB] dark:bg-[#090909] overflow-y-auto p-2 scrollbar-hide"
+								className="w-3/5 bg-gray-50 dark:bg-[#0a0a0a] overflow-y-auto p-3 scrollbar-hide"
 								style={{ scrollbarWidth: "none" }}
 							>
 								{(dynamicHierarchy[activeParent] || [])
-									.filter(
-										(cat) =>
-											!catQuery ||
-											cat.name.toLowerCase().includes(catQuery.toLowerCase()),
-									)
-									.map((cat) => (
-										<SubCategoryRow
-											key={cat.id || cat.name}
-											category={cat}
-											parent={activeParent}
-											isSelected={currentCategory === cat.name}
-											onSelect={(s, p) => {
-												onSelect(s, p);
-												setIsOpen(false);
-												setCatQuery("");
-											}}
-										/>
-									))}
+									.filter((cat) => {
+										if (!catQuery) {
+											return true;
+										}
+										return cat.name
+											.toLowerCase()
+											.includes(catQuery.toLowerCase());
+									})
+									.map((cat) => {
+										return (
+											<SubCategoryRow
+												key={cat.id || cat.name}
+												category={cat}
+												parent={activeParent}
+												isSelected={currentCategory === cat.name}
+												onSelect={(s, p) => {
+													onSelect(s, p);
+													setIsOpen(false);
+													setCatQuery("");
+												}}
+											/>
+										);
+									})}
 							</div>
 						</div>
 					</div>
