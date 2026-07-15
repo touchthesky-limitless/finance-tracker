@@ -24,35 +24,32 @@ export default function ProOverviewPage() {
             {/* --- HEADER --- */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Financial Dashboard</h1>
+                    <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Statistics & Analysis</h1>
                 </div>
                 
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-3">
                     <button className="flex items-center gap-2 px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-sm font-semibold transition-colors shadow-sm shadow-purple-600/20">
                         <Plus size={16} />
                         Add Transaction
                     </button>
                     <button className="flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-[#121212] border border-gray-200 dark:border-gray-800 text-gray-700 dark:text-gray-300 rounded-xl text-sm font-semibold hover:bg-gray-50 dark:hover:bg-[#1a1a1a] transition-colors shadow-sm">
                         <Download size={16} />
-                        Export Data
+                        <span className="hidden sm:inline">Export Data</span>
                     </button>
                 </div>
             </div>
 
-            {/* --- TOP ROW: 3 COLUMNS --- */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-6">
+            {/* --- TOP ROW: IPAD (2 COLS) -> DESKTOP (12 COLS) --- */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-12 gap-6 mb-6">
                 
                 {/* 1. MONTHLY BUDGET OVERVIEW */}
-                <Card className="lg:col-span-5" title="June Budget Overview">
+                {/* Full width on iPad, 5 cols on Desktop */}
+                <Card className="lg:col-span-2 xl:col-span-5" title="June Budget Overview">
                     <div className="flex flex-col sm:flex-row items-center gap-8 mt-4">
-                        {/* Semi-Circle Chart */}
                         <div className="relative w-48 h-28 shrink-0">
                             <svg viewBox="0 0 200 110" className="w-full h-full overflow-visible drop-shadow-sm">
-                                {/* Track (Total Budget) */}
                                 <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="currentColor" strokeWidth="16" strokeLinecap="round" className="text-gray-100 dark:text-gray-800/50" />
-                                {/* Spent (Purple) */}
                                 <path d="M 20 100 A 80 80 0 0 1 120 25" fill="none" stroke="#8b5cf6" strokeWidth="16" strokeLinecap="round" className="drop-shadow-sm" />
-                                {/* Scheduled/Pending (Yellow) */}
                                 <path d="M 120 25 A 80 80 0 0 1 150 40" fill="none" stroke="#f59e0b" strokeWidth="16" strokeLinecap="round" className="drop-shadow-sm" />
                             </svg>
                             <div className="absolute inset-0 flex flex-col items-center justify-end pb-0 text-center">
@@ -67,7 +64,6 @@ export default function ProOverviewPage() {
                             </div>
                         </div>
 
-                        {/* Mini Stats List */}
                         <div className="flex-1 w-full space-y-4">
                             <MiniStat icon={TrendingDown} label="Total Spent" value="$3,450" />
                             <MiniStat icon={Receipt} label="Upcoming Bills" value="$820" />
@@ -76,8 +72,7 @@ export default function ProOverviewPage() {
                         </div>
                     </div>
 
-                    {/* Legend */}
-                    <div className="flex items-center justify-between mt-8 border-t border-gray-100 dark:border-gray-800 pt-4">
+                    <div className="flex flex-wrap items-center justify-center sm:justify-between gap-4 mt-8 border-t border-gray-100 dark:border-gray-800 pt-4">
                         <LegendItem color="bg-purple-500" label="Spent" value="$ 3,450" />
                         <LegendItem color="bg-yellow-500" label="Scheduled" value="$ 820" />
                         <LegendItem color="bg-gray-200 dark:bg-gray-700" label="Remaining" value="$ 1,240" />
@@ -86,7 +81,8 @@ export default function ProOverviewPage() {
                 </Card>
 
                 {/* 2. SAVINGS GOALS */}
-                <Card className="lg:col-span-4" title="Savings Projections">
+                {/* 1 col on iPad, 4 cols on Desktop */}
+                <Card className="lg:col-span-1 xl:col-span-4" title="Savings Projections">
                     <div className="flex justify-between mt-2 mb-6">
                         <div>
                             <p className="text-xs text-gray-500 font-medium">Total Saved YTD</p>
@@ -100,7 +96,6 @@ export default function ProOverviewPage() {
                         </div>
                     </div>
                     
-                    {/* Fake Stacked Bar Chart - Representing different savings buckets over time */}
                     <div className="h-40 flex items-end justify-between gap-2 px-2 mt-4">
                         <StackedBar h1="30%" h2="20%" h3="20%" label="JAN" />
                         <StackedBar h1="40%" h2="25%" h3="35%" label="FEB" />
@@ -111,7 +106,8 @@ export default function ProOverviewPage() {
                 </Card>
 
                 {/* 3. LINKED ACCOUNTS */}
-                <Card className="lg:col-span-3 flex flex-col" title="Linked Accounts">
+                {/* 1 col on iPad, 3 cols on Desktop */}
+                <Card className="lg:col-span-1 xl:col-span-3 flex flex-col" title="Linked Accounts">
                     <div className="flex-1 flex flex-col gap-4 mt-4">
                         <AccountRow icon={Landmark} bg="bg-blue-600" title="Chase Checking" subtitle="...4920" balance="$4,250.00" />
                         <AccountRow icon={CreditCard} bg="bg-slate-800 dark:bg-slate-700" title="Amex Platinum" subtitle="...1002" balance="-$1,240.50" isDebt />
@@ -125,11 +121,12 @@ export default function ProOverviewPage() {
 
             </div>
 
-            {/* --- BOTTOM ROW: 2 COLUMNS --- */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            {/* --- BOTTOM ROW: IPAD (3 COLS) -> DESKTOP (12 COLS) --- */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 xl:grid-cols-12 gap-6">
                 
                 {/* 4. CASH FLOW (Line Chart) */}
-                <Card className="lg:col-span-8 flex flex-col" title="Cash Flow Trend" 
+                {/* 2 cols on iPad, 8 cols on Desktop */}
+                <Card className="lg:col-span-2 xl:col-span-8 flex flex-col" title="Cash Flow Trend" 
                     action={
                         <div className="flex bg-gray-50 dark:bg-[#1a1a1a] p-1 rounded-lg border border-gray-100 dark:border-gray-800 text-[11px] font-medium">
                             <button className="px-3 py-1 text-gray-500 hover:text-gray-900 dark:hover:text-white">1M</button>
@@ -149,14 +146,11 @@ export default function ProOverviewPage() {
                         </div>
                     </div>
 
-                    {/* Fake Spline Area Chart */}
                     <div className="relative h-48 w-full border-b border-gray-100 dark:border-gray-800/50 mb-4">
-                        {/* Fake Grid lines */}
                         <div className="absolute inset-0 flex flex-col justify-between pointer-events-none">
                             {[1,2,3,4].map(i => <div key={i} className="w-full border-t border-gray-50 dark:border-gray-800/30 h-0"></div>)}
                         </div>
                         
-                        {/* Green Line (Income) */}
                         <svg className="absolute inset-0 w-full h-full" preserveAspectRatio="none" viewBox="0 0 100 100">
                             <defs>
                                 <linearGradient id="greenGrad" x1="0" y1="0" x2="0" y2="1">
@@ -168,7 +162,6 @@ export default function ProOverviewPage() {
                             <path d="M 0 60 C 20 40, 30 70, 50 30 C 70 -10, 80 50, 100 40" fill="none" stroke="#10b981" strokeWidth="2" strokeLinecap="round" />
                         </svg>
 
-                        {/* Purple Line (Expense) */}
                         <svg className="absolute inset-0 w-full h-full" preserveAspectRatio="none" viewBox="0 0 100 100">
                             <defs>
                                 <linearGradient id="purpleGrad" x1="0" y1="0" x2="0" y2="1">
@@ -181,12 +174,10 @@ export default function ProOverviewPage() {
                         </svg>
                     </div>
 
-                    {/* Chart X-Axis Labels */}
                     <div className="flex justify-between text-[10px] text-gray-400 font-bold tracking-wider px-2 mb-8">
-                        <span>JAN</span><span>FEB</span><span>MAR</span><span>APR</span><span>MAY</span><span className="text-gray-900 dark:text-white">JUN</span><span>JUL</span><span>AUG</span><span>SEP</span><span>OCT</span><span>NOV</span><span>DEC</span>
+                        <span>JAN</span><span className="hidden sm:inline">FEB</span><span>MAR</span><span className="hidden sm:inline">APR</span><span>MAY</span><span className="text-gray-900 dark:text-white">JUN</span><span className="hidden sm:inline">JUL</span><span>AUG</span><span className="hidden sm:inline">SEP</span><span>OCT</span><span className="hidden sm:inline">NOV</span><span>DEC</span>
                     </div>
 
-                    {/* Footer Stats */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-6 border-t border-gray-100 dark:border-gray-800/50">
                         <div>
                             <p className="text-xs text-gray-500 font-medium">Average Monthly Income</p>
@@ -198,30 +189,25 @@ export default function ProOverviewPage() {
                             <h4 className="text-2xl font-bold text-gray-900 dark:text-white">$4,300<span className="text-gray-400 text-lg">.50</span></h4>
                             <p className="text-[10px] text-green-500 font-bold mt-1 bg-green-50 dark:bg-green-500/10 inline-block px-2 py-0.5 rounded-full">-2.1% <span className="text-gray-400 font-normal">vs last 6 months</span></p>
                         </div>
-                        <div className="flex items-center text-xs text-gray-500 leading-relaxed border-l border-gray-100 dark:border-gray-800 pl-6">
+                        <div className="flex items-center text-xs text-gray-500 leading-relaxed border-t md:border-t-0 md:border-l border-gray-100 dark:border-gray-800 pt-4 md:pt-0 md:pl-6">
                             Your cash flow is exceptionally healthy. Dining out expenses decreased by 12% this month, keeping your overall spending well below your income line.
                         </div>
                     </div>
                 </Card>
 
                 {/* 5. SPENDING BY CATEGORY (Nested Donut) */}
-                <Card className="lg:col-span-4 flex flex-col" title="Spending by Category">
+                {/* 1 col on iPad, 4 cols on Desktop */}
+                <Card className="lg:col-span-1 xl:col-span-4 flex flex-col" title="Spending by Category">
                     <div className="flex-1 flex flex-col items-center justify-center mt-6">
-                        {/* Nested Donut Fake */}
                         <div className="relative w-48 h-48 mb-8">
                             <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
-                                {/* Outer (Purple - Housing) */}
                                 <circle cx="50" cy="50" r="40" fill="none" stroke="#8b5cf6" strokeWidth="6" strokeDasharray="200 251" strokeLinecap="round" />
-                                {/* Middle (Green - Food) */}
                                 <circle cx="50" cy="50" r="30" fill="none" stroke="#10b981" strokeWidth="6" strokeDasharray="140 188" strokeLinecap="round" />
-                                {/* Inner (Yellow - Transport) */}
                                 <circle cx="50" cy="50" r="20" fill="none" stroke="#f59e0b" strokeWidth="6" strokeDasharray="80 125" strokeLinecap="round" />
-                                {/* Innermost (Pink - Subs) */}
                                 <circle cx="50" cy="50" r="10" fill="none" stroke="#ec4899" strokeWidth="6" strokeDasharray="30 62" strokeLinecap="round" />
                             </svg>
                         </div>
 
-                        {/* 4x4 Grid Stats */}
                         <div className="grid grid-cols-2 gap-3 w-full">
                             <ExpenseBox label="Housing & Utilities" icon={Home} value="42%" trend="-$50" isUp={true} />
                             <ExpenseBox label="Food & Dining" icon={Utensils} value="24%" trend="+$120" isUp={false} />
@@ -237,7 +223,7 @@ export default function ProOverviewPage() {
 }
 
 // ==========================================
-// SUB-COMPONENTS (Keep in same file for now)
+// SUB-COMPONENTS
 // ==========================================
 interface CardProps {
     title: string;
@@ -314,7 +300,6 @@ function StackedBar({ h1, h2, h3, label }: StackedBarProps) {
     return (
         <div className="flex flex-col items-center gap-3 w-full">
             <div className="flex flex-col justify-end w-4 sm:w-8 h-32 gap-0.5 group cursor-pointer">
-                {/* Visualizing 3 different savings buckets (e.g. Emergency, Travel, Investments) */}
                 <div className="w-full bg-pink-400 dark:bg-pink-500 rounded-t-sm group-hover:opacity-80 transition-opacity" style={{ height: h3 }}></div>
                 <div className="w-full bg-purple-600 dark:bg-purple-500 group-hover:opacity-80 transition-opacity" style={{ height: h2 }}></div>
                 <div className="w-full bg-green-500 dark:bg-green-500 rounded-b-sm group-hover:opacity-80 transition-opacity" style={{ height: h1 }}></div>
@@ -369,7 +354,6 @@ function ExpenseBox({ label, icon: Icon, value, trend, isUp }: ExpenseBoxProps) 
             </div>
             <div className="flex items-end justify-between mt-2">
                 <h4 className="text-xl font-bold text-gray-900 dark:text-white leading-none">{value}</h4>
-                {/* For expenses, a decrease (isUp=true) is "good" (green), an increase is "bad" (red) */}
                 <div className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${isUp ? 'text-green-500 bg-green-50 dark:bg-green-500/10' : 'text-red-500 bg-red-50 dark:bg-red-500/10'}`}>
                     {trend}
                 </div>

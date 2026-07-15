@@ -146,7 +146,7 @@ export default function CategoriesPage() {
 			{/* MOBILE SIDEBAR OVERLAY */}
 			{isSidebarOpen && (
 				<div
-					className="fixed inset-0 bg-black/60 backdrop-blur-sm z-100 lg:hidden"
+					className="fixed inset-0 bg-black/60 backdrop-blur-sm z-100 xl:hidden"
 					onClick={() => setIsSidebarOpen(false)}
 				/>
 			)}
@@ -154,7 +154,7 @@ export default function CategoriesPage() {
 			{/* LEFT SIDEBAR (Desktop: static, Mobile: fixed drawer) */}
 			<div
 				className={`
-                fixed inset-y-0 left-0 z-101 w-64 bg-gray-50 dark:bg-[#0d0d0d] border-r border-black/5 dark:border-white/5 flex flex-col transition-transform duration-300 lg:relative lg:translate-x-0
+                fixed inset-y-0 left-0 z-101 w-64 bg-gray-50 dark:bg-[#0d0d0d] border-r border-black/5 dark:border-white/5 flex flex-col transition-transform duration-300 xl:relative xl:translate-x-0
                 ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"}
             `}
 			>
@@ -166,7 +166,7 @@ export default function CategoriesPage() {
 						type="button"
 						aria-label="Close"
 						onClick={() => setIsSidebarOpen(false)}
-						className="lg:hidden p-1 text-gray-900 dark:text-white"
+						className="xl:hidden p-1 text-gray-900 dark:text-white"
 					>
 						<X size={20} />
 					</button>
@@ -181,7 +181,7 @@ export default function CategoriesPage() {
 									onClick={() => {
 										setTransactionType(type);
 										setActivePrimary("All");
-										if (window.innerWidth < 1024) setIsSidebarOpen(false);
+										if (window.innerWidth < 1280) setIsSidebarOpen(false);
 									}}
 									className={`py-2.5 text-center transition-colors border-b border-black/5 dark:border-white/5 last:border-b-0 ${
 										transactionType === type
@@ -261,7 +261,7 @@ export default function CategoriesPage() {
 							type="button"
 							aria-label="Menu"
 							onClick={() => setIsSidebarOpen(true)}
-							className="lg:hidden p-2 bg-black/5 dark:bg-white/5 rounded-lg border border-black/10 dark:border-white/10 text-gray-900 dark:text-white"
+							className="xl:hidden p-2 bg-black/5 dark:bg-white/5 rounded-lg border border-black/10 dark:border-white/10 text-gray-900 dark:text-white"
 						>
 							<Menu size={20} />
 						</button>
