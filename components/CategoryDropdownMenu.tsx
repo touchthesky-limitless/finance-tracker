@@ -124,7 +124,6 @@ export function CategoryDropdownMenu({
                 <div className="flex items-center gap-3 bg-white dark:bg-[#1a1a1a] px-4 py-3 rounded-xl border border-gray-200 dark:border-white/10 focus-within:border-orange-500 focus-within:ring-2 focus-within:ring-orange-500/20 transition-all shadow-sm">
                     <Search size={16} className="text-gray-400" />
                     <input
-                        autoFocus
                         ref={inputRef}
                         placeholder="Search categories..."
                         className="bg-transparent text-sm text-gray-900 dark:text-white outline-none w-full placeholder:text-gray-400"
@@ -138,7 +137,6 @@ export function CategoryDropdownMenu({
                             type="button"
                             onClick={() => {
                                 setCatQuery("");
-                                inputRef.current?.focus();
                             }}
                             className="p-1 hover:bg-gray-100 dark:hover:bg-white/10 rounded-lg transition-colors text-gray-400 hover:text-gray-900 dark:hover:text-white"
                         >

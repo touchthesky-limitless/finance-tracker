@@ -325,35 +325,32 @@ export default function TransactionsPage() {
 				</div>
 
 				<div
-					className={`flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full md:w-auto ${showMobileFilters ? "flex" : "hidden md:flex"}`}
+					className={`flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full md:w-auto mt-3 md:mt-0 ${showMobileFilters ? "flex" : "hidden md:flex"}`}
 				>
 					<div className="relative flex-1 flex flex-col sm:flex-row gap-2">
 						<SearchInput
 							ref={inputRef}
 							searchIconClassName="text-gray-400"
-							inputClassName="bg-white dark:bg-[#121212] border border-gray-200 dark:border-white/10 rounded-xl py-2 pl-10 pr-4 text-sm focus:ring-1 focus:ring-orange-500 outline-none w-full md:w-64 transition-all placeholder:text-gray-400"
+							// Reduced py-2 to py-1.5 for a slimmer profile
+							inputClassName="bg-white dark:bg-[#121212] border border-gray-200 dark:border-white/10 rounded-xl py-1.5 pl-10 pr-10 text-sm focus:ring-1 focus:ring-orange-500 outline-none w-full md:w-64 transition-all placeholder:text-gray-400"
 							value={searchQuery}
 							onClear={handleClear}
-							onChange={(e) => {
-								setSearchQuery(e.target.value);
-							}}
-							placeholder="Search transactions"
+							onChange={(e) => setSearchQuery(e.target.value)}
+							placeholder="Search transactions..."
 						/>
-						{/* Extracted Category Filter for Mobile Accessibility */}
-						<div className="flex items-center gap-2 w-full sm:w-auto bg-white dark:bg-[#121212] border border-gray-200 dark:border-white/10 rounded-xl px-2 py-1">
+
+						<div className="flex items-center gap-2 w-full sm:w-auto bg-white dark:bg-[#121212] border border-gray-200 dark:border-white/10 rounded-xl px-2 py-0.5">
 							<CategorySelector
 								variant="filter"
 								currentCategory={categoryFilter || "All Categories"}
-								onSelect={(sub) => {
-									setCategoryFilter(sub === "All" ? null : sub);
-								}}
+								onSelect={(sub) =>
+									setCategoryFilter(sub === "All" ? null : sub)
+								}
 							/>
 							{categoryFilter && (
 								<button
-									onClick={() => {
-										setCategoryFilter(null);
-									}}
-									className="text-orange-500 hover:text-orange-400 p-1 bg-orange-50 dark:bg-orange-500/10 rounded-full ml-auto"
+									onClick={() => setCategoryFilter(null)}
+									className="text-orange-500 hover:text-orange-400 p-1 bg-orange-50 dark:bg-orange-500/10 rounded-full ml-auto shrink-0"
 								>
 									<X size={14} strokeWidth={3} />
 								</button>
@@ -361,29 +358,21 @@ export default function TransactionsPage() {
 						</div>
 					</div>
 
-					<div className="flex items-center justify-between sm:justify-end gap-2 mt-2 sm:mt-0">
+					{/* Removed the mt-2 margin that was pushing this down on mobile */}
+					<div className="flex items-center justify-between sm:justify-end gap-2">
 						<button
-							className="hidden md:flex items-center gap-2 px-4 py-2 bg-orange-600 hover:bg-orange-500 text-white rounded-xl text-sm font-bold transition-all shadow-lg shadow-orange-600/20 active:scale-95"
+							className="hidden md:flex items-center gap-2 px-4 py-1.5 bg-orange-600 hover:bg-orange-500 text-white rounded-xl text-sm font-bold transition-all shadow-lg shadow-orange-600/20 active:scale-95"
 							onClick={handleAddTransaction}
 						>
 							<Plus size={16} strokeWidth={2.5} />
 							<span>Add</span>
 						</button>
 						<button
-							className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-white dark:bg-[#121212] border border-gray-200 dark:border-white/10 hover:bg-gray-50 dark:hover:bg-white/5 text-gray-700 dark:text-gray-300 rounded-xl text-sm font-bold transition-all active:scale-95"
-							onClick={() => {
-								setShowUploader(true);
-							}}
+							className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-1.5 bg-white dark:bg-[#121212] border border-gray-200 dark:border-white/10 hover:bg-gray-50 dark:hover:bg-white/5 text-gray-700 dark:text-gray-300 rounded-xl text-sm font-bold transition-all active:scale-95"
+							onClick={() => setShowUploader(true)}
 						>
 							<Upload size={16} />
 							<span>Import</span>
-						</button>
-						<button
-							disabled
-							className="hidden md:flex p-2 bg-gray-100 dark:bg-white/5 text-gray-400 dark:text-gray-600 rounded-xl cursor-not-allowed opacity-50 shrink-0"
-							title="Clear all data"
-						>
-							<Trash2 size={18} />
 						</button>
 					</div>
 				</div>
