@@ -8,7 +8,6 @@ import {
 	X,
 	ChevronLeft,
 	ChevronRight,
-	Filter,
 } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { useBudgetStore } from "@/store/useBudgetStore";
@@ -80,7 +79,6 @@ export default function TransactionsPage() {
 		categoryQuery,
 	);
 	const [, setIsEditModalOpen] = useState(false);
-	const [showMobileFilters, setShowMobileFilters] = useState(false);
 
 	const [currentPage, setCurrentPage] = useState(1);
 	const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -296,8 +294,9 @@ export default function TransactionsPage() {
 		<div className="block md:flex md:flex-col md:h-full bg-transparent text-slate-900 dark:text-gray-300 transition-colors animate-in fade-in duration-300 relative">
 			{/* 1. RESPONSIVE ACTION BAR */}
 			<div className="p-4 md:p-6 border-b border-gray-200/50 dark:border-white/5 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white/80 dark:bg-[#050505]/80 backdrop-blur-md transform-gpu z-30 sticky top-0">
-				<div className="flex items-center justify-between w-full md:w-auto">
-					<div className="flex items-center gap-3">
+				<div className="flex flex-col sm:flex-row w-full items-center gap-3 md:gap-6">
+					{/* Title & Count (Always visible on iPad/PC, hidden on small phones to maximize search space) */}
+					<div className="hidden sm:flex items-center gap-3 shrink-0">
 						<h2 className="text-xl font-black tracking-tight text-gray-900 dark:text-white">
 							Transactions
 						</h2>
@@ -305,44 +304,26 @@ export default function TransactionsPage() {
 							{transactions.length} total
 						</span>
 					</div>
-					{/* Mobile Buttons */}
-					<div className="md:hidden flex items-center gap-2">
-						<button
-							onClick={() => {
-								setShowMobileFilters(!showMobileFilters);
-							}}
-							className="p-2 bg-gray-100 dark:bg-white/5 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-white/10 rounded-xl transition-colors"
-						>
-							<Filter size={18} />
-						</button>
-						<button
-							className="flex items-center justify-center p-2 bg-orange-600 hover:bg-orange-500 text-white rounded-xl transition-all shadow-lg shadow-orange-600/20 active:scale-95"
-							onClick={handleAddTransaction}
-						>
-							<Plus size={18} strokeWidth={2.5} />
-						</button>
-					</div>
-				</div>
 
-				<div
-					className={`flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full md:w-auto mt-3 md:mt-0 ${showMobileFilters ? "flex" : "hidden md:flex"}`}
-				>
-					<div className="relative flex-1 flex flex-col sm:flex-row gap-2">
-						<SearchInput
-							ref={inputRef}
-							searchIconClassName="text-gray-400"
-							// Reduced py-2 to py-1.5 for a slimmer profile
-							inputClassName="bg-white dark:bg-[#121212] border border-gray-200 dark:border-white/10 rounded-xl py-1.5 pl-10 pr-10 text-sm focus:ring-1 focus:ring-orange-500 outline-none w-full md:w-64 transition-all placeholder:text-gray-400"
-							value={searchQuery}
-							onClear={handleClear}
-							onChange={(e) => setSearchQuery(e.target.value)}
-							placeholder="Search transactions..."
-						/>
+					{/* Unified Search, Filter & Add Row */}
+					<div className="flex-1 flex items-center gap-2 w-full">
+						<div className="flex-1">
+							<SearchInput
+								ref={inputRef}
+								searchIconClassName="text-gray-400"
+								inputClassName="bg-gray-50 dark:bg-[#121212] border border-transparent focus:border-orange-500 dark:focus:border-orange-500/50 rounded-xl py-2 pl-10 pr-10 text-sm outline-none w-full transition-all placeholder:text-gray-500 shadow-sm"
+								value={searchQuery}
+								onClear={handleClear}
+								onChange={(e) => setSearchQuery(e.target.value)}
+								placeholder="Search..."
+							/>
+						</div>
 
-						<div className="flex items-center gap-2 w-full sm:w-auto bg-white dark:bg-[#121212] border border-gray-200 dark:border-white/10 rounded-xl px-2 py-0.5">
+						{/* Compact Filter Dropdown */}
+						<div className="shrink-0 bg-gray-50 dark:bg-[#121212] rounded-xl flex items-center shadow-sm">
 							<CategorySelector
 								variant="filter"
-								currentCategory={categoryFilter || "All Categories"}
+								currentCategory={categoryFilter || "Filter"}
 								onSelect={(sub) =>
 									setCategoryFilter(sub === "All" ? null : sub)
 								}
@@ -350,29 +331,37 @@ export default function TransactionsPage() {
 							{categoryFilter && (
 								<button
 									onClick={() => setCategoryFilter(null)}
-									className="text-orange-500 hover:text-orange-400 p-1 bg-orange-50 dark:bg-orange-500/10 rounded-full ml-auto shrink-0"
+									className="pr-2 pl-1 text-gray-400 hover:text-orange-500 transition-colors"
 								>
 									<X size={14} strokeWidth={3} />
 								</button>
 							)}
 						</div>
-					</div>
 
-					{/* Removed the mt-2 margin that was pushing this down on mobile */}
-					<div className="flex items-center justify-between sm:justify-end gap-2">
+						{/* NEW: Mobile-Only Add Button (Next to Filter) */}
 						<button
-							className="hidden md:flex items-center gap-2 px-4 py-1.5 bg-orange-600 hover:bg-orange-500 text-white rounded-xl text-sm font-bold transition-all shadow-lg shadow-orange-600/20 active:scale-95"
+							className="md:hidden shrink-0 flex items-center justify-center w-10 h-10 bg-orange-600 hover:bg-orange-500 text-white rounded-xl shadow-md shadow-orange-600/20 active:scale-95 transition-all"
 							onClick={handleAddTransaction}
 						>
-							<Plus size={16} strokeWidth={2.5} />
-							<span>Add</span>
+							<Plus size={20} strokeWidth={2.5} />
 						</button>
+					</div>
+
+					{/* Desktop-Only Actions (iPad Pro & PC) */}
+					<div className="hidden md:flex items-center gap-2 shrink-0">
 						<button
-							className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-1.5 bg-white dark:bg-[#121212] border border-gray-200 dark:border-white/10 hover:bg-gray-50 dark:hover:bg-white/5 text-gray-700 dark:text-gray-300 rounded-xl text-sm font-bold transition-all active:scale-95"
+							className="flex items-center justify-center gap-2 px-4 py-2 bg-white dark:bg-[#121212] border border-gray-200 dark:border-white/10 hover:bg-gray-50 dark:hover:bg-white/5 text-gray-700 dark:text-gray-300 rounded-xl text-sm font-bold transition-all shadow-sm active:scale-95"
 							onClick={() => setShowUploader(true)}
 						>
 							<Upload size={16} />
 							<span>Import</span>
+						</button>
+						<button
+							className="flex items-center gap-2 px-4 py-2 bg-orange-600 hover:bg-orange-500 text-white rounded-xl text-sm font-bold transition-all shadow-lg shadow-orange-600/20 active:scale-95"
+							onClick={handleAddTransaction}
+						>
+							<Plus size={16} strokeWidth={2.5} />
+							<span>Add</span>
 						</button>
 					</div>
 				</div>
