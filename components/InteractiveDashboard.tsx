@@ -896,7 +896,7 @@ export default function InteractiveDashboard({
 					</div>
 				</div>
 
-				<div className="space-y-1 max-h-80 overflow-y-auto pr-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+				<div className="space-y-1 max-h-80 overflow-y-auto pr-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] scrollbar-none">
 					{chartData.segments.slice(0, 6).map((entry) => {
 						const style = categoryStyles[entry.name] || { color: "#ccc" };
 						const isSelected = selectedCategory === entry.name;

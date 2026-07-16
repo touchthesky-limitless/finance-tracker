@@ -7,9 +7,6 @@ import { NeedsReviewBadge } from "@/components/ui/NeedsReviewBadge";
 import { CategoryIcon } from "@/components/CategoryIcon";
 import { useUnifiedCategories } from "@/hooks/useUnifiedCategories";
 
-// ==========================================
-// 1. GLOBAL CACHE & STATIC HELPERS
-// ==========================================
 const PARENT_KEYS = Object.keys(CATEGORY_HIERARCHY);
 const PARENT_KEY_SET = new Set(PARENT_KEYS);
 
@@ -22,9 +19,6 @@ interface TransactionRowProps {
 	onSelect?: (id: string, e: React.MouseEvent) => void;
 }
 
-// ==========================================
-// 2. THE COMPONENT
-// ==========================================
 export const TransactionRow = memo(function TransactionRow({
 	transaction,
 	onRowClick,
@@ -33,12 +27,18 @@ export const TransactionRow = memo(function TransactionRow({
 }: TransactionRowProps) {
 	const { allUnifiedCategories } = useUnifiedCategories("Expense", "All");
 
-	const categoryData = useMemo(() => {
-		const transactionCatName = transaction.category.toLowerCase();
-		return allUnifiedCategories.find(
-			(cat) => cat.name.toLowerCase() === transactionCatName,
-		);
-	}, [allUnifiedCategories, transaction.category]);
+	const categoryData = useMemo(
+		function () {
+			const transactionCatName = transaction.category.toLowerCase();
+			for (let i = 0; i < allUnifiedCategories.length; i++) {
+				if (allUnifiedCategories[i].name.toLowerCase() === transactionCatName) {
+					return allUnifiedCategories[i];
+				}
+			}
+			return undefined;
+		},
+		[allUnifiedCategories, transaction.category],
+	);
 
 	const theme = categoryData?.theme || getCategoryTheme("Uncategorized");
 	const iconName = categoryData?.icon || "HelpCircle";
@@ -47,12 +47,6 @@ export const TransactionRow = memo(function TransactionRow({
 
 	const needsReview =
 		transaction.needs_review || isUncategorized || isParentCat;
-
-	// Enforce 10-character limit
-	// let displayMerchant = transaction.merchant;
-	// if (displayMerchant.length > 10) {
-	// 	displayMerchant = displayMerchant.substring(0, 10) + "...";
-	// }
 
 	const isExpense = transaction.amount < 0;
 	const amountColor = isExpense
@@ -67,20 +61,28 @@ export const TransactionRow = memo(function TransactionRow({
 			? `${transaction.account.substring(0, 10)}...`
 			: transaction.account;
 
+	// Extracted event handlers to preserve memoization
+	const handleRowClick = function () {
+		onRowClick(transaction);
+	};
+
+	const handleSelectClick = function (e: React.MouseEvent) {
+		e.stopPropagation();
+		if (onSelect) {
+			onSelect(transaction.id, e);
+		}
+	};
+
 	return (
 		<tr
-			onClick={() => onRowClick(transaction)}
+			onClick={handleRowClick}
 			className={`hover:bg-gray-50 dark:hover:bg-white/5 cursor-pointer transition-colors group border-b border-gray-100 dark:border-white/5 text-sm ${
 				isSelected ? "bg-orange-50/50 dark:bg-orange-500/10" : ""
 			}`}
 		>
-			{/* --- CHECKBOX CELL --- */}
 			<td className="py-4 pl-2 md:pl-3 pr-0 w-8">
 				<div
-					onClick={(e) => {
-						e.stopPropagation();
-						if (onSelect) onSelect(transaction.id, e);
-					}}
+					onClick={handleSelectClick}
 					className={`w-4 h-4 rounded border flex items-center justify-center transition-all cursor-pointer ${
 						isSelected
 							? "bg-orange-600 border-orange-600"
@@ -104,8 +106,6 @@ export const TransactionRow = memo(function TransactionRow({
 					)}
 				</div>
 			</td>
-
-			{/* 1. Merchant */}
 			<td className="py-4 pl-0 pr-2 align-middle">
 				<div className="flex flex-col min-w-0 w-full">
 					<span className="block w-full font-medium text-xs md:text-sm text-gray-900 dark:text-gray-200 uppercase tracking-tight truncate">
@@ -118,8 +118,6 @@ export const TransactionRow = memo(function TransactionRow({
 					)}
 				</div>
 			</td>
-
-			{/* 2. Category Column */}
 			<td className="py-4 px-2">
 				<div className="inline-flex items-center gap-2 px-3 py-1.5">
 					<CategoryIcon name={iconName} size={16} colorClass={theme.text} />
@@ -128,25 +126,17 @@ export const TransactionRow = memo(function TransactionRow({
 					</span>
 				</div>
 			</td>
-
-			{/* 3. AMOUNT */}
 			<td className={`py-4 px-2 text-left font-bold ${amountColor}`}>
 				{formattedAmount}
 			</td>
-
-			{/* 4. ACCOUNT */}
 			<td className="py-4 px-2 text-gray-500 text-xs italic">
 				{displayAccount}
 			</td>
-
-			{/* 5: Tags Column */}
 			<td className="py-4 px-2">
 				<span className="text-[10px] text-gray-400 dark:text-gray-600 font-medium uppercase tracking-wider">
 					Tags
 				</span>
 			</td>
-
-			{/* 6: Status Column */}
 			<td className="py-4 px-2">
 				{needsReview ? (
 					<NeedsReviewBadge />

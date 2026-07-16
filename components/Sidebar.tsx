@@ -64,7 +64,11 @@ const NAV_LINKS = [
 const NavLink = memo(
 	({ href, name, icon, onClick, isPrimary }: NavLinkProps) => {
 		const pathname = usePathname();
-		const active = pathname === href;
+
+		// FIX: Use startsWith for "/budget" so children remain highlighted,
+		// but keep strict equality for others to prevent accidental matching.
+		const active =
+			href === "/budget" ? pathname.startsWith("/budget") : pathname === href;
 
 		const displayClass =
 			isPrimary && enableBottomNav ? "hidden lg:flex" : "flex";

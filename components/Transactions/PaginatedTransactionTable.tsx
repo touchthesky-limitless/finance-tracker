@@ -15,37 +15,44 @@ export function PaginatedTransactionTable({
 	itemsPerPage = 15,
 }: PaginatedTableProps) {
 	const [currentPage, setCurrentPage] = useState(1);
-
-	// 1. THE MICRO-DEFERRAL FIX
-	// This tells the component to wait 1 frame before rendering the heavy rows,
-	// which unblocks the Next.js router and makes the Sidebar click feel instant.
 	const [isMounted, setIsMounted] = useState(false);
-	
-	useEffect(() => {
-        // By wrapping this in a setTimeout, we push the state update to the 
-        // end of the execution queue. This satisfies the linter AND guarantees 
-        // the browser has time to close the sidebar before rendering the rows.
-        const timer = setTimeout(() => {
-            setIsMounted(true);
-        }, 0); 
 
-        return () => clearTimeout(timer);
-    }, []);
+	useEffect(function () {
+		const timer = setTimeout(function () {
+			setIsMounted(true);
+		}, 0);
+
+		return function () {
+			clearTimeout(timer);
+		};
+	}, []);
 
 	const totalPages = Math.max(1, Math.ceil(transactions.length / itemsPerPage));
 	const startIndex = (currentPage - 1) * itemsPerPage;
 	const endIndex = startIndex + itemsPerPage;
 
-	const currentTransactions = useMemo(() => {
-		return transactions.slice(startIndex, endIndex);
-	}, [transactions, startIndex, endIndex]);
+	const currentTransactions = useMemo(
+		function () {
+			const result = [];
+			const limit = Math.min(endIndex, transactions.length);
+			for (let i = startIndex; i < limit; i++) {
+				result.push(transactions[i]);
+			}
+			return result;
+		},
+		[transactions, startIndex, endIndex],
+	);
 
-	const goToNextPage = () => {
-		if (currentPage < totalPages) setCurrentPage((p) => p + 1);
+	const goToNextPage = function () {
+		setCurrentPage(function (p) {
+			return p < totalPages ? p + 1 : p;
+		});
 	};
 
-	const goToPrevPage = () => {
-		if (currentPage > 1) setCurrentPage((p) => p - 1);
+	const goToPrevPage = function () {
+		setCurrentPage(function (p) {
+			return p > 1 ? p - 1 : p;
+		});
 	};
 
 	if (transactions.length === 0) {
@@ -71,7 +78,6 @@ export function PaginatedTransactionTable({
 						</tr>
 					</thead>
 					<tbody>
-						{/* 2. ONLY RENDER ROWS AFTER MOUNT */}
 						{!isMounted ? (
 							<tr>
 								<td
@@ -84,13 +90,15 @@ export function PaginatedTransactionTable({
 								</td>
 							</tr>
 						) : (
-							currentTransactions.map((t) => (
-								<TransactionRow
-									key={t.id}
-									transaction={t}
-									onRowClick={onRowClick}
-								/>
-							))
+							currentTransactions.map(function (t) {
+								return (
+									<TransactionRow
+										key={t.id}
+										transaction={t}
+										onRowClick={onRowClick}
+									/>
+								);
+							})
 						)}
 					</tbody>
 				</table>
