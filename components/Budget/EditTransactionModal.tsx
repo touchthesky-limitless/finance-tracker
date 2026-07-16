@@ -439,13 +439,12 @@ export default function EditTransactionModal({
 										>
 											<Calendar
 												size={16}
-												className="absolute left-3 md:left-4 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none"
+												className="absolute left-3 md:left-4 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none z-10"
 											/>
 											<input
 												id="date-picker"
 												type="date"
-												// Added the pseudo-element style to the class string
-												className="w-full bg-[#F8F9FB] dark:bg-[#0d0d0d] border border-gray-200 dark:border-gray-800 rounded-xl py-2.5 md:py-3 pl-10 md:pl-12 pr-4 text-sm text-gray-900 dark:text-gray-300 outline-none focus:border-orange-500/50 scheme-light-dark dark:scheme-dark [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:inset-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+												className="relative min-w-0 w-full bg-[#F8F9FB] dark:bg-[#0d0d0d] border border-gray-200 dark:border-gray-800 rounded-xl py-2.5 md:py-3 pl-10 md:pl-12 pr-4 text-sm text-gray-900 dark:text-gray-300 outline-none focus:border-orange-500/50 scheme-light-dark dark:scheme-dark [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:inset-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:cursor-pointer"
 												value={editedData.date}
 												onChange={(e) =>
 													setEditedData({ ...editedData, date: e.target.value })

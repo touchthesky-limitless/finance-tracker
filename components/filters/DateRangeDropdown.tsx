@@ -113,7 +113,7 @@ export const DateRangeDropdown = memo(function DateRangeDropdown({
 			<button
 				key={p}
 				onClick={() => handlePresetClick(p)}
-				className={`text-left px-3 py-2 text-xs font-semibold rounded-lg transition-colors
+				className={`text-left px-2 py-2 text-xs font-semibold rounded-lg transition-colors
                     ${
 											activePreset === p
 												? "bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-400"
@@ -215,18 +215,23 @@ export const DateRangeDropdown = memo(function DateRangeDropdown({
 				<Popover.Content
 					sideOffset={8}
 					align="end"
-					className="z-100 w-[calc(100vw-2rem)] sm:w-120 bg-white dark:bg-[#121212] border border-gray-200 dark:border-gray-800 rounded-2xl shadow-2xl flex flex-col sm:flex-row overflow-hidden animate-in fade-in zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out data-[state=closed]:zoom-out-95"
+					// 1. Reverted to safe Radix dimensions, but added max-h-[85vh] to prevent overflowing off small screens
+					className="z-100 w-[calc(100vw-2rem)] sm:w-120 max-h-[85vh] bg-white dark:bg-[#121212] border border-gray-200 dark:border-gray-800 rounded-2xl shadow-2xl flex flex-col sm:flex-row overflow-hidden animate-in fade-in zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out data-[state=closed]:zoom-out-95"
 				>
 					{/* --- LEFT: PRESETS --- */}
-					<div className="w-full sm:w-1/3 bg-gray-50 dark:bg-[#0d0d0d] border-b sm:border-b-0 sm:border-r border-gray-200 dark:border-gray-800 p-2 flex flex-col gap-1">
-						<p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider px-3 pt-2 pb-1">
+					<div className="w-full shrink-0 sm:w-1/3 bg-gray-50 dark:bg-[#0d0d0d] border-b sm:border-b-0 sm:border-r border-gray-200 dark:border-gray-800 p-2 flex flex-col gap-1">
+						<p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider px-3 pt-2 pb-1 shrink-0">
 							Filters
 						</p>
-						{presetElements}
+						{/* 2. Changed to a horizontal flex-row on mobile to save massive vertical space */}
+						<div className="flex flex-row sm:flex-col overflow-x-auto scrollbar-hide  sm:pb-0">
+							{presetElements}
+						</div>
 					</div>
 
 					{/* --- RIGHT: DYNAMIC CONTENT --- */}
-					<div className="w-full sm:w-2/3 p-4 flex flex-col h-full justify-between">
+					{/* 3. Added overflow-y-auto so the calendar itself can scroll if the phone screen is very short */}
+					<div className="w-full sm:w-2/3 p-4 flex flex-col h-full justify-between overflow-y-auto">
 						{activePreset === "Custom Range" ? (
 							<div className="flex justify-center mb-4 pb-2 border-b border-gray-100 dark:border-gray-800">
 								<DayPicker
@@ -234,7 +239,6 @@ export const DateRangeDropdown = memo(function DateRangeDropdown({
 									selected={dateRange}
 									onSelect={setDateRange}
 									showOutsideDays={true}
-									// 1. THE FIX: Added "relative" here so buttons anchor to the calendar!
 									className="font-sans relative"
 									classNames={{
 										months:
@@ -245,14 +249,10 @@ export const DateRangeDropdown = memo(function DateRangeDropdown({
 										caption_label:
 											"text-sm font-medium text-gray-900 dark:text-white",
 										nav: "space-x-1 flex items-center",
-
-										// 2. Updated to left-0/right-0 and top-1 for perfect alignment
 										button_previous:
 											"absolute left-0 top-1 z-10 h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100 border border-gray-200 dark:border-gray-700 rounded-md flex items-center justify-center",
 										button_next:
 											"absolute right-0 top-1 z-10 h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100 border border-gray-200 dark:border-gray-700 rounded-md flex items-center justify-center",
-
-										// ... (Keep the rest of your table and day classes exactly the same)
 										month_grid: "w-full border-collapse space-y-1",
 										weekdays: "flex",
 										weekday:
@@ -295,16 +295,16 @@ export const DateRangeDropdown = memo(function DateRangeDropdown({
 						)}
 
 						{/* --- ACTION ROW --- */}
-						<div className="pt-4 border-t border-gray-100 dark:border-gray-800 flex justify-between items-center mt-auto">
+						<div className="pt-4 border-t border-gray-100 dark:border-gray-800 flex justify-between items-center mt-4 sm:mt-auto shrink-0">
 							<button
 								onClick={handleReset}
-								className="text-[10px] font-bold text-gray-400 hover:text-red-500 transition-colors"
+								className="text-[10px] font-bold text-gray-400 hover:text-red-500 transition-colors p-2 -ml-2"
 							>
 								Reset
 							</button>
 							<button
 								onClick={handleApply}
-								className="px-4 py-2 bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-xs font-bold rounded-lg hover:opacity-90 transition-opacity"
+								className="px-4 py-3 sm:py-2 bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-sm sm:text-xs font-bold rounded-xl sm:rounded-lg hover:opacity-90 transition-opacity w-full sm:w-auto text-center ml-4"
 							>
 								Apply Filter
 							</button>
