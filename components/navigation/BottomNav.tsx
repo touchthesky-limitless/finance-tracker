@@ -27,7 +27,7 @@ const BottomNav = memo(function BottomNav({ onOpenMenu }: BottomNavProps) {
 
 	return (
 		<nav
-			className="fixed bottom-6 left-4 right-4 z-50 lg:hidden flex justify-around items-center h-20 rounded-4xl pb-1 
+			className="fixed bottom-2 left-4 right-4 z-50 lg:hidden flex justify-around items-center h-20 rounded-4xl pb-1 
     bg-white/40 dark:bg-[#1a1a1a]/40 
     backdrop-blur-3xl 
     border border-white/30 dark:border-white/10

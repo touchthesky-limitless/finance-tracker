@@ -148,9 +148,13 @@ const Sidebar = memo(function Sidebar() {
 			{/* On mobile: Completely hidden if BottomNav is true, otherwise uses legacy drawer. On desktop: Always visible. */}
 			<aside
 				className={`
-                    fixed inset-y-0 left-0 z-60 w-72 bg-gray-50 dark:bg-[#050505] border-r border-gray-200 dark:border-white/5 
-                    flex flex-col transform-gpu transition-transform duration-200 ease-out
-                    lg:translate-x-0 lg:static lg:w-64 lg:z-auto
+                    fixed inset-y-0 left-0 z-60 w-72 
+					bg-white/30 dark:bg-[#0d0d0d]/40 
+					backdrop-blur-3xl 
+					border-r border-white/20 dark:border-white/5
+					shadow-[0_0_40px_rgba(0,0,0,0.1)]
+					flex flex-col transform-gpu transition-transform duration-300 ease-in-out
+					lg:translate-x-0 lg:static lg:w-72
                     ${isOpen ? "translate-x-0" : "-translate-x-full"}
                 `}
 			>
