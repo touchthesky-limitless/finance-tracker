@@ -1,42 +1,100 @@
 "use client";
 
-import { useState, memo, useCallback } from "react";
-import { Menu, X } from "lucide-react";
+import { useState, memo, useCallback, useRef, useEffect } from "react";
+import { X, ChevronDown } from "lucide-react";
 import { VersionProvider } from "@/app/context/VersionContext";
 import ProSidebar from "@/components/Sidebar/ProSidebar";
 import { usePathname } from "next/navigation";
+import Link from "next/link";
 import { useBudgetStore } from "@/store/useBudgetStore";
 import { UndoToast } from "@/components/ui/UndoToast";
+import { NAV_GROUPS } from "@/config/navigation";
+import { FeatureGuard } from "@/components/ui/FeatureGuard";
 
-// 1. ISOLATE THE URL DEPENDENCY
-// This tiny component handles the title so the giant Layout doesn't have to re-render.
-const MobileHeaderTitle = memo(function MobileHeaderTitle() {
+// 1. NEW CONTEXTUAL DROPDOWN NAV
+const LocalNavigation = memo(function LocalNavigation() {
 	const pathname = usePathname();
+	const [isOpen, setIsOpen] = useState(false);
+	const dropdownRef = useRef<HTMLDivElement>(null);
 
-	const PAGE_TITLES: Record<string, string> = {
-		"/budget": "Dashboard",
-		"/budget/transactions": "Transaction Details",
-		"/budget/accounts": "Accounts",
-		"/budget/categories": "Categories",
-		"/budget/stats": "Statistics & Analysis",
-		"/budget/insights": "Insights Explorer",
-	};
-
-	let currentTitle = "Budget Tracker";
-
-	// Using a standard loop to evaluate the current route
-	const titleKeys = Object.keys(PAGE_TITLES);
-	for (let i = 0; i < titleKeys.length; i++) {
-		if (pathname === titleKeys[i]) {
-			currentTitle = PAGE_TITLES[titleKeys[i]];
-			break;
+	// Close the dropdown if clicking outside
+	useEffect(() => {
+		function handleClickOutside(event: MouseEvent) {
+			if (
+				dropdownRef.current &&
+				!dropdownRef.current.contains(event.target as Node)
+			) {
+				setIsOpen(false);
+			}
 		}
-	}
+		document.addEventListener("mousedown", handleClickOutside);
+		return () => document.removeEventListener("mousedown", handleClickOutside);
+	}, []);
+
+	// Flatten your config to easily find the active page title
+	const allNavItems = NAV_GROUPS.flatMap((group) => group.items);
+	const currentItem = allNavItems.find((item) => item.href === pathname);
+	const currentTitle = currentItem ? currentItem.name : "Budget Tracker";
 
 	return (
-		<h1 className="text-gray-900 dark:text-white font-semibold text-sm tracking-tight">
-			{currentTitle}
-		</h1>
+		<div className="relative" ref={dropdownRef}>
+			{/* The Trigger */}
+			<button
+				onClick={() => setIsOpen(!isOpen)}
+				className="flex items-center gap-2 px-3 py-2 -ml-3 rounded-xl hover:bg-gray-100 dark:hover:bg-white/5 transition-colors group"
+			>
+				<h1 className="text-lg md:text-xl font-bold text-gray-900 dark:text-white transition-colors group-hover:text-orange-600 dark:group-hover:text-orange-500">
+					{currentTitle}
+				</h1>
+				<ChevronDown
+					size={20}
+					className={`text-gray-500 transition-transform duration-300 ${isOpen ? "rotate-180 text-orange-600 dark:text-orange-500" : ""}`}
+				/>
+			</button>
+
+			{/* The Dropdown Menu */}
+			{isOpen && (
+				<div className="absolute left-0 top-11.25 z-100 w-64 max-w-50 bg-white dark:bg-[#121212] border border-gray-100 dark:border-gray-800 rounded-2xl shadow-xl overflow-y-auto max-h-[70vh] scrollbar-hide animate-in fade-in slide-in-from-top-2 duration-200">
+					<div className="p-2 flex flex-col gap-1">
+						{NAV_GROUPS.map((group, groupIndex) => (
+							<div key={groupIndex} className="mb-2 last:mb-0">
+								{group.label && (
+									<span className="block text-[10px] font-black uppercase tracking-widest text-gray-400 px-3 pt-2 pb-1">
+										{group.label}
+									</span>
+								)}
+
+								{group.items.map((item) => {
+									const isActive = pathname === item.href;
+									const Icon = item.icon;
+
+									return (
+										<FeatureGuard key={item.href} isLocked={item.isLocked}>
+											<Link
+												href={item.href}
+												onClick={() => setIsOpen(false)}
+												className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+													isActive
+														? "bg-orange-50 dark:bg-orange-500/10 text-orange-600 dark:text-orange-500"
+														: "text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-white"
+												}`}
+											>
+												<div
+													className={`${isActive ? "text-orange-600 dark:text-orange-500" : "text-gray-400"}`}
+												>
+													<Icon size={18} />
+												</div>
+												<span className="flex-1 truncate">{item.name}</span>
+											</Link>
+										</FeatureGuard>
+									);
+								})}
+							</div>
+						))}
+					</div>
+				</div>
+			)}
+		</div>
 	);
 });
 
@@ -84,19 +142,13 @@ function ProLayoutShell({ children }: { children: React.ReactNode }) {
 			)}
 
 			<div className="flex-1 flex flex-col min-w-0">
-				{/* 3. Mobile Header */}
-				<header className="lg:hidden h-16 border-b border-gray-200 dark:border-gray-800 flex items-center px-4 justify-between shrink-0 transform-gpu bg-white dark:bg-[#0d0d0d]">
-					<button
-						type="button"
-						aria-label="Menu"
-						onClick={() => setIsMobileOpen(true)}
-						className="p-2 text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors"
-					>
-						<Menu size={24} />
-					</button>
-					{/* The isolated title component */}
-					<MobileHeaderTitle />
-					<div className="w-10" /> {/* Spacer to keep title centered */}
+				{/* 3. Mobile Header (Updated) */}
+				<header className="relative z-40 lg:hidden h-12 border-b border-gray-200 dark:border-gray-800 flex items-center px-4 justify-between shrink-0 transform-gpu bg-white dark:bg-[#0d0d0d]">
+					{" "}
+					{/* The new interactive title dropdown completely replaces the left burger and static title */}
+					<LocalNavigation />
+					{/* You can add your top-right global menu trigger here later if needed */}
+					<div className="w-10" />
 				</header>
 
 				{/* 4. Main Content Area */}

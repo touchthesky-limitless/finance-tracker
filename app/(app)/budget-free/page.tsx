@@ -6,7 +6,6 @@ import { Search, Trash2 } from "lucide-react";
 import InteractiveDashboard from "@/components/InteractiveDashboard";
 import ClearDataModal from "@/components/ClearDataModal";
 
-
 export default function BudgetPage() {
 	const transactions = useBudgetStore((state) => state.transactions);
 
@@ -25,18 +24,6 @@ export default function BudgetPage() {
 			.filter(Boolean)
 			.sort();
 	}, [transactions, isLoading]);
-
-	// 3. TOGGLE LOGIC
-	const toggleBank = (bank: string) => {
-		setSelectedBanks((prev) => {
-			// If already selected, remove it
-			if (prev.includes(bank)) {
-				return prev.filter((b) => b !== bank);
-			}
-			// Otherwise add it
-			return [...prev, bank];
-		});
-	};
 
 	// 4. FILTER LOGIC
 	const filteredTransactions = useMemo(() => {
@@ -102,28 +89,30 @@ export default function BudgetPage() {
 	}
 
 	return (
-		<div className="min-h-screen bg-white dark:bg-gray-950 p-6 md:p-12 transition-colors">
-			<div className="max-w-6xl mx-auto space-y-8">
+		<div className="min-h-screen bg-white dark:bg-gray-950 p-4 md:p-8 transition-colors">
+			<div className="max-w-6xl mx-auto space-y-6 md:space-y-8">
 				{/* HEADER ROW */}
-				<div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+				<div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 md:gap-6">
 					<div>
-						<h1 className="text-4xl font-extrabold text-gray-900 dark:text-white tracking-tight mb-2">
+						<h1 className="text-2xl md:text-4xl font-extrabold text-gray-900 dark:text-white tracking-tight mb-1 md:mb-2">
 							Financial Dashboard
 						</h1>
-						<p className="text-gray-500 dark:text-gray-400 text-lg">
+						<p className="text-gray-500 dark:text-gray-400 text-sm md:text-lg">
 							Track your spending across all accounts.
 						</p>
 					</div>
-					<div className="flex gap-3">
+					<div className="flex gap-3 w-full md:w-auto">
 						<button
 							disabled={!hasData}
 							onClick={() => setIsDeleteModalOpen(true)}
-							className="flex items-center px-4 py-2 text-sm font-medium text-red-600 bg-red-50 dark:bg-red-900/20 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
+							className="flex-1 md:flex-none justify-center flex items-center px-4 py-2 text-sm font-medium text-red-600 bg-red-50 dark:bg-red-900/20 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
 						>
 							<Trash2 size={18} />
 							Clear Data
 						</button>
-						<CsvUploader />
+						<div className="flex-1 md:flex-none">
+							<CsvUploader />
+						</div>
 					</div>
 					<ClearDataModal
 						isOpen={isDeleteModalOpen}

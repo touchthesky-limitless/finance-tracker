@@ -375,14 +375,20 @@ export default function TransactionsPage() {
 				<div className="w-full overflow-x-auto md:overflow-auto md:flex-1 scrollbar-hide pb-4 md:pb-0 relative">
 					<table className="w-full min-w-150 border-collapse table-fixed text-sm [&_td]:truncate [&_th]:truncate [&_td]:px-2">
 						<colgroup>
-							<col className="w-7" /> {/* Checkbox: Fixed tight width */}
-							<col className="w-[20%]" />{" "}
-							{/* Name: Reduced from 30% to 20% to close the gap */}
-							<col className="w-[20%]" /> {/* Category */}
-							<col className="w-[12%]" /> {/* Amount */}
-							<col className="w-[18%]" /> {/* Account */}
-							<col className="w-[10%]" /> {/* Tags */}
-							<col className="w-[20%]" /> {/* Status */}
+							{/* Checkbox */}
+							<col className="w-7" />
+							{/* Name */}
+							<col className="w-[20%]" />
+							{/* Category */}
+							<col className="w-[20%]" />
+							{/* Amount */}
+							<col className="w-[12%]" />
+							{/* Account */}
+							<col className="w-[18%]" />
+							{/* Tag */}
+							<col className="w-[10%]" />
+							{/* Status */}
+							<col className="w-[20%]" />
 						</colgroup>
 
 						<thead className="md:sticky md:top-0 bg-[#F8F9FB] dark:bg-[#050505] z-20">
