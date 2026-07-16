@@ -73,7 +73,7 @@ const LocalNavigation = memo(function LocalNavigation() {
 											<Link
 												href={item.href}
 												onClick={() => setIsOpen(false)}
-												className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+												className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all [-webkit-tap-highlight-color:transparent] ${
 													isActive
 														? "bg-orange-50 dark:bg-orange-500/10 text-orange-600 dark:text-orange-500"
 														: "text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-white"

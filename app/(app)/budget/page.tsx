@@ -25,11 +25,10 @@ export default function OverviewPage() {
 	const [isHeaderVisible, setIsHeaderVisible] = useState(true);
 	const lastScrollY = useRef(0);
 
-	// --- Scroll Event Listener targeting <main> ---
 	// --- Mobile-Optimized Scroll Event Listener ---
 	useEffect(() => {
-		// Target the layout's specific scrolling container using its class instead of tag name
-		const scrollContainer = document.querySelector(".overflow-y-auto");
+		// Specifically target the layout's scrolling <main> tag, ignoring the sidebar
+		const scrollContainer = document.querySelector("main.overflow-y-auto");
 		if (!scrollContainer) return;
 
 		const handleScroll = () => {
@@ -105,7 +104,7 @@ export default function OverviewPage() {
 					isHeaderVisible ? "translate-y-0" : "-translate-y-full"
 				}`}
 			>
-				<div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4 py-4 md:py-6 px-4 md:px-8">
+				<div className="flex flex-col lg:flex-row lg:items-end justify-between py-2 md:py-6 px-4 md:px-8">
 					<div className="max-w-2xl">
 						<h1 className="text-xl md:text-3xl font-black text-gray-900 dark:text-white tracking-tighter mb-1 md:mb-2 uppercase">
 							Financial <span className="text-orange-600">Dashboard</span>
