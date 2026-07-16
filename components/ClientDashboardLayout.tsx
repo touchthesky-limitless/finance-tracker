@@ -19,7 +19,7 @@ export default function ClientDashboardLayout({
 	// Show shimmer ONLY on the very first load
 	const showShimmer = !hasHydrated || (isLoading && transactions.length === 0);
 
-	const enableBottomNav = featureFlags.BudgetLayoutEnableBottomNav;
+	const enableBottomNav = featureFlags.ClientDashboardLayoutEnableBottomNav;
 
 	return (
 		<div

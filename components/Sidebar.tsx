@@ -18,7 +18,7 @@ import ThemeToggle from "@/components/ThemeToggle";
 import BottomNav from "@/components/navigation/BottomNav";
 import { featureFlags } from "@/config/featureFlags";
 
-const enableBottomNav = featureFlags.BudgetLayoutEnableBottomNav;
+const enableBottomNav = featureFlags.SidebarEnableBottomNav;
 
 interface NavLinkProps {
 	href: string;

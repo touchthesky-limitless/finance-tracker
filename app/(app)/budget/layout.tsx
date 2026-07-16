@@ -10,6 +10,7 @@ import { useBudgetStore } from "@/store/useBudgetStore";
 import { UndoToast } from "@/components/ui/UndoToast";
 import { NAV_GROUPS } from "@/config/navigation";
 import { FeatureGuard } from "@/components/ui/FeatureGuard";
+import { featureFlags } from "@/config/featureFlags";
 
 // 1. NEW CONTEXTUAL DROPDOWN NAV
 const LocalNavigation = memo(function LocalNavigation() {
@@ -17,7 +18,11 @@ const LocalNavigation = memo(function LocalNavigation() {
 	const [isOpen, setIsOpen] = useState(false);
 	const dropdownRef = useRef<HTMLDivElement>(null);
 
-	// Close the dropdown if clicking outside
+	// The new feature flag
+	const enableHorizontalNav =
+		featureFlags.LayoutLocalNavigationEnableHorizontalNav;
+
+	// Close the dropdown if clicking outside (used in legacy mode)
 	useEffect(() => {
 		function handleClickOutside(event: MouseEvent) {
 			if (
@@ -31,14 +36,71 @@ const LocalNavigation = memo(function LocalNavigation() {
 		return () => document.removeEventListener("mousedown", handleClickOutside);
 	}, []);
 
-	// Flatten your config to easily find the active page title
-	const allNavItems = NAV_GROUPS.flatMap((group) => group.items);
-	const currentItem = allNavItems.find((item) => item.href === pathname);
-	const currentTitle = currentItem ? currentItem.name : "Budget Tracker";
+	// Flatten the groups using a standard loop
+	const allNavItems = [];
+	for (let i = 0; i < NAV_GROUPS.length; i++) {
+		const group = NAV_GROUPS[i];
+		for (let j = 0; j < group.items.length; j++) {
+			allNavItems.push(group.items[j]);
+		}
+	}
 
+	// Find the title of the active page using a standard loop
+	let currentTitle = "Budget Tracker";
+	for (let i = 0; i < allNavItems.length; i++) {
+		if (allNavItems[i].href === pathname) {
+			currentTitle = allNavItems[i].name;
+			break;
+		}
+	}
+
+	// --- PATH 1: NEW HORIZONTAL UBER-EATS STYLE ---
+	if (enableHorizontalNav) {
+		return (
+			<div className="w-full bg-white dark:bg-[#050505] flex flex-col pt-2 pb-1 z-40">
+				{/* Horizontal Scroll Pill Row */}
+				<nav className="w-full">
+					<ul className="flex items-center gap-2 overflow-x-auto scrollbar-hide px-4 py-2 snap-x snap-mandatory">
+						{allNavItems.map((item) => {
+							const isActive = pathname === item.href;
+							const Icon = item.icon;
+
+							return (
+								<li key={item.href} className="snap-start shrink-0">
+									<FeatureGuard isLocked={item.isLocked}>
+										<Link
+											href={item.href}
+											className={`flex items-center gap-1.5 px-3.5 py-2 rounded-full text-[14px] font-medium transition-colors [-webkit-tap-highlight-color:transparent] ${
+												isActive
+													? "bg-gray-100 text-gray-900 border border-transparent dark:bg-white/10 dark:text-white"
+													: "bg-white text-gray-800 border border-gray-300 hover:bg-gray-50 dark:bg-[#0d0d0d] dark:text-gray-300 dark:border-white/15 dark:hover:bg-white/5"
+											}`}
+										>
+											<Icon
+												size={18}
+												className={
+													isActive
+														? "text-gray-900 dark:text-white stroke-[2.5px]"
+														: "text-gray-700 dark:text-gray-400 stroke-[2px]"
+												}
+											/>
+											<span className="whitespace-nowrap tracking-tight">
+												{item.name}
+											</span>
+										</Link>
+									</FeatureGuard>
+								</li>
+							);
+						})}
+					</ul>
+				</nav>
+			</div>
+		);
+	}
+
+	// --- PATH 2: LEGACY CONTEXTUAL DROPDOWN NAV ---
 	return (
 		<div className="relative" ref={dropdownRef}>
-			{/* The Trigger */}
 			<button
 				onClick={() => setIsOpen(!isOpen)}
 				className="flex items-center gap-2 px-3 py-2 -ml-3 rounded-xl hover:bg-gray-100 dark:hover:bg-white/5 transition-colors group"
@@ -52,7 +114,6 @@ const LocalNavigation = memo(function LocalNavigation() {
 				/>
 			</button>
 
-			{/* The Dropdown Menu */}
 			{isOpen && (
 				<div className="absolute left-0 top-11.25 z-100 w-64 max-w-50 bg-white dark:bg-[#121212] border border-gray-100 dark:border-gray-800 rounded-2xl shadow-xl overflow-y-auto max-h-[70vh] scrollbar-hide animate-in fade-in slide-in-from-top-2 duration-200">
 					<div className="p-2 flex flex-col gap-1">
@@ -143,7 +204,7 @@ function ProLayoutShell({ children }: { children: React.ReactNode }) {
 
 			<div className="flex-1 flex flex-col min-w-0">
 				{/* 3. Mobile Header (Updated) */}
-				<header className="relative z-40 lg:hidden h-12 border-b border-gray-200 dark:border-gray-800 flex items-center px-4 justify-between shrink-0 transform-gpu bg-white dark:bg-[#0d0d0d]">
+				<header className="relative z-40 lg:hidden shrink-0 w-full transform-gpu">
 					{" "}
 					{/* The new interactive title dropdown completely replaces the left burger and static title */}
 					<LocalNavigation />

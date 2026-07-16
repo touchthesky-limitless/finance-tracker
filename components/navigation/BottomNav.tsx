@@ -35,7 +35,9 @@ const BottomNav = memo(function BottomNav({ onOpenMenu }: BottomNavProps) {
 		>
 			{/* 1. Map through the standard page links */}
 			{BOTTOM_NAV_LINKS.map((item) => {
-				const isActive = pathname === item.href;
+				// This keeps the tab active if you are on the exact page OR any of its sub-pages
+				const isActive =
+					pathname === item.href || pathname.startsWith(`${item.href}/`);
 				const Icon = item.icon;
 
 				return (

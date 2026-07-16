@@ -1,3 +1,7 @@
 export const featureFlags = {
-    BudgetLayoutEnableBottomNav: true,
+    // BottomNav and Sidebar
+    ClientDashboardLayoutEnableBottomNav: true,
+    SidebarEnableBottomNav: true,
+    // Change from dropdown to horizontal
+    LayoutLocalNavigationEnableHorizontalNav: true,
 };
