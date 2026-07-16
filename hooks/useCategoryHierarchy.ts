@@ -1,129 +1,200 @@
-// This hook handles fetching the unified categories,
-// mapping the static hierarchy to dynamic objects, 
-// processing custom categories, 
-// and handling all the real-time search filtering.
-
 import { useState, useMemo } from "react";
-import { CATEGORY_HIERARCHY, getCategoryTheme, UnifiedCategory } from "@/constants";
+import {
+	CATEGORY_HIERARCHY,
+	getCategoryTheme,
+	UnifiedCategory,
+} from "@/constants";
 import { useUnifiedCategories } from "@/hooks/useUnifiedCategories";
 
 export function useCategoryHierarchy(
-    currentCategory: string,
-    deferredQuery: string
+	currentCategory: string,
+	deferredQuery: string,
 ) {
-    // 1. Fetch categories
-    const { allUnifiedCategories } = useUnifiedCategories("Expense", "All");
+	// 1. Fetch categories
+	const { allUnifiedCategories } = useUnifiedCategories("Expense", "All");
 
-    // 2. Manage parent tab state
-    const [selectedParent, setSelectedParent] = useState<string>(() => {
-        const found = Object.keys(CATEGORY_HIERARCHY).find((parent) => {
-            return (
-                CATEGORY_HIERARCHY[parent].includes(currentCategory) ||
-                currentCategory.startsWith(parent)
-            );
-        });
-        return found || "Food & drink";
-    });
+	// 2. Manage parent tab state
+	const [selectedParent, setSelectedParent] = useState<string>(function () {
+		const parents = Object.keys(CATEGORY_HIERARCHY);
 
-    // 3. Find active category data for the UI trigger
-    const selectedCategoryData = useMemo(() => {
-        return allUnifiedCategories.find((cat) => {
-            return cat.name === currentCategory;
-        });
-    }, [allUnifiedCategories, currentCategory]);
+		for (let i = 0; i < parents.length; i++) {
+			const parent = parents[i];
+			const children = CATEGORY_HIERARCHY[parent];
 
-    // 4. Build the dynamic hierarchy
-    const dynamicHierarchy = useMemo(() => {
-        const base: Record<string, UnifiedCategory[]> = {};
+			let childMatch = false;
+			for (let j = 0; j < children.length; j++) {
+				if (children[j] === currentCategory) {
+					childMatch = true;
+					break;
+				}
+			}
 
-        Object.keys(CATEGORY_HIERARCHY).forEach((parent) => {
-            base[parent] = CATEGORY_HIERARCHY[parent].map((subName) => {
-                const foundCat = allUnifiedCategories.find((c) => {
-                    return c.name === subName;
-                });
-                
-                if (foundCat) {
-                    return foundCat;
-                }
-                
-                return {
-                    name: subName,
-                    icon: subName,
-                    theme: getCategoryTheme(parent),
-                    isCustom: false,
-                } as UnifiedCategory;
-            });
-        });
+			if (childMatch || currentCategory.startsWith(parent)) {
+				return parent;
+			}
+		}
 
-        allUnifiedCategories.forEach((cat) => {
-            if (!cat.isCustom) {
-                return;
-            }
+		return "Food & drink";
+	});
 
-            if (cat.parentName && base[cat.parentName]) {
-                const exists = base[cat.parentName].some((c) => {
-                    return c.name === cat.name;
-                });
-                if (!exists) {
-                    base[cat.parentName].push(cat);
-                }
-            } else if (!cat.parentName) {
-                if (!base[cat.name]) {
-                    base[cat.name] = [];
-                }
-            }
-        });
+	// 3. Find active category data for the UI trigger
+	const selectedCategoryData = useMemo(
+		function () {
+			for (let i = 0; i < allUnifiedCategories.length; i++) {
+				if (allUnifiedCategories[i].name === currentCategory) {
+					return allUnifiedCategories[i];
+				}
+			}
+			return undefined;
+		},
+		[allUnifiedCategories, currentCategory],
+	);
 
-        return base;
-    }, [allUnifiedCategories]);
+	// 4. Build the dynamic hierarchy
+	const dynamicHierarchy = useMemo(
+		function () {
+			const base: Record<string, UnifiedCategory[]> = {};
 
-    // 5. Filter parent tabs based on search
-    const visibleParents = useMemo(() => {
-        const query = deferredQuery.toLowerCase().trim();
-        const parents = Object.keys(dynamicHierarchy);
+			// --- OPTIMIZATION: Create an O(1) Lookup Map ---
+			const categoryMap = new Map<string, UnifiedCategory>();
+			for (let i = 0; i < allUnifiedCategories.length; i++) {
+				categoryMap.set(allUnifiedCategories[i].name, allUnifiedCategories[i]);
+			}
 
-        if (!query) {
-            return parents;
-        }
+			// --- OPTIMIZATION: Single-pass hierarchy building ---
+			const hierarchyKeys = Object.keys(CATEGORY_HIERARCHY);
+			for (let i = 0; i < hierarchyKeys.length; i++) {
+				const parent = hierarchyKeys[i];
+				const subs = CATEGORY_HIERARCHY[parent];
+				const mappedSubs: UnifiedCategory[] = [];
 
-        return parents.filter((parent) => {
-            const matchesParent = parent.toLowerCase().includes(query);
-            const matchesChild = dynamicHierarchy[parent].some((cat) => {
-                return cat.name.toLowerCase().includes(query);
-            });
-            return matchesParent || matchesChild;
-        });
-    }, [deferredQuery, dynamicHierarchy]);
+				for (let j = 0; j < subs.length; j++) {
+					const subName = subs[j];
 
-    // 6. Determine which parent tab is currently active
-    const activeParent = useMemo(() => {
-        const query = deferredQuery.toLowerCase().trim();
-        if (!query) {
-            return selectedParent;
-        }
+					// Instant O(1) lookup instead of O(N) .find()
+					const foundCat = categoryMap.get(subName);
 
-        const matchesParent = selectedParent.toLowerCase().includes(query);
-        const matchesChild = CATEGORY_HIERARCHY[selectedParent]?.some((s) => {
-            return s.toLowerCase().includes(query);
-        });
+					if (foundCat) {
+						mappedSubs.push(foundCat);
+					} else {
+						mappedSubs.push({
+							name: subName,
+							icon: subName,
+							theme: getCategoryTheme(parent),
+							isCustom: false,
+						} as UnifiedCategory);
+					}
+				}
 
-        if (matchesParent || matchesChild) {
-            return selectedParent;
-        }
+				base[parent] = mappedSubs;
+			}
 
-        if (visibleParents.length > 0) {
-            return visibleParents[0];
-        }
-        
-        return selectedParent;
-    }, [deferredQuery, visibleParents, selectedParent]);
+			// Handle Custom Categories
+			for (let i = 0; i < allUnifiedCategories.length; i++) {
+				const cat = allUnifiedCategories[i];
 
-    return {
-        selectedCategoryData,
-        dynamicHierarchy,
-        visibleParents,
-        activeParent,
-        selectedParent,
-        setSelectedParent,
-    };
+				if (!cat.isCustom) continue;
+
+				if (cat.parentName && base[cat.parentName]) {
+					const parentList = base[cat.parentName];
+					let exists = false;
+
+					for (let j = 0; j < parentList.length; j++) {
+						if (parentList[j].name === cat.name) {
+							exists = true;
+							break;
+						}
+					}
+
+					if (!exists) {
+						parentList.push(cat);
+					}
+				} else if (!cat.parentName) {
+					if (!base[cat.name]) {
+						base[cat.name] = [];
+					}
+				}
+			}
+
+			return base;
+		},
+		[allUnifiedCategories],
+	);
+
+	// 5. Filter parent tabs based on search
+	const visibleParents = useMemo(
+		function () {
+			const query = deferredQuery.toLowerCase().trim();
+			const parents = Object.keys(dynamicHierarchy);
+
+			if (!query) return parents;
+
+			const results: string[] = [];
+
+			for (let i = 0; i < parents.length; i++) {
+				const parent = parents[i];
+
+				if (parent.toLowerCase().includes(query)) {
+					results.push(parent);
+					continue;
+				}
+
+				const children = dynamicHierarchy[parent];
+				let childMatch = false;
+
+				if (children) {
+					for (let j = 0; j < children.length; j++) {
+						if (children[j].name.toLowerCase().includes(query)) {
+							childMatch = true;
+							break;
+						}
+					}
+				}
+
+				if (childMatch) {
+					results.push(parent);
+				}
+			}
+
+			return results;
+		},
+		[deferredQuery, dynamicHierarchy],
+	);
+
+	// 6. Determine which parent tab is currently active
+	const activeParent = useMemo(
+		function () {
+			const query = deferredQuery.toLowerCase().trim();
+			if (!query) return selectedParent;
+
+			if (selectedParent.toLowerCase().includes(query)) {
+				return selectedParent;
+			}
+
+			const children = CATEGORY_HIERARCHY[selectedParent];
+			if (children) {
+				for (let i = 0; i < children.length; i++) {
+					if (children[i].toLowerCase().includes(query)) {
+						return selectedParent;
+					}
+				}
+			}
+
+			if (visibleParents.length > 0) {
+				return visibleParents[0];
+			}
+
+			return selectedParent;
+		},
+		[deferredQuery, visibleParents, selectedParent],
+	);
+
+	return {
+		selectedCategoryData,
+		dynamicHierarchy,
+		visibleParents,
+		activeParent,
+		selectedParent,
+		setSelectedParent,
+	};
 }

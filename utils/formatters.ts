@@ -1,61 +1,76 @@
-export const formatMoney = (amount: number) =>
-	new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(
-		amount,
-	);
+// 1. Cache the expensive Intl objects globally
+const moneyFormatter = new Intl.NumberFormat("en-US", {
+	style: "currency",
+	currency: "USD",
+});
 
-export const formatDate = (dateStr: string) => {
+const numberFormatter = new Intl.NumberFormat("en-US", {
+	minimumFractionDigits: 2,
+	maximumFractionDigits: 2,
+});
+
+const shortDateFormatter = new Intl.DateTimeFormat("en-US", {
+	month: "short",
+	day: "numeric",
+	year: "2-digit",
+});
+
+const longDateFormatter = new Intl.DateTimeFormat("en-US", {
+	month: "long",
+	day: "numeric",
+	year: "numeric",
+});
+
+// 2. Convert all 1-line arrow functions to explicit blocks
+export function formatMoney(amount: number) {
+	return moneyFormatter.format(amount);
+}
+
+export function formatDate(dateStr: string) {
 	const d = new Date(dateStr);
-	return isNaN(d.getTime())
-		? dateStr
-		: d.toLocaleDateString("en-US", {
-				month: "short",
-				day: "numeric",
-				year: "2-digit",
-			});
-};
+	if (isNaN(d.getTime())) {
+		return dateStr;
+	}
+	return shortDateFormatter.format(d);
+}
 
-export const formatDateLong = (dateStr: string) => {
+export function formatDateLong(dateStr: string) {
 	const d = new Date(dateStr);
-	return isNaN(d.getTime())
-		? dateStr
-		: d.toLocaleDateString("en-US", {
-				month: "long",
-				day: "numeric",
-				year: "numeric",
-			});
-};
+	if (isNaN(d.getTime())) {
+		return dateStr;
+	}
+	return longDateFormatter.format(d);
+}
 
-// 1000 -> 1,000
-export const formatThousandWithCommas = (val: string | number) => {
-	if (val === undefined || val === null || val === "") return "";
+export function formatThousandWithCommas(val: string | number) {
+	if (val === undefined || val === null || val === "") {
+		return "";
+	}
 	const str = val.toString().replace(/[^0-9.]/g, "");
 	const parts = str.split(".");
 	parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 	return parts.join(".");
-};
+}
 
-export const formatCurrency = (num: number) => {
+export function formatCurrency(num: number) {
 	if (isNaN(num) || num === undefined) {
 		return "$0.00";
 	}
 	const sign = num < 0 ? "-" : "";
 	const absNum = Math.abs(num);
-	return `${sign}$${absNum.toLocaleString("en-US", {
-		minimumFractionDigits: 2,
-		maximumFractionDigits: 2,
-	})}`;
-};
+	return `${sign}$${numberFormatter.format(absNum)}`;
+}
 
-export const formatCompact = (num: number) => {
+export function formatCompact(num: number) {
 	if (isNaN(num) || num === undefined) {
 		return "$0k";
 	}
 	const sign = num < 0 ? "-" : "";
 	const absNum = Math.abs(num);
-	return `${sign}$${(absNum / 1000).toFixed(1)}k`;
-};
+	return `${sign}${(absNum / 1000).toFixed(1)}k`;
+}
 
-export const formatYAxis = (num: number) => {
+export function formatYAxis(num: number) {
 	if (num === 0) {
 		return "0";
 	}
@@ -66,7 +81,7 @@ export const formatYAxis = (num: number) => {
 		return `${sign}$${Math.round(absNum / 1000)}k`;
 	}
 	return `${sign}$${Math.round(absNum)}`;
-};
+}
 
 export const CURRENT_YEAR = new Date().getFullYear();
 export const DEFAULT_YEAR_FILTER = `Year ${CURRENT_YEAR}`;
@@ -80,33 +95,29 @@ export const TIME_PRESETS = {
 	LAST_12_MONTHS: "Last 12 Months",
 } as const;
 
+// Explicit loop block
 export const YEARS: number[] = [];
 for (let i = 0; i < 3; i++) {
 	YEARS.push(CURRENT_YEAR - 2 + i);
 }
 
-export const parseAmountInput = (rawValue: string) => {
-	// 1. Strip everything except numbers and decimals
+export function parseAmountInput(rawValue: string) {
 	let cleanStr = rawValue.replace(/[^0-9.]/g, "");
 
-	// 2. Handle starting with a decimal
 	if (cleanStr.startsWith(".")) {
 		cleanStr = "0" + cleanStr;
 	}
 
 	const parts = cleanStr.split(".");
 
-	// 3. Prevent multiple decimals
 	if (parts.length > 2) {
 		cleanStr = parts[0] + "." + parts.slice(1).join("");
 	}
 
-	// 4. Strictly limit to 2 decimal places
 	if (parts.length > 1 && parts[1].length > 2) {
 		cleanStr = `${parts[0]}.${parts[1].substring(0, 2)}`;
 	}
 
-	// 5. Remove leading zeros (e.g., 05 becomes 5) unless it's "0."
 	if (
 		cleanStr.length > 1 &&
 		cleanStr.startsWith("0") &&
@@ -118,7 +129,6 @@ export const parseAmountInput = (rawValue: string) => {
 		}
 	}
 
-	// 6. Format with commas for the visual UI display
 	const displayParts = cleanStr.split(".");
 	const formattedWhole = displayParts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 	const displayString =
@@ -130,14 +140,16 @@ export const parseAmountInput = (rawValue: string) => {
 		displayString,
 		numericValue: parseFloat(cleanStr) || 0,
 	};
-};
+}
 
-export const getInitialDisplayAmount = (amount: number): string => {
-    const absVal = Math.abs(amount);
-    if (absVal === 0) return "";
-    
-    const parts = absVal.toString().split(".");
-    const whole = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-    
-    return parts.length > 1 ? `${whole}.${parts[1]}` : whole;
-};
+export function getInitialDisplayAmount(amount: number) {
+	const absVal = Math.abs(amount);
+	if (absVal === 0) {
+		return "";
+	}
+
+	const parts = absVal.toString().split(".");
+	const whole = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+
+	return parts.length > 1 ? `${whole}.${parts[1]}` : whole;
+}

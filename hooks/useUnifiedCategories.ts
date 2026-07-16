@@ -13,90 +13,142 @@ export function useUnifiedCategories(
 	const customCategories = useBudgetStore((state) => state.customCategories);
 
 	// 1. Merge System + Custom into one Master List
-	const allUnifiedCategories = useMemo(() => {
-		// 1. Generate the System Categories from your constants
-		const staticItems: UnifiedCategory[] = Object.entries(
-			CATEGORY_HIERARCHY,
-		).flatMap(([parent, subs]) => {
-			const parentItem: UnifiedCategory = {
-				name: parent,
-				isCustom: false,
-				theme: getCategoryTheme(parent),
-				icon: parent
-			};
-			const subItems: UnifiedCategory[] = subs.map((sub) => ({
-				name: sub,
-				isCustom: false,
-				parentName: parent,
-				theme: getCategoryTheme(parent),
-				icon: sub
-			}));
-			return [parentItem, ...subItems];
-		});
+	const allUnifiedCategories = useMemo(
+		function () {
+			const customItems: UnifiedCategory[] = [];
+			const customKeys = new Set<string>();
 
-		// 2. Map the Custom Categories from the Store/DB
-		const customItems: UnifiedCategory[] = customCategories.map((cat) => {
-			// Logic:
-			// If it has a parent, get the theme of that parent (System name).
-			// If it's a primary, use the 'color_key' (e.g. "Rose") saved in DB.
-			const themeKey = cat.parent_name || cat.color_key;
-			const theme = getCategoryTheme(themeKey);
+			// Single pass to build custom items and their lookup keys
+			for (let i = 0; i < customCategories.length; i++) {
+				const cat = customCategories[i];
+				const themeKey = cat.parent_name || cat.color_key;
+				const theme = getCategoryTheme(themeKey);
 
-			return {
-				id: cat.id,
-				name: cat.name,
-				isCustom: true,
-				parentName: cat.parent_name || undefined,
-				theme: theme,
-				icon: cat.icon_name,
-			};
-		});
+				const customItem: UnifiedCategory = {
+					id: cat.id,
+					name: cat.name,
+					isCustom: true,
+					parentName: cat.parent_name || undefined,
+					theme: theme,
+					icon: cat.icon_name,
+				};
 
-		// 3. Create a "Lookup Key" set to identify overrides
-		// We use "Name|ParentName" to uniquely identify a category slot
-		const customKeys = new Set(
-			customItems.map(
-				(c) =>
-					`${c.name.toLowerCase()}|${(c.parentName || "root").toLowerCase()}`,
-			),
-		);
+				customItems.push(customItem);
 
-		// 4. Filter out system categories that have a custom equivalent
-		const filteredStatic = staticItems.filter((s) => {
-			const key = `${s.name.toLowerCase()}|${(s.parentName || "root").toLowerCase()}`;
-			return !customKeys.has(key);
-		});
+				const key = `${customItem.name.toLowerCase()}|${(customItem.parentName || "root").toLowerCase()}`;
+				customKeys.add(key);
+			}
 
-		return [...filteredStatic, ...customItems];
-	}, [customCategories]);
+			const staticItems: UnifiedCategory[] = [];
+			const hierarchyEntries = Object.entries(CATEGORY_HIERARCHY);
+
+			// Single pass to generate static items and filter out custom overrides simultaneously
+			for (let i = 0; i < hierarchyEntries.length; i++) {
+				const [parent, subs] = hierarchyEntries[i];
+				const parentTheme = getCategoryTheme(parent);
+				const parentKey = `${parent.toLowerCase()}|root`;
+
+				// Only create and push the static parent if it wasn't overridden
+				if (!customKeys.has(parentKey)) {
+					staticItems.push({
+						name: parent,
+						isCustom: false,
+						theme: parentTheme,
+						icon: parent,
+					});
+				}
+
+				// Only create and push the static sub-categories if they weren't overridden
+				for (let j = 0; j < subs.length; j++) {
+					const sub = subs[j];
+					const subKey = `${sub.toLowerCase()}|${parent.toLowerCase()}`;
+
+					if (!customKeys.has(subKey)) {
+						staticItems.push({
+							name: sub,
+							isCustom: false,
+							parentName: parent,
+							theme: parentTheme,
+							icon: sub,
+						});
+					}
+				}
+			}
+
+			// Combine arrays efficiently
+			const result: UnifiedCategory[] = [];
+			for (let i = 0; i < staticItems.length; i++) {
+				result.push(staticItems[i]);
+			}
+			for (let i = 0; i < customItems.length; i++) {
+				result.push(customItems[i]);
+			}
+
+			return result;
+		},
+		[customCategories],
+	);
 
 	// 2. Derive Sidebar Primaries
-	const primaryCategories = useMemo(() => {
-		const primaries = allUnifiedCategories.filter((cat) => !cat.parentName);
-		return primaries.filter((cat) => {
-			if (transactionType === "Income") return cat.name === "Income";
-			if (transactionType === "Transfer") return cat.name === "Transfers";
-			return cat.name !== "Income" && cat.name !== "Transfers";
-		});
-	}, [allUnifiedCategories, transactionType]);
+	const primaryCategories = useMemo(
+		function () {
+			const results: UnifiedCategory[] = [];
+
+			for (let i = 0; i < allUnifiedCategories.length; i++) {
+				const cat = allUnifiedCategories[i];
+
+				if (!cat.parentName) {
+					if (transactionType === "Income") {
+						if (cat.name === "Income") results.push(cat);
+					} else if (transactionType === "Transfer") {
+						if (cat.name === "Transfers") results.push(cat);
+					} else {
+						if (cat.name !== "Income" && cat.name !== "Transfers") {
+							results.push(cat);
+						}
+					}
+				}
+			}
+
+			return results;
+		},
+		[allUnifiedCategories, transactionType],
+	);
 
 	// 3. Derive Table Display List
-	const displayList = useMemo(() => {
-		if (activePrimary === "All") return primaryCategories;
-		return allUnifiedCategories.filter(
-			(cat) => cat.parentName === activePrimary,
-		);
-	}, [activePrimary, primaryCategories, allUnifiedCategories]);
+	const displayList = useMemo(
+		function () {
+			if (activePrimary === "All") return primaryCategories;
+
+			const results: UnifiedCategory[] = [];
+			for (let i = 0; i < allUnifiedCategories.length; i++) {
+				const cat = allUnifiedCategories[i];
+				if (cat.parentName === activePrimary) {
+					results.push(cat);
+				}
+			}
+
+			return results;
+		},
+		[activePrimary, primaryCategories, allUnifiedCategories],
+	);
 
 	// 4. Derive Active Context
-	const activeCategory = useMemo(() => {
-		if (activePrimary === "All") return null;
-		return (
-			allUnifiedCategories.find(
-				(c) => c.name === activePrimary && !c.parentName,
-			) || null
-		);
-	}, [activePrimary, allUnifiedCategories]);
+	const activeCategory = useMemo(
+		function () {
+			if (activePrimary === "All") return null;
+
+			for (let i = 0; i < allUnifiedCategories.length; i++) {
+				const cat = allUnifiedCategories[i];
+				if (cat.name === activePrimary && !cat.parentName) {
+					return cat;
+				}
+			}
+
+			return null;
+		},
+		[activePrimary, allUnifiedCategories],
+	);
 
 	return {
 		allUnifiedCategories,

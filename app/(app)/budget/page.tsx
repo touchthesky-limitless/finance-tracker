@@ -12,10 +12,29 @@ import {
 import { DateRangeDropdown } from "@/components/filters/DateRangeDropdown";
 
 import { HeroSummary } from "@/components/features/HeroSummary";
-import { SpendingChart } from "@/components/features/SpendingChart";
 import { TopBudgetsList } from "@/components/features/TopBudgetsList";
 import { MerchantInsights } from "@/components/features/MerchantInsights";
 import { PredictedBillsList } from "@/components/features/PredictedBillsList";
+import type { SpendingChartProps } from "@/components/features/SpendingChart";
+import dynamic from "next/dynamic";
+
+const DynamicSpendingChart = dynamic<SpendingChartProps>(
+	function () {
+		return import("@/components/features/SpendingChart");
+	},
+	{
+		ssr: false,
+		loading: function () {
+			return (
+				<div className="w-full min-h-37.5 animate-pulse bg-gray-100 dark:bg-white/5 rounded-2xl flex items-center justify-center">
+					<span className="text-sm font-medium text-gray-400">
+						Loading chart...
+					</span>
+				</div>
+			);
+		},
+	},
+);
 
 export default function OverviewPage() {
 	const [timeFilter, setTimeFilter] = useState(DEFAULT_YEAR_FILTER);
@@ -142,7 +161,7 @@ export default function OverviewPage() {
 				<HeroSummary stats={stats} budgetMetrics={budgetMetrics} />
 
 				<div className="grid grid-cols-1 @5xl:grid-cols-3 gap-6 mb-6 relative z-10">
-					<SpendingChart
+					<DynamicSpendingChart
 						stats={stats}
 						monthlyData={monthlyData}
 						activeYear={activeYear}

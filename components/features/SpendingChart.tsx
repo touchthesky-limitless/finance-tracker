@@ -9,7 +9,7 @@ interface MonthlyDataPoint {
 	height: number;
 }
 
-interface SpendingChartProps {
+export interface SpendingChartProps {
 	stats: { expenses: number };
 	monthlyData: MonthlyDataPoint[];
 	activeYear: number;
@@ -18,7 +18,7 @@ interface SpendingChartProps {
 	onFilterChange: (filter: string) => void;
 }
 
-export const SpendingChart = memo(function SpendingChart({
+const SpendingChart = memo(function SpendingChart({
 	stats,
 	monthlyData,
 	activeYear,
@@ -179,3 +179,5 @@ export const SpendingChart = memo(function SpendingChart({
 		</Card>
 	);
 });
+
+export default SpendingChart;

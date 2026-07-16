@@ -3,486 +3,627 @@
 import { useMemo } from "react";
 import { useBudgetStore } from "@/store/useBudgetStore";
 import { ICON_MAP } from "@/constants/icons";
-import { CategoryData } from "@/types/budget";
+import type { CategoryData } from "@/types/budget";
 import { COLORS_HEX } from "@/data/categories";
 import { getCategoryTheme } from "@/constants/categories";
 
+const MONTHS = [
+	"Jan",
+	"Feb",
+	"Mar",
+	"Apr",
+	"May",
+	"Jun",
+	"Jul",
+	"Aug",
+	"Sep",
+	"Oct",
+	"Nov",
+	"Dec",
+] as const;
+
+const MONTH_INDEX: Readonly<Record<string, number>> = {
+	Jan: 0,
+	Feb: 1,
+	Mar: 2,
+	Apr: 3,
+	May: 4,
+	Jun: 5,
+	Jul: 6,
+	Aug: 7,
+	Sep: 8,
+	Oct: 9,
+	Nov: 10,
+	Dec: 11,
+};
+
+const YEAR_TABS = ["This Month", "Last Month", "Last 12 Months"];
+
+const TOP_MERCHANT_PREFIX = /^(SQ\s\*|TST\s\*|PY\s\*|Check\s#\d+\s-\s)/i;
+const RECURRING_MERCHANT_PREFIX = /^(SQ\s\*|TST\s\*|PY\s\*|PAYMENT\s\*)/i;
+const PAYMENT_MERCHANT = /PAYMENT|TRANSFER|PMT/i;
+const PAYMENT_OR_DEPOSIT_MERCHANT = /PAYMENT|TRANSFER|PMT|DEP/i;
+const SUBSCRIPTION_KEYWORD = /PRO|PLUS|PREMIUM|MONTHLY|ANNUAL|SUBS|MEMBERSHIP/i;
+const LIKELY_SERVICE =
+	/CLAUDE|OPENAI|NETFLIX|SPOTIFY|ADOBE|YOUTUBE|APPLE|GOOGLE|AMAZON|HULU|DISNEY/i;
+
+const VARIABLE_CATEGORIES = new Set([
+	"shopping",
+	"transportation",
+	"groceries",
+	"food & drink",
+	"gas",
+	"dining",
+	"restaurants",
+	"general",
+]);
+
+const COMMON_SUBSCRIPTION_PRICES = new Set([
+	9.99, 12.99, 14.99, 15.99, 19.99, 29.99, 99,
+]);
+
+type FilterMode =
+	| "specific-month"
+	| "this-month"
+	| "last-month"
+	| "year"
+	| "this-year"
+	| "last-12-months"
+	| "today"
+	| "this-week"
+	| "all";
+
+function takeFirstTwoWords(value: string): string {
+	return value.trim().split(/\s+/).slice(0, 2).join(" ");
+}
+
+function cleanTopMerchant(merchant: string): string {
+	return (
+		takeFirstTwoWords(merchant.replace(TOP_MERCHANT_PREFIX, "")) || "Unknown"
+	);
+}
+
+function cleanRecurringMerchant(merchant: string): string {
+	return takeFirstTwoWords(merchant.replace(RECURRING_MERCHANT_PREFIX, ""));
+}
+
+function isKnownBillCategory(category: string): boolean {
+	return (
+		category.includes("insurance") ||
+		category.includes("utilit") ||
+		category.includes("housing")
+	);
+}
+
+function isEntertainmentCategory(category: string): boolean {
+	return (
+		category.includes("entertainment") ||
+		category === "music" ||
+		category === "movies & tv" ||
+		category === "streaming" ||
+		category === "games"
+	);
+}
+
 export function useBudgetData(timeFilter: string) {
-	const transactions = useBudgetStore((state) => state.transactions);
-	const confirmedMerchants = useBudgetStore(
-		(state) => state.confirmedRecurringMerchants,
+	const transactions = useBudgetStore(function (state) {
+		return state.transactions;
+	});
+
+	const confirmedMerchants = useBudgetStore(function (state) {
+		return state.confirmedRecurringMerchants;
+	});
+
+	type Transaction = NonNullable<typeof transactions>[number];
+	type ParsedTransaction = {
+		transaction: Transaction;
+		timestamp: number;
+		dayKey: number;
+		year: number;
+		month: number;
+		day: number;
+	};
+
+	const parsedTransactions = useMemo<ParsedTransaction[]>(
+		function () {
+			if (!transactions?.length) return [];
+
+			const parsed: ParsedTransaction[] = [];
+
+			for (let i = 0; i < transactions.length; i++) {
+				const transaction = transactions[i];
+				if (!transaction.date) continue;
+
+				const date = new Date(transaction.date);
+				const timestamp = date.getTime();
+				if (!Number.isFinite(timestamp)) continue;
+
+				const year = date.getFullYear();
+				const month = date.getMonth();
+				const day = date.getDate();
+
+				parsed.push({
+					transaction,
+					timestamp,
+					dayKey: year * 10_000 + (month + 1) * 100 + day,
+					year,
+					month,
+					day,
+				});
+			}
+
+			return parsed;
+		},
+		[transactions],
 	);
 
-	// --- 1. UNIFIED PARSER ---
-	// Extract Month and Year from strings like "Jan 2026", "Year 2025", or "This Month"
-	const filterContext = useMemo(() => {
-		const now = new Date();
-		const monthMap: Record<string, number> = {
-			Jan: 0,
-			Feb: 1,
-			Mar: 2,
-			Apr: 3,
-			May: 4,
-			Jun: 5,
-			Jul: 6,
-			Aug: 7,
-			Sep: 8,
-			Oct: 9,
-			Nov: 10,
-			Dec: 11,
-		};
+	const filterContext = useMemo(
+		function () {
+			const now = new Date();
+			const currentYear = now.getFullYear();
+			const currentMonth = now.getMonth();
+			const currentDay = now.getDate();
+			const normalizedFilter = timeFilter.trim();
+			const parts = normalizedFilter.split(/\s+/);
 
-		// Split "Dec 2025" -> ["Dec", "2025"]
-		const parts = timeFilter.split(" ");
+			const parsedYear = Number.parseInt(parts[parts.length - 1] ?? "", 10);
+			const selectedYear = Number.isNaN(parsedYear) ? currentYear : parsedYear;
+			const selectedMonth = MONTH_INDEX[parts[0]] ?? null;
+			const isSpecificMonth = selectedMonth !== null;
 
-		// Detect year (either from "Jan 2026" or "Year 2026")
-		// Default to current year if not found
-		// 1. Detect Year: Look at the last part of the string
-		const lastPartAsYear = parseInt(parts[parts.length - 1]);
-		// If the string is a preset like "This Month", parseInt will return NaN.
-		// In that case, we default to the actual current year (2026).
-		const selectedYear = isNaN(lastPartAsYear)
-			? now.getFullYear()
-			: lastPartAsYear;
+			let mode: FilterMode = "all";
+			if (isSpecificMonth) mode = "specific-month";
+			else if (normalizedFilter === "This Month") mode = "this-month";
+			else if (normalizedFilter === "Last Month") mode = "last-month";
+			else if (normalizedFilter.startsWith("Year")) mode = "year";
+			else if (normalizedFilter === "This Year") mode = "this-year";
+			else if (normalizedFilter === "Last 12 Months") mode = "last-12-months";
+			else if (normalizedFilter.startsWith("Today")) mode = "today";
+			else if (normalizedFilter.startsWith("This Week")) mode = "this-week";
 
-		// 2. Detect Month: Look at the first part of the string
-		const isSpecificMonth = monthMap[parts[0]] !== undefined;
-		const selectedMonth = isSpecificMonth ? monthMap[parts[0]] : null;
+			const lastMonthDate = new Date(currentYear, currentMonth - 1, 1);
+			const twelveMonthsAgoTimestamp = new Date(
+				currentYear,
+				currentMonth - 12,
+				currentDay,
+			).getTime();
 
-		return {
-			isSpecificMonth,
-			selectedMonth,
-			selectedYear,
-			now,
-		};
-	}, [timeFilter]);
+			const dayOfWeek = now.getDay();
+			const diffToMonday = currentDay - (dayOfWeek === 0 ? 6 : dayOfWeek - 1);
+			const weekStartTimestamp = new Date(
+				currentYear,
+				currentMonth,
+				diffToMonday,
+			).getTime();
+			const weekStartDate = new Date(weekStartTimestamp);
+			const weekEndDate = new Date(weekStartTimestamp);
+			weekEndDate.setDate(weekEndDate.getDate() + 6);
 
-	// --- 2. FILTER TRANSACTIONS ---
-	const filteredTransactions = useMemo(() => {
-		// 1. START THE CLOCK
-		// const start = performance.now();
-		// console.log("🚀 DATA ENGINE CHECKING...");
+			const weekStartKey =
+				weekStartDate.getFullYear() * 10_000 +
+				(weekStartDate.getMonth() + 1) * 100 +
+				weekStartDate.getDate();
+			const weekEndKey =
+				weekEndDate.getFullYear() * 10_000 +
+				(weekEndDate.getMonth() + 1) * 100 +
+				weekEndDate.getDate();
 
-		// 2. Safety Gate
-		if (!transactions || transactions.length === 0) {
-			// const end = performance.now();
-			// console.log(`%c ⚡ Engine (Empty State): ${(end - start).toFixed(3)}ms`, "color: #6b7280;");
-			return [];
-		}
+			return {
+				mode,
+				isSpecificMonth,
+				selectedMonth,
+				selectedYear,
+				currentYear,
+				currentMonth,
+				currentDay,
+				lastMonth: lastMonthDate.getMonth(),
+				lastMonthYear: lastMonthDate.getFullYear(),
+				twelveMonthsAgoTimestamp,
+				weekStartKey,
+				weekEndKey,
+			};
+		},
+		[timeFilter],
+	);
 
-		if (!timeFilter) {
-			console.warn("⚠️ Data Engine Aborted: No timeFilter provided.");
-			return [];
-		}
-
-		// console.log(`✅ Processing ${transactions.length} transactions...`);
-
-		const { isSpecificMonth, selectedMonth, selectedYear, now } = filterContext;
-
-		// STEP 1: PRE-CALCULATE BOUNDARIES
-		const currentYear = now.getFullYear();
-		const currentMonth = now.getMonth();
-		const currentDate = now.getDate();
-
-		const lastM = new Date(currentYear, currentMonth - 1, 1);
-		const twelveMonthsAgo = new Date(
-			currentYear,
-			currentMonth - 12,
-			currentDate,
-		);
-
-		const dayOfWeek = now.getDay();
-		const diffToMonday = currentDate - (dayOfWeek === 0 ? 6 : dayOfWeek - 1);
-		const monday = new Date(currentYear, currentMonth, diffToMonday);
-		const sunday = new Date(monday);
-		sunday.setDate(monday.getDate() + 6);
-		sunday.setHours(23, 59, 59, 999);
-
-		let targetYear = currentYear;
-		if (timeFilter.startsWith("Year")) {
-			targetYear = parseInt(timeFilter.split(" ").pop() || String(currentYear));
-		}
-
-		// STEP 2: FILTER TRANSACTIONS
-		const result = transactions.filter((t) => {
-			if (!t.date) return false;
-
-			const txDate = new Date(t.date);
-			if (isNaN(txDate.getTime())) return false;
-
-			const txYear = txDate.getFullYear();
-			const txMonth = txDate.getMonth();
-			const txDay = txDate.getDate();
-
-			if (isSpecificMonth)
-				return txMonth === selectedMonth && txYear === selectedYear;
-			if (timeFilter === "This Month")
-				return txMonth === currentMonth && txYear === currentYear;
-			if (timeFilter === "Last Month")
-				return txMonth === lastM.getMonth() && txYear === lastM.getFullYear();
-			if (timeFilter.startsWith("Year")) return txYear === targetYear;
-			if (timeFilter === "This Year") return txYear === currentYear;
-			if (timeFilter === "Last 12 Months") return txDate >= twelveMonthsAgo;
-			if (timeFilter.startsWith("Today"))
-				return (
-					txYear === currentYear &&
-					txMonth === currentMonth &&
-					txDay === currentDate
-				);
-			if (timeFilter.startsWith("This Week")) {
-				const txMidnight = new Date(txYear, txMonth, txDay);
-				return txMidnight >= monday && txMidnight <= sunday;
+	const filteredResult = useMemo(
+		function () {
+			if (!timeFilter || parsedTransactions.length === 0) {
+				return {
+					rows: [] as ParsedTransaction[],
+					transactions: [] as Transaction[],
+				};
 			}
 
-			return true;
-		});
+			const rows: ParsedTransaction[] = [];
+			const filtered: Transaction[] = [];
+			const context = filterContext;
 
-		// 3. LOG THE SUCCESSFUL RUN (Outside the filter loop)
-		// const end = performance.now();
-		// console.log(
-		//     `%c ⚡ Engine Speed: ${(end - start).toFixed(3)}ms`,
-		//     "color: #f97316; font-weight: bold; font-size: 12px;"
-		// );
+			for (let i = 0; i < parsedTransactions.length; i++) {
+				const row = parsedTransactions[i];
+				let include = false;
 
-		return result;
-	}, [transactions, timeFilter, filterContext]);
-
-	// --- 3. DERIVED STATS ---
-	const stats = useMemo(() => {
-		let income = 0;
-		let expenses = 0;
-		let unreviewedCount = 0;
-
-		filteredTransactions.forEach((t) => {
-			if (t.needs_review) unreviewedCount++;
-			if (t.amount > 0) income += t.amount;
-			else expenses += Math.abs(t.amount);
-		});
-
-		const uncategorizedCount = filteredTransactions.filter(
-			(t) => !t.category || t.category === "Uncategorized",
-		).length;
-
-		return {
-			income,
-			expenses,
-			remaining: income - expenses,
-			savings: income - expenses,
-			unreviewedCount,
-			totalTransactions: filteredTransactions.length,
-			uncategorizedCount,
-		};
-	}, [filteredTransactions]);
-
-	// --- 4. MONTHLY / DAILY DATA (For Bar Chart) ---
-	const monthlyData = useMemo(() => {
-		const { isSpecificMonth, selectedMonth, selectedYear } = filterContext;
-
-		if (isSpecificMonth && selectedMonth !== null) {
-			// --- DAILY VIEW ---
-			const daysInMonth = new Date(
-				selectedYear,
-				selectedMonth + 1,
-				0,
-			).getDate();
-			const days = Array.from({ length: daysInMonth }, (_, i) => ({
-				label: (i + 1).toString(),
-				value: 0,
-				height: 0,
-			}));
-
-			filteredTransactions.forEach((t) => {
-				if (t.amount < 0) {
-					const d = new Date(t.date).getDate();
-					if (days[d - 1]) days[d - 1].value += Math.abs(t.amount);
+				switch (context.mode) {
+					case "specific-month":
+						include =
+							row.month === context.selectedMonth &&
+							row.year === context.selectedYear;
+						break;
+					case "this-month":
+						include =
+							row.month === context.currentMonth &&
+							row.year === context.currentYear;
+						break;
+					case "last-month":
+						include =
+							row.month === context.lastMonth &&
+							row.year === context.lastMonthYear;
+						break;
+					case "year":
+						include = row.year === context.selectedYear;
+						break;
+					case "this-year":
+						include = row.year === context.currentYear;
+						break;
+					case "last-12-months":
+						include = row.timestamp >= context.twelveMonthsAgoTimestamp;
+						break;
+					case "today":
+						include =
+							row.year === context.currentYear &&
+							row.month === context.currentMonth &&
+							row.day === context.currentDay;
+						break;
+					case "this-week":
+						include =
+							row.dayKey >= context.weekStartKey &&
+							row.dayKey <= context.weekEndKey;
+						break;
+					case "all":
+						include = true;
 				}
-			});
 
-			const max = Math.max(...days.map((d) => d.value), 1);
-			return days.map((d) => ({
-				...d,
-				height: Math.max((d.value / max) * 100, 2),
-			}));
-		} else {
-			// --- MONTHLY VIEW ---
-			const months = [
-				"Jan",
-				"Feb",
-				"Mar",
-				"Apr",
-				"May",
-				"Jun",
-				"Jul",
-				"Aug",
-				"Sep",
-				"Oct",
-				"Nov",
-				"Dec",
-			];
-			const data = months.map((m) => ({ label: m, value: 0, height: 0 }));
-
-			filteredTransactions.forEach((t) => {
-				if (t.amount < 0) {
-					const mIdx = new Date(t.date).getMonth();
-					data[mIdx].value += Math.abs(t.amount);
+				if (include) {
+					rows.push(row);
+					filtered.push(row.transaction);
 				}
-			});
+			}
 
-			const max = Math.max(...data.map((d) => d.value), 1);
-			return data.map((d) => ({
-				...d,
-				height: Math.max((d.value / max) * 100, 2),
-			}));
-		}
-	}, [filteredTransactions, filterContext]);
+			return { rows, transactions: filtered };
+		},
+		[filterContext, parsedTransactions, timeFilter],
+	);
 
-	// --- 5. CATEGORY GROUPING ---
-	const categoryData = useMemo<CategoryData[]>(() => {
-		const groups: Record<string, number> = {};
-		filteredTransactions
-			.filter((t) => t.amount < 0)
-			.forEach((t) => {
-				const cat = t.category || "Uncategorized";
-				groups[cat] = (groups[cat] || 0) + Math.abs(t.amount);
-			});
+	const filteredTransactions = filteredResult.transactions;
 
-		return Object.entries(groups)
-			.sort(([, a], [, b]) => b - a)
-			.map(([name, amount], i) => {
-				const theme = getCategoryTheme(name);
+	const dashboardData = useMemo(
+		function () {
+			let income = 0;
+			let expenses = 0;
+			let unreviewedCount = 0;
+			let uncategorizedCount = 0;
+
+			const isDailyView =
+				filterContext.isSpecificMonth && filterContext.selectedMonth !== null;
+			const bucketCount = isDailyView
+				? new Date(
+						filterContext.selectedYear,
+						filterContext.selectedMonth! + 1,
+						0,
+					).getDate()
+				: 12;
+
+			const chartValues = new Array<number>(bucketCount).fill(0);
+			const categoryTotals = new Map<string, number>();
+			const merchantTotals = new Map<
+				string,
+				{ count: number; total: number }
+			>();
+			const topPurchases: Array<{ transaction: Transaction; amount: number }> =
+				[];
+
+			for (let i = 0; i < filteredResult.rows.length; i++) {
+				const row = filteredResult.rows[i];
+				const transaction = row.transaction;
+				const amount = transaction.amount;
+
+				if (transaction.needs_review) unreviewedCount++;
+				if (!transaction.category || transaction.category === "Uncategorized") {
+					uncategorizedCount++;
+				}
+
+				if (amount > 0) {
+					income += amount;
+					continue;
+				}
+
+				const absoluteAmount = Math.abs(amount);
+				expenses += absoluteAmount;
+
+				if (amount < 0) {
+					const chartIndex = isDailyView ? row.day - 1 : row.month;
+					if (chartValues[chartIndex] !== undefined) {
+						chartValues[chartIndex] += absoluteAmount;
+					}
+
+					const category = transaction.category || "Uncategorized";
+					categoryTotals.set(
+						category,
+						(categoryTotals.get(category) ?? 0) + absoluteAmount,
+					);
+
+					const merchant = cleanTopMerchant(transaction.merchant);
+					const merchantData = merchantTotals.get(merchant);
+
+					if (merchantData) {
+						merchantData.count++;
+						merchantData.total += absoluteAmount;
+					} else {
+						merchantTotals.set(merchant, { count: 1, total: absoluteAmount });
+					}
+
+					let insertAt = 0;
+					while (
+						insertAt < topPurchases.length &&
+						topPurchases[insertAt].amount >= absoluteAmount
+					) {
+						insertAt++;
+					}
+					if (insertAt < 10) {
+						topPurchases.splice(insertAt, 0, {
+							transaction,
+							amount: absoluteAmount,
+						});
+						if (topPurchases.length > 10) topPurchases.pop();
+					}
+				}
+			}
+
+			const remaining = income - expenses;
+			const stats = {
+				income,
+				expenses,
+				remaining,
+				savings: remaining,
+				unreviewedCount,
+				totalTransactions: filteredTransactions.length,
+				uncategorizedCount,
+			};
+
+			const maxMonthlyValue = Math.max(...chartValues, 0);
+			const chartScale = Math.max(maxMonthlyValue, 1);
+
+			const monthlyData = chartValues.map(function (value, index) {
 				return {
-					name,
-					value: Number(amount.toFixed(2)),
-					percent:
-						stats.expenses > 0
-							? Math.round((amount / stats.expenses) * 100)
-							: 0,
-					color: theme.bg,
-					textColor: theme.text,
-					fill: COLORS_HEX[i % COLORS_HEX.length],
-					icon: ICON_MAP[name] || ICON_MAP["Uncategorized"],
+					label: isDailyView ? String(index + 1) : MONTHS[index],
+					value,
+					height: Math.max((value / chartScale) * 100, 2),
 				};
 			});
-	}, [filteredTransactions, stats.expenses]);
 
-	// --- NEW: MERCHANT AGGREGATION ---
-	const topMerchants = useMemo(() => {
-		const map: Record<string, { count: number; total: number }> = {};
+			const categoryData: CategoryData[] = Array.from(categoryTotals.entries())
+				.sort(function ([, a], [, b]) {
+					return b - a;
+				})
+				.map(function ([name, amount], index) {
+					const theme = getCategoryTheme(name);
+					return {
+						name,
+						value: Number(amount.toFixed(2)),
+						percent: expenses > 0 ? Math.round((amount / expenses) * 100) : 0,
+						color: theme.bg,
+						textColor: theme.text,
+						fill: COLORS_HEX[index % COLORS_HEX.length],
+						icon: ICON_MAP[name] || ICON_MAP.Uncategorized,
+					};
+				});
 
-		filteredTransactions
-			.filter((t) => t.amount < 0)
-			.forEach((t) => {
-				// Clean merchant: Remove "SQ *" or "TST*" and take the first word
-				const cleanName =
-					t.merchant
-						.replace(/^(SQ\s\*|TST\s\*|PY\s\*|Check\s#\d+\s-\s)/i, "") // Clean prefix
-						.split(" ") // Split into words
-						.filter((word) => word.length > 0) // Remove empty spaces
-						.slice(0, 2) // Take first two words
-						.join(" ") || // Join them back
-					"Unknown";
+			const topMerchants = Array.from(merchantTotals.entries())
+				.sort(function ([, a], [, b]) {
+					return b.total - a.total;
+				})
+				.map(function ([name, data]) {
+					return {
+						name,
+						count: data.count,
+						total: Number(data.total.toFixed(2)),
+					};
+				});
 
-				if (!map[cleanName]) map[cleanName] = { count: 0, total: 0 };
-				map[cleanName].count++;
-				map[cleanName].total += Math.abs(t.amount);
-			});
+			return {
+				stats,
+				monthlyData,
+				maxMonthlyValue,
+				categoryData,
+				topMerchants,
+				largestPurchases: topPurchases.map(function (item) {
+					return item.transaction;
+				}),
+			};
+		},
+		[filterContext, filteredResult.rows, filteredTransactions.length],
+	);
 
-		return Object.entries(map)
-			.sort(([, a], [, b]) => b.total - a.total)
-			.map(([name, data]) => ({
-				name,
-				count: data.count,
-				total: Number(data.total.toFixed(2)),
-			}));
-	}, [filteredTransactions]);
+	const predictedBills = useMemo(
+		function () {
+			type MerchantAggregate = {
+				count: number;
+				totalAmount: number;
+				minAmount: number;
+				maxAmount: number;
+				lastTimestamp: number;
+				category: string | null | undefined;
+				uniqueMonths: Set<number>;
+			};
 
-	// --- NEW: LARGEST PURCHASES ---
-	const largestPurchases = useMemo(() => {
-		return [...filteredTransactions] // Spread to avoid mutating original array
-			.filter((t) => t.amount < 0)
-			.sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount))
-			.slice(0, 10); // Usually only need the top 5-10 for UI
-	}, [filteredTransactions]);
+			const merchantAggregates = new Map<string, MerchantAggregate>();
+			const confirmedMerchantSet = new Set(
+				confirmedMerchants.map(function (merchant) {
+					return merchant.toLowerCase();
+				}),
+			);
 
-	const predictedBills = useMemo(() => {
-		const merchants: Record<
-			string,
-			{ dates: number[]; amounts: number[]; category: string }
-		> = {};
+			for (let i = 0; i < parsedTransactions.length; i++) {
+				const row = parsedTransactions[i];
+				const transaction = row.transaction;
 
-		transactions.forEach((t) => {
-			// Exclude internal payments/transfers
-			const isPayment = /PAYMENT|TRANSFER|PMT/i.test(t.merchant);
-			if (t.amount < 0 && !isPayment) {
-				const name = t.merchant
-					.replace(/^(SQ\s\*|TST\s\*|PY\s\*|PAYMENT\s\*)/i, "")
-					.split(" ")
-					.slice(0, 2)
-					.join(" ");
-
-				if (!merchants[name]) {
-					merchants[name] = { dates: [], amounts: [], category: t.category };
+				if (
+					transaction.amount >= 0 ||
+					PAYMENT_MERCHANT.test(transaction.merchant)
+				) {
+					continue;
 				}
-				merchants[name].dates.push(new Date(t.date).getTime());
-				merchants[name].amounts.push(Math.abs(t.amount));
+
+				const name = cleanRecurringMerchant(transaction.merchant);
+				const amount = Math.abs(transaction.amount);
+				const monthKey = row.year * 12 + row.month;
+				const existing = merchantAggregates.get(name);
+
+				if (existing) {
+					existing.count++;
+					existing.totalAmount += amount;
+					existing.minAmount = Math.min(existing.minAmount, amount);
+					existing.maxAmount = Math.max(existing.maxAmount, amount);
+					existing.lastTimestamp = Math.max(
+						existing.lastTimestamp,
+						row.timestamp,
+					);
+					existing.uniqueMonths.add(monthKey);
+				} else {
+					merchantAggregates.set(name, {
+						count: 1,
+						totalAmount: amount,
+						minAmount: amount,
+						maxAmount: amount,
+						lastTimestamp: row.timestamp,
+						category: transaction.category,
+						uniqueMonths: new Set([monthKey]),
+					});
+				}
 			}
-		});
 
-		return Object.entries(merchants)
-			.filter(([name, data]) => {
-				// 1. Manual Confirmation always wins
-				const isManuallyConfirmed = confirmedMerchants.some(
-					(m) => m.toLowerCase() === name.toLowerCase(),
-				);
-				if (isManuallyConfirmed) return true;
+			const now = new Date();
+			const nowTimestamp = now.getTime();
+			const bills = [];
 
-				// 2. Must happen at least twice
-				if (data.dates.length < 2) return false;
+			const merchantEntries = Array.from(merchantAggregates.entries());
+			for (let i = 0; i < merchantEntries.length; i++) {
+				const [name, data] = merchantEntries[i];
+				const manuallyConfirmed = confirmedMerchantSet.has(name.toLowerCase());
+				const categoryLower = (data.category || "").toLowerCase();
+				const knownBillCategory = isKnownBillCategory(categoryLower);
 
-				const catLower = (data.category || "").toLowerCase();
+				if (!manuallyConfirmed) {
+					if (data.count < 2 || VARIABLE_CATEGORIES.has(categoryLower))
+						continue;
 
-				// 3. Block everyday variable spending
-				const variableCategories = [
-					"shopping",
-					"transportation",
-					"groceries",
-					"food & drink",
-					"gas",
-					"dining",
-					"restaurants",
-					"general",
-				];
-				if (variableCategories.includes(catLower)) return false;
+					const amountDifference = data.maxAmount - data.minAmount;
+					const stableAmount =
+						knownBillCategory ||
+						amountDifference <= 10 ||
+						amountDifference <= data.maxAmount * 0.5;
+					const spacedOut = knownBillCategory || data.uniqueMonths.size >= 2;
 
-				// 🌟 THE VIP PASS: Insurance, Utilities, and Housing are automatically trusted
-				const isKnownBillCat =
-					catLower.includes("insurance") ||
-					catLower.includes("utilit") ||
-					catLower.includes("housing");
+					if (!stableAmount || !spacedOut) continue;
+				}
 
-				// 4. Amount Stability
-				const maxAmt = Math.max(...data.amounts);
-				const minAmt = Math.min(...data.amounts);
-				const diff = maxAmt - minAmt;
-
-				// If it's a VIP bill, ignore variance (allows for $15 Renters + $120 Auto)
-				const isStableAmount =
-					isKnownBillCat || diff <= 10 || diff <= maxAmt * 0.5;
-
-				// 5. Frequency Check (Count unique months)
-				const uniqueMonths = new Set(
-					data.dates.map((d) => {
-						const dateObj = new Date(d);
-						return `${dateObj.getFullYear()}-${dateObj.getMonth()}`;
-					}),
-				).size;
-
-				// If it's a VIP bill, allow it even if 4 policies hit in the exact same month!
-				const isSpacedOut = isKnownBillCat || uniqueMonths >= 2;
-
-				return isStableAmount && isSpacedOut;
-			})
-			.map(([name, data]) => {
-				const lastDate = new Date(Math.max(...data.dates));
+				const lastDate = new Date(data.lastTimestamp);
 				const dayOfMonth = lastDate.getDate();
-
-				// Sum split bills accurately
-				const uniqueMonths = new Set(
-					data.dates.map((d) => {
-						const dateObj = new Date(d);
-						return `${dateObj.getFullYear()}-${dateObj.getMonth()}`;
-					}),
-				).size;
-				const totalAmount = data.amounts.reduce((a, b) => a + b, 0);
-				const avgMonthlyAmount = totalAmount / Math.max(1, uniqueMonths);
-
-				const now = new Date();
 				const nextDate = new Date(
 					now.getFullYear(),
 					now.getMonth(),
 					dayOfMonth,
 				);
-				if (nextDate <= now) {
+
+				if (nextDate.getTime() <= nowTimestamp) {
 					nextDate.setMonth(nextDate.getMonth() + 1);
 				}
 
-				// ✅ EXACTLY AS REQUESTED: Only Entertainment (and its subcategories) are Subscriptions.
-				const catLower = (data.category || "").toLowerCase();
-				const isEntertainment =
-					catLower.includes("entertainment") ||
-					catLower === "music" ||
-					catLower === "movies & tv" ||
-					catLower === "streaming" ||
-					catLower === "games";
-
-				return {
+				bills.push({
 					id: name,
 					merchant: name,
-					amount: avgMonthlyAmount,
+					amount: data.totalAmount / Math.max(1, data.uniqueMonths.size),
 					category: data.category || "Uncategorized",
 					dueDate: nextDate,
 					dayOfMonth,
-					frequency: data.dates.length >= 12 ? "Yearly" : "Monthly",
-					// The rest go to Upcoming Recurring Bills
-					type: isEntertainment ? "subscription" : "bill",
-				};
-			})
-			.filter((bill) => bill.dueDate > new Date())
-			.sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime());
-	}, [transactions, confirmedMerchants]);
+					frequency: data.count >= 12 ? "Yearly" : "Monthly",
+					type: isEntertainmentCategory(categoryLower)
+						? "subscription"
+						: "bill",
+				});
+			}
 
-	const potentialSubscriptions = useMemo(() => {
-		const identifiedNames = new Set(
-			predictedBills.map((b) => b.merchant.toLowerCase()),
-		);
+			return bills.sort(function (a, b) {
+				return a.dueDate.getTime() - b.dueDate.getTime();
+			});
+		},
+		[confirmedMerchants, parsedTransactions],
+	);
 
-		return transactions
-			.filter((t) => {
-				const name = t.merchant.toLowerCase();
-				const amount = Math.abs(t.amount);
+	const potentialSubscriptions = useMemo(
+		function () {
+			const identifiedNames = new Set(
+				predictedBills.map(function (bill) {
+					return bill.merchant.toLowerCase();
+				}),
+			);
 
-				if (identifiedNames.has(name) || t.amount >= 0) return false;
-				if (/PAYMENT|TRANSFER|PMT|DEP/i.test(t.merchant)) return false;
+			const seenMerchants = new Set<string>();
+			const matches: Transaction[] = [];
 
-				const catLower = (t.category || "").toLowerCase();
+			if (!transactions) return matches;
 
-				// ✅ STRICTLY SUBSCRIPTIONS ONLY:
-				// Reject anything categorized as housing, utilities, or insurance from the detector.
-				if (
-					catLower.includes("insurance") ||
-					catLower.includes("utilit") ||
-					catLower.includes("housing")
-				) {
-					return false;
-				}
+			for (let i = 0; i < transactions.length; i++) {
+				const transaction = transactions[i];
+				const merchant = transaction.merchant;
+				const merchantLower = merchant.toLowerCase();
+				const amount = Math.abs(transaction.amount);
 
-				// Detection Fingerprints (Looking for digital services only)
-				const hasSubKeyword =
-					/PRO|PLUS|PREMIUM|MONTHLY|ANNUAL|SUBS|MEMBERSHIP/i.test(t.merchant);
-				const isCommonPricePoint = [
-					9.99, 12.99, 14.99, 15.99, 19.99, 29.99, 99.0,
-				].includes(amount);
-				const isLikelyService =
-					/CLAUDE|OPENAI|NETFLIX|SPOTIFY|ADOBE|YOUTUBE|APPLE|GOOGLE|AMAZON|HULU|DISNEY/i.test(
-						t.merchant,
-					);
+				if (identifiedNames.has(merchantLower) || transaction.amount >= 0)
+					continue;
+				if (PAYMENT_OR_DEPOSIT_MERCHANT.test(merchant)) continue;
 
-				return hasSubKeyword || (isCommonPricePoint && isLikelyService);
-			})
-			.filter((v, i, a) => a.findIndex((t) => t.merchant === v.merchant) === i)
-			.slice(0, 4);
-	}, [transactions, predictedBills]);
+				const categoryLower = (transaction.category || "").toLowerCase();
+				if (isKnownBillCategory(categoryLower)) continue;
 
-	return {
-		stats,
-		categoryData,
-		monthlyData,
-		maxMonthlyValue: Math.max(...monthlyData.map((d) => d.value), 0),
-		topMerchants,
-		largestPurchases,
-		filteredTransactions,
-		yearTabs: ["This Month", "Last Month", "Last 12 Months"],
-		predictedBills,
-		potentialSubscriptions,
-	};
+				const isPotentialSubscription =
+					SUBSCRIPTION_KEYWORD.test(merchant) ||
+					(COMMON_SUBSCRIPTION_PRICES.has(amount) &&
+						LIKELY_SERVICE.test(merchant));
+
+				if (!isPotentialSubscription || seenMerchants.has(merchant)) continue;
+
+				seenMerchants.add(merchant);
+				matches.push(transaction);
+
+				if (matches.length === 4) break;
+			}
+
+			return matches;
+		},
+		[predictedBills, transactions],
+	);
+
+	return useMemo(
+		function () {
+			return {
+				stats: dashboardData.stats,
+				categoryData: dashboardData.categoryData,
+				monthlyData: dashboardData.monthlyData,
+				maxMonthlyValue: dashboardData.maxMonthlyValue,
+				topMerchants: dashboardData.topMerchants,
+				largestPurchases: dashboardData.largestPurchases,
+				filteredTransactions,
+				yearTabs: YEAR_TABS,
+				predictedBills,
+				potentialSubscriptions,
+			};
+		},
+		[
+			dashboardData,
+			filteredTransactions,
+			potentialSubscriptions,
+			predictedBills,
+		],
+	);
 }
