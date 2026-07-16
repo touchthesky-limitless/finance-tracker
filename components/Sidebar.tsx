@@ -15,44 +15,77 @@ import {
 } from "lucide-react";
 import { LogoutButton } from "@/components/LogoutButton";
 import ThemeToggle from "@/components/ThemeToggle";
+import BottomNav from "@/components/navigation/BottomNav";
+import { featureFlags } from "@/config/featureFlags";
+
+const enableBottomNav = featureFlags.BudgetLayoutEnableBottomNav;
 
 interface NavLinkProps {
 	href: string;
 	name: string;
 	icon: ReactNode;
 	onClick: () => void;
+	isPrimary?: boolean;
 }
 
 const NAV_LINKS = [
-	{ name: "Overview", href: "/overview", icon: <LayoutDashboard size={18} /> },
-	{ name: "Budget Tracking", href: "/budget", icon: <ReceiptText size={18} /> },
-	{ name: "Market Pulse", href: "/stocks", icon: <BarChart3 size={18} /> },
-	{ name: "Wallet Rewards", href: "/wallet", icon: <WalletCards size={18} /> },
-	{ name: "Calculator", href: "/calculator", icon: <Calculator size={18} /> },
+	{
+		name: "Overview",
+		href: "/overview",
+		icon: <LayoutDashboard size={18} />,
+		isPrimary: true,
+	},
+	{
+		name: "Budget Tracking",
+		href: "/budget",
+		icon: <ReceiptText size={18} />,
+		isPrimary: true,
+	},
+	{
+		name: "Market Pulse",
+		href: "/stocks",
+		icon: <BarChart3 size={18} />,
+		isPrimary: true,
+	},
+	{
+		name: "Wallet Rewards",
+		href: "/wallet",
+		icon: <WalletCards size={18} />,
+		isPrimary: true,
+	},
+	{
+		name: "Calculator",
+		href: "/calculator",
+		icon: <Calculator size={18} />,
+		isPrimary: false,
+	},
 ];
 
-// 1. Move usePathname DOWN into the child component.
-// Now, only the button cares about the URL, not the whole Sidebar.
-const NavLink = memo(({ href, name, icon, onClick }: NavLinkProps) => {
-	const pathname = usePathname(); // <--- MOVED HERE
-	const active = pathname === href;
+const NavLink = memo(
+	({ href, name, icon, onClick, isPrimary }: NavLinkProps) => {
+		const pathname = usePathname();
+		const active = pathname === href;
 
-	return (
-		<Link
-			href={href}
-			prefetch={true}
-			onClick={onClick}
-			className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold text-sm transition-all duration-75 transform-gpu ${
-				active
-					? "bg-orange-600 text-white shadow-lg shadow-orange-600/20"
-					: "text-gray-500 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/5"
-			}`}
-		>
-			{icon}
-			{name}
-		</Link>
-	);
-});
+		const displayClass =
+			isPrimary && enableBottomNav ? "hidden lg:flex" : "flex";
+
+		return (
+			<Link
+				href={href}
+				prefetch={true}
+				onClick={onClick}
+				className={`${displayClass} items-center gap-3 px-4 py-3 rounded-xl font-bold text-sm transition-all duration-75 transform-gpu ${
+					active
+						? "bg-orange-600 text-white shadow-lg shadow-orange-600/20"
+						: "text-gray-500 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/5"
+				}`}
+			>
+				{icon}
+				{name}
+			</Link>
+		);
+	},
+);
 NavLink.displayName = "NavLink";
 
 const Sidebar = memo(function Sidebar() {
@@ -60,7 +93,6 @@ const Sidebar = memo(function Sidebar() {
 	const toggleMobile = useCallback(() => setIsOpen((prev) => !prev), []);
 	const closeMobile = useCallback(() => setIsOpen(false), []);
 
-	// Explicitly loop through nav links instead of using inline maps
 	const navLinkElements = [];
 	for (let i = 0; i < NAV_LINKS.length; i++) {
 		const link = NAV_LINKS[i];
@@ -71,31 +103,15 @@ const Sidebar = memo(function Sidebar() {
 				name={link.name}
 				icon={link.icon}
 				onClick={closeMobile}
+				isPrimary={link.isPrimary}
 			/>,
 		);
 	}
 
 	return (
 		<>
-			{/* MOBILE HEADER */}
-			<header className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-white/80 dark:bg-[#050505]/80 backdrop-blur-md transform-gpu border-b border-gray-200 dark:border-white/5 px-6 flex justify-between items-center z-40">
-				<Link href="/overview">
-					<div className="flex items-center gap-2 font-black text-gray-900 dark:text-white tracking-tighter cursor-pointer transition-opacity hover:opacity-80">
-						<Zap className="text-orange-600 fill-orange-600" size={20} />
-						Budget Pro
-					</div>
-				</Link>
-				<button
-					type="button"
-					aria-label="Menu"
-					onClick={toggleMobile}
-					className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
-				>
-					<Menu size={24} />
-				</button>
-			</header>
-
-			{/* OVERLAY */}
+			{/* --- 1. THE OVERLAY (Moved outside the ternary) --- */}
+			{/* LEGACY OVERLAY */}
 			{isOpen && (
 				<div
 					className="fixed inset-0 bg-gray-900/60 dark:bg-black/60 backdrop-blur-sm transform-gpu z-50 lg:hidden"
@@ -103,7 +119,33 @@ const Sidebar = memo(function Sidebar() {
 				/>
 			)}
 
-			{/* SIDEBAR DRAWER */}
+			{/* --- 2. THE TERNARY FEATURE GATE FOR MOBILE NAV --- */}
+			{enableBottomNav ? (
+				<BottomNav onOpenMenu={toggleMobile} />
+			) : (
+				<>
+					{/* LEGACY MOBILE HEADER */}
+					<header className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-white/80 dark:bg-[#050505]/80 backdrop-blur-md transform-gpu border-b border-gray-200 dark:border-white/5 px-6 flex justify-between items-center z-40">
+						<Link href="/overview">
+							<div className="flex items-center gap-2 font-black text-gray-900 dark:text-white tracking-tighter cursor-pointer transition-opacity hover:opacity-80">
+								<Zap className="text-orange-600 fill-orange-600" size={20} />
+								Budget Pro
+							</div>
+						</Link>
+						<button
+							type="button"
+							aria-label="Menu"
+							onClick={toggleMobile}
+							className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
+						>
+							<Menu size={24} />
+						</button>
+					</header>
+				</>
+			)}
+
+			{/* --- 3. THE SMART SIDEBAR DRAWER --- */}
+			{/* On mobile: Completely hidden if BottomNav is true, otherwise uses legacy drawer. On desktop: Always visible. */}
 			<aside
 				className={`
                     fixed inset-y-0 left-0 z-60 w-72 bg-gray-50 dark:bg-[#050505] border-r border-gray-200 dark:border-white/5 
