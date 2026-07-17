@@ -1,8 +1,9 @@
 import MarketStatus from "@/components/MarketStatus";
+import Image from "next/image";
+import { ArrowUpRight, ArrowDownRight } from "lucide-react";
 import { getFullMarketInfo } from "@/lib/date";
 import { getTrendProps } from "@/lib/utils";
-import Image from "next/image";
-import { ArrowUpRight, ArrowDownRight, DollarSign } from "lucide-react";
+import { formatMarketCap } from "@/utils/formatters";
 
 interface FinancialCardProps {
 	symbol: string;
@@ -11,9 +12,10 @@ interface FinancialCardProps {
 	change: number;
 	changePercent: number;
 	currency?: string;
-	exchange: string;
-	logo?: string;
 	showFooter?: boolean;
+	logo?: string;
+	marketCap?: number;
+	view?: "grid" | "stack";
 }
 
 export default function FinancialCard({
@@ -23,81 +25,95 @@ export default function FinancialCard({
 	change,
 	changePercent,
 	currency,
-	exchange,
-	logo,
 	showFooter = false,
+	logo,
+	marketCap,
+	view = "grid",
 }: FinancialCardProps) {
 	const { date, time, session } = getFullMarketInfo();
-	const { color } = getTrendProps(change, "asset");
 	const isPositive = change > 0;
+	const { color } = getTrendProps(change, "asset");
 
-	return (
-		<div className="bg-gray-50 dark:bg-[#0d0d0d] border border-black/5 dark:border-white/5 rounded-3xl p-8 flex flex-col justify-between h-full hover:border-orange-500/30 transition-all group">
-			<div>
-				{/* HEADER */}
-				<div className="flex justify-between items-start mb-8">
-					<div className="w-12 h-12 rounded-2xl bg-black/5 dark:bg-white/5 overflow-hidden flex items-center justify-center border border-black/10 dark:border-white/10 group-hover:border-orange-500/50 transition-all">
-						{logo ? (
-							<Image
-								src={logo}
-								alt={`${name} logo`}
-								width={40}
-								height={40}
-								className="object-contain p-1.5"
-							/>
-						) : (
-							<span className="text-xl font-black text-orange-600">
-								{symbol?.[0]}
+	const marketCapNumber = formatMarketCap(marketCap);
+
+	if (view === "stack") {
+		return (
+			<div className="bg-gray-50 dark:bg-[#0d0d0d] border border-black/5 dark:border-white/5 rounded-3xl p-4 flex flex-row items-center gap-4">
+				<div className="w-10 h-10 rounded-2xl bg-black/5 dark:bg-white/5 flex items-center justify-center shrink-0">
+					{logo ? (
+						<Image src={logo} alt={name} width={24} height={24} />
+					) : (
+						<span className="text-sm font-black text-orange-600">
+							{symbol?.[0]}
+						</span>
+					)}
+				</div>
+				<div className="flex flex-1 items-center justify-between min-w-0">
+					<div className="min-w-0">
+						<h2 className="text-sm font-black text-gray-900 dark:text-white uppercase truncate">
+							{name}
+						</h2>
+						<div className="text-[10px] font-bold text-orange-600 uppercase">
+							{symbol}{" "}
+							<span className="text-gray-400 font-normal">
+								- MC: {marketCapNumber} {currency}
 							</span>
-						)}
-					</div>
-					<div className="flex flex-col items-end">
-						<div className="text-[10px] font-black uppercase tracking-[0.2em] text-orange-600 mb-1">
-							{symbol}
 						</div>
-						<div className="text-[10px] font-bold uppercase tracking-widest text-gray-600">
-							{exchange}
+					</div>
+					<div className="text-right">
+						<div className="text-sm font-black text-gray-900 dark:text-white">
+							$ {price.toFixed(2)}
+						</div>
+						<div className={`text-[10px] font-bold ${color}`}>
+							{isPositive ? "+" : ""}
+							{change.toFixed(2)} ({changePercent.toFixed(2)}%)
 						</div>
 					</div>
 				</div>
+			</div>
+		);
+	}
 
-				<div className="space-y-1">
-					<h2 className="text-sm font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest truncate max-w-50">
-						{name}
-					</h2>
-					<div className="flex items-center gap-1 overflow-hidden">
-						<DollarSign
-							className="w-6 h-6 md:w-8 md:h-8 text-gray-900 dark:text-white shrink-0"
-							strokeWidth={3}
-						/>
-						<span className="text-3xl md:text-4xl font-black tracking-tighter text-gray-900 dark:text-white truncate">
-							{price?.toFixed(2) ?? "0.00"}
+	// GRID VIEW: Updated to match exact image with amount change added
+	return (
+		<div className="bg-gray-50 dark:bg-[#0d0d0d] border border-black/5 dark:border-white/5 rounded-3xl p-5 flex flex-col h-full">
+			<div className="flex justify-between items-start w-full mb-4">
+				<div className="w-10 h-10 rounded-2xl bg-black/5 dark:bg-white/5 flex items-center justify-center shrink-0">
+					{logo ? (
+						<Image src={logo} alt={name} width={24} height={24} />
+					) : (
+						<span className="text-sm font-black text-orange-600">
+							{symbol?.[0]}
 						</span>
-						<span className="text-sm md:text-base text-gray-500 font-bold uppercase tracking-tighter self-end pb-1">
-							{currency}
-						</span>
+					)}
+				</div>
+				<div className="text-right">
+					<div className="text-[10px] font-black text-orange-600 uppercase">
+						{symbol}
+					</div>
+					<div className="text-[9px] font-bold text-gray-400 uppercase">
+						MC: {marketCapNumber} {currency}
 					</div>
 				</div>
 			</div>
 
-			<div>
-				{/* CHANGE INDICATOR */}
+			<div className="mt-auto">
+				<h2 className="text-sm font-black text-gray-900 dark:text-white uppercase truncate mb-1">
+					{name}
+				</h2>
+				<div className="text-lg font-black text-gray-900 dark:text-white mb-0.5">
+					$ {price.toFixed(2)}
+				</div>
 				<div
-					className={`mt-8 flex items-center gap-2 ${color} font-black text-sm uppercase tracking-wider`}
+					className={`text-[11px] font-bold flex items-center gap-0.5 ${color}`}
 				>
-					<div
-						className={`p-1 rounded-md ${isPositive ? "bg-green-500/10" : "bg-red-500/10"}`}
-					>
-						{isPositive ? (
-							<ArrowUpRight size={16} />
-						) : (
-							<ArrowDownRight size={16} />
-						)}
-					</div>
-					<span>
-						{isPositive ? "+" : ""}
-						{change?.toFixed(2)} ({changePercent?.toFixed(2)}%)
-					</span>
+					{isPositive ? (
+						<ArrowUpRight size={10} />
+					) : (
+						<ArrowDownRight size={10} />
+					)}
+					{isPositive ? "+" : ""}
+					{change?.toFixed(2)} ({changePercent?.toFixed(2)}%)
 				</div>
 
 				{/* FOOTER */}

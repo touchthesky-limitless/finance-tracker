@@ -153,3 +153,15 @@ export function getInitialDisplayAmount(amount: number) {
 
 	return parts.length > 1 ? `${whole}.${parts[1]}` : whole;
 }
+
+export function formatMarketCap(valueInMillions: number | undefined) {
+  if (valueInMillions === undefined || !Number.isFinite(valueInMillions)) {
+    return "N/A";
+  }
+
+  if (valueInMillions >= 1_000_000) {
+    return (valueInMillions / 1_000_000).toFixed(2) + "T";
+  } else {
+    return (valueInMillions / 1_000).toFixed(2) + "B";
+  }
+}

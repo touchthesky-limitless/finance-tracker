@@ -39,6 +39,7 @@ export async function getStockData(
 			currency: profile.currency || "USD",
 			exchange: profile.exchange?.split(" ")[0] || "US", // "NASDAQ NMS" -> "NASDAQ"
 			logo: profile.logo || undefined,
+			marketCap: profile.marketCapitalization,
 		};
 	} catch (error) {
 		console.error(`Error fetching ${targetSymbol}:`, error);

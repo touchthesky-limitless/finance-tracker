@@ -40,8 +40,9 @@ export interface StockData {
 	change: number;
 	changePercent: number;
 	currency: string;
-	exchange: string;
+	exchange?: string;
 	logo?: string;
+	marketCap?: number;
 }
 
 export interface DashboardData {
