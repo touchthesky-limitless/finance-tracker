@@ -3,14 +3,7 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { CreditCard, useBudgetStore } from "@/store/useBudgetStore";
 import { CATEGORY_DICTIONARY, CategoryId } from "@/config/categoryDictionary";
-import {
-	Tag,
-	LayoutGrid,
-	Layers,
-	CheckCircle2,
-	SquarePen,
-	Trash2,
-} from "lucide-react";
+import { Tag, CheckCircle2, SquarePen, Trash2 } from "lucide-react";
 import { WalletHeader } from "@/components/Wallet/Header";
 import { BentoCard } from "@/components/Wallet/BentoCard";
 import { WalletManagerModal } from "@/components/Wallet/modals/WalletManagerModal";
@@ -37,6 +30,7 @@ import {
 } from "@dnd-kit/sortable";
 import { SortableItem } from "@/components/Wallet/SortableItem";
 import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
+import ViewToggle from "@/components/ViewToggle";
 
 export default function WalletRewardsPage() {
 	const {
@@ -75,7 +69,7 @@ export default function WalletRewardsPage() {
 	const [isWalletManagerOpen, setIsWalletManagerOpen] = useState(false);
 	const [isSearchOpen, setIsSearchOpen] = useState(false);
 	const [hiddenCategories, setHiddenCategories] = useState<string[]>([]);
-	const [viewMode, setViewMode] = useState<"grid" | "stack">("grid");
+	const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 
 	// Modal Data States
 	const [editingCategory, setEditingCategory] = useState<string | null>(null);
@@ -232,7 +226,7 @@ export default function WalletRewardsPage() {
 		// Push the state update to the next tick to avoid React's synchronous render warning
 		const timer = setTimeout(() => {
 			if (window.innerWidth < 768) {
-				setViewMode("stack");
+				setViewMode("list");
 			}
 		}, 0);
 
@@ -264,30 +258,11 @@ export default function WalletRewardsPage() {
 				onAddCategory={(id) => addActiveCategory(id)}
 			/>
 			<div className="flex w-full justify-end">
-				<div className="flex items-center gap-1 bg-gray-100 dark:bg-[#0a0a0a] p-1 rounded-xl w-fit mb-4 md:mb-8 border border-gray-200 dark:border-white/5">
-					<button
-						type="button"
-						onClick={() => setViewMode("grid")}
-						className={`p-2 rounded-lg flex items-center gap-2 text-xs font-bold transition-all ${
-							viewMode === "grid"
-								? "bg-white dark:bg-[#1a1a1a] text-gray-900 dark:text-white shadow-xs"
-								: "text-gray-500 hover:text-gray-900 dark:hover:text-white"
-						}`}
-					>
-						<LayoutGrid size={16} />
-					</button>
-					<button
-						type="button"
-						onClick={() => setViewMode("stack")}
-						className={`p-2 rounded-lg flex items-center gap-2 text-xs font-bold transition-all ${
-							viewMode === "stack"
-								? "bg-white dark:bg-[#1a1a1a] text-gray-900 dark:text-white shadow-xs"
-								: "text-gray-500 hover:text-gray-900 dark:hover:text-white"
-						}`}
-					>
-						<Layers size={16} />
-					</button>
-				</div>
+				<ViewToggle
+					viewMode={viewMode}
+					setViewMode={setViewMode}
+					iconSize={20}
+				/>
 			</div>
 
 			<DndContext
@@ -295,7 +270,7 @@ export default function WalletRewardsPage() {
 				collisionDetection={closestCenter}
 				onDragEnd={handleDragEnd}
 				// Dynamically apply the vertical lock only if we are in Stack view
-				modifiers={viewMode === "stack" ? [restrictToVerticalAxis] : []}
+				modifiers={viewMode === "list" ? [restrictToVerticalAxis] : []}
 			>
 				{viewMode === "grid" ? (
 					<SortableContext

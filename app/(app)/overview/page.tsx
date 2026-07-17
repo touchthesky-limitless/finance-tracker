@@ -4,15 +4,21 @@ import { getAverageMortgagePayment } from "@/lib/market-utils";
 import FinancialCard from "@/components/FinancialCard";
 import MortgageCard from "@/components/MortgageCard";
 import { BudgetSummaryCards } from "@/components/Dashboard/BudgetSummaryCards";
+import { StockData } from "@/lib/types";
 
-const HERO_SYMBOL = "MSFT";
+const HERO_SYMBOLS = ["MSFT", "VTI"];
 
 export default async function OverviewPage() {
 	// 1. Parallel fetching for speed
-	const [mortgage, featuredStock] = await Promise.all([
+	const [mortgage, ...featuredStocks] = await Promise.all([
 		getMortgageData(),
-		getStockData(HERO_SYMBOL),
+		...HERO_SYMBOLS.map(
+			(symbol): Promise<StockData | null> => getStockData(symbol),
+		),
 	]);
+	const validStocks = featuredStocks.filter(
+		(stock): stock is StockData => stock !== null,
+	);
 
 	const marketRate = mortgage?.frm30.rate || 6.5;
 	const avgPayment = getAverageMortgagePayment(350000, marketRate);
@@ -40,6 +46,9 @@ export default async function OverviewPage() {
 					Market Pulse
 				</h2>
 				<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+					{validStocks.map((stock) => (
+						<FinancialCard key={stock.symbol} {...stock} showFooter={true} />
+					))}
 					<MortgageCard
 						program="30-Year Fixed"
 						rate={marketRate}
@@ -47,19 +56,6 @@ export default async function OverviewPage() {
 						payment={avgPayment}
 						date={mortgage?.date}
 					/>
-					{featuredStock && (
-						<FinancialCard
-							symbol={featuredStock.symbol}
-							name={featuredStock.name}
-							price={featuredStock.price}
-							change={featuredStock.change}
-							changePercent={featuredStock.changePercent}
-							currency={featuredStock.currency}
-							logo={featuredStock.logo}
-							showFooter={true}
-							marketCap={featuredStock.marketCap}
-						/>
-					)}
 				</div>
 			</section>
 		</main>

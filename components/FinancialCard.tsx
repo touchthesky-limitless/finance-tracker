@@ -15,7 +15,7 @@ interface FinancialCardProps {
 	showFooter?: boolean;
 	logo?: string;
 	marketCap?: number;
-	view?: "grid" | "stack";
+	viewMode?: "grid" | "list";
 }
 
 export default function FinancialCard({
@@ -28,7 +28,7 @@ export default function FinancialCard({
 	showFooter = false,
 	logo,
 	marketCap,
-	view = "grid",
+	viewMode = "grid",
 }: FinancialCardProps) {
 	const { date, time, session } = getFullMarketInfo();
 	const isPositive = change > 0;
@@ -36,7 +36,7 @@ export default function FinancialCard({
 
 	const marketCapNumber = formatMarketCap(marketCap);
 
-	if (view === "stack") {
+	if (viewMode === "list") {
 		return (
 			<div className="bg-gray-50 dark:bg-[#0d0d0d] border border-black/5 dark:border-white/5 rounded-3xl p-4 flex flex-row items-center gap-4">
 				<div className="w-10 h-10 rounded-2xl bg-black/5 dark:bg-white/5 flex items-center justify-center shrink-0">
