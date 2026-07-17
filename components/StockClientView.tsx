@@ -108,9 +108,10 @@ export default function StockClientView({
 			</header>
 
 			{/* NEW: Search & Sort Controls */}
-			<div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+			<div className="flex flex-row justify-between items-center gap-2 md:gap-4 mb-6">
 				{/* Search Bar */}
-				<div className="relative w-full md:max-w-xs">
+				{/* Changed to flex-1 so it takes up available space, removed w-full */}
+				<div className="relative flex-1 md:max-w-xs">
 					<div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
 						<Search size={16} />
 					</div>
@@ -124,11 +125,12 @@ export default function StockClientView({
 				</div>
 
 				{/* Sort Controls */}
-				<div className="flex items-center bg-gray-50 dark:bg-[#0a0a0a] border border-gray-200 dark:border-white/5 rounded-xl p-1 w-full md:w-auto">
+				{/* Removed w-full, added shrink-0 so it doesn't get squished by the search bar */}
+				<div className="flex items-center shrink-0 bg-gray-50 dark:bg-[#0a0a0a] border border-gray-200 dark:border-white/5 rounded-xl p-1">
 					<select
 						value={sortBy}
 						onChange={(e) => setSortBy(e.target.value as never)}
-						className="bg-transparent text-sm text-gray-700 dark:text-gray-300 py-1.5 px-3 focus:outline-none cursor-pointer appearance-none outline-none"
+						className="bg-transparent text-sm text-gray-700 dark:text-gray-300 py-1.5 px-2 md:px-3 focus:outline-none cursor-pointer appearance-none outline-none"
 					>
 						<option
 							value="symbol"
