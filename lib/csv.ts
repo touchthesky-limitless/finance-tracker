@@ -22,15 +22,9 @@ export function parseBankCSV(
 
 		const hasDate = rowValues.some((v) => v.includes("date"));
 		const hasAmount = rowValues.some((v) => v.includes("amount"));
-		const hasMerchant = rowValues.some(
-			(v) =>
-				v.includes("description") ||
-				v.includes("payee") ||
-				v.includes("merchant") ||
-				v === "name",
-		);
+		const hasDescription = rowValues.some((v) => v.includes("description"));
 
-		if (hasDate && hasAmount && hasMerchant) {
+		if (hasDate && hasAmount && hasDescription) {
 			headerIndex = i;
 			headers = rowValues;
 			break;
@@ -40,33 +34,27 @@ export function parseBankCSV(
 	if (headerIndex === -1) throw new Error("Could not find header row.");
 
 	// 2. MAPPING INDICES
-	const dateIdx = headers.findIndex((h) => h.includes("date"));
+	// Prefer "posted date", fallback to any column containing "date"
+	let dateIdx = headers.findIndex((h) => h === "posted date");
+	if (dateIdx === -1) dateIdx = headers.findIndex((h) => h.includes("date"));
+
 	const amountIdx = headers.findIndex((h) => h === "amount");
+	const descriptionIdx = headers.findIndex((h) => h === "description");
+	const accountIdx = headers.findIndex((h) => h === "account name");
 
-	// BofA Specifics
-	const mccIdx = headers.findIndex((h) => h === "mcc");
-	const categoryIdx = headers.findIndex(
-		(h) =>
-			h === "merchant category" || h === "category" || h.includes("category"),
+	// Prioritize "Detailed Category" > "Primary Category" > any category
+	const detailedCategoryIdx = headers.findIndex(
+		(h) => h === "detailed category",
 	);
-	const typeIdx = headers.findIndex(
-		(h) => h.includes("type") || h.includes("cr/dr"),
-	);
+	const primaryCategoryIdx = headers.findIndex((h) => h === "primary category");
+	const categoryIdx = headers.findIndex((h) => h.includes("category"));
 
-	const merchantIdx = headers.findIndex(
-		(h) =>
-			h === "description" ||
-			h === "merchant" ||
-			h === "payee" ||
-			h === "name" ||
-			h.includes("merchant name"),
-	);
-
-	const memoIdx = headers.findIndex(
-		(h) => h === "memo" || h.includes("original description"),
-	);
-	// If there is no explicit "Category" column, we use the Memo index as the category source
-	const effectiveCategoryIdx = categoryIdx !== -1 ? categoryIdx : memoIdx;
+	const effectiveCategoryIdx =
+		detailedCategoryIdx !== -1
+			? detailedCategoryIdx
+			: primaryCategoryIdx !== -1
+				? primaryCategoryIdx
+				: categoryIdx;
 
 	// 3. ROW PARSING
 	for (let i = headerIndex + 1; i < lines.length; i++) {
@@ -76,66 +64,33 @@ export function parseBankCSV(
 
 		if (cols.length < 3) continue;
 
-		const rawMerchant = cols[merchantIdx] || "";
+		const rawDescription = descriptionIdx !== -1 ? cols[descriptionIdx] : "";
 		const merchantValue =
-			rawMerchant.replace(/\s+/g, " ").trim() || "Unknown Merchant";
+			rawDescription.replace(/\s+/g, " ").trim() || "Unknown Merchant";
 
 		const amountRaw = cols[amountIdx]?.replace(/[$,\s]/g, "") || "0";
-		let amount = parseFloat(amountRaw);
+		const amount = parseFloat(amountRaw);
 
-		// --- GLOBAL SIGN LOGIC (BofA, Chase, US Bank) ---
-		const type = typeIdx !== -1 ? cols[typeIdx].toUpperCase() : "";
-		const merchantLower = merchantValue.toLowerCase();
-
-		// 1. If it's a known 'Payment' or 'Credit', it's money leaving your bank to the card.
-		// We force it to be NEGATIVE so it shows as an outflow.
-		if (
-			type === "PAYMENT" ||
-			type === "CREDIT" ||
-			type === "C" ||
-			merchantLower.includes("payment thank you") ||
-			merchantLower.includes("automatic payment")
-		) {
-			amount = -Math.abs(amount);
-		}
-
-		// 2. If it's a 'Debit' or 'Sale', it's a standard expense.
-		// We force it to be NEGATIVE.
-		else if (type === "DEBIT" || type === "D" || type === "SALE") {
-			amount = -Math.abs(amount);
-		}
-
-		// 3. Fallback: If no type is found, we assume the CSV sign is correct.
-		// ------------------------------------------------
-
-		const date = cols[dateIdx] || "";
-
-		// ✨ US BANK FIX:
-		// If we are using the Memo column as the category, it contains the MCC (e.g., "00300")
-		const rawType = typeIdx !== -1 ? cols[typeIdx] : "";
+		const date = dateIdx !== -1 ? cols[dateIdx] : "";
 		const rawCatInput =
 			effectiveCategoryIdx !== -1 ? cols[effectiveCategoryIdx] : "";
-		const rawMcc = mccIdx !== -1 ? cols[mccIdx] : "";
 
-		// Combine Category Text and MCC (e.g., "EATING PLACES 5812")
-		// This allows resolveToParent to find the 4-digit code OR the string
-		const combinedCategoryInput =
-			`${rawCatInput} ${rawMcc}`.trim() || "Uncategorized";
+		// Use the CSV Account Name if available, otherwise fallback to the filename
+		const accountName =
+			accountIdx !== -1 && cols[accountIdx]
+				? cols[accountIdx]
+				: baseAccountName;
 
-		const finalCategory = resolveToParent(
-			combinedCategoryInput,
-			merchantValue,
-			rawType,
-		);
+		const finalCategory = resolveToParent(rawCatInput, merchantValue);
 
 		if (date && !isNaN(amount)) {
 			transactions.push({
 				id: crypto.randomUUID(),
 				date,
 				merchant: merchantValue,
-				description: memoIdx !== -1 ? cols[memoIdx] : "",
-				amount,
-				account: baseAccountName,
+				description: "",
+				amount, // Centralized CSVs generally have accurate positive/negative values natively
+				account: accountName,
 				category: finalCategory,
 				needs_review: finalCategory === "Uncategorized",
 				needs_subcat:

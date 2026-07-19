@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useRef } from "react";
-import { AlertCircle, CheckCircle2, Upload } from "lucide-react";
+import { AlertCircle, CheckCircle2, Import } from "lucide-react";
 import { useBudgetStore } from "@/store/useBudgetStore";
 import { Transaction } from "@/store/useBudgetStore";
 import { parseBankCSV } from "@/lib/csv";
@@ -61,7 +61,7 @@ export default function CsvUploader({ onComplete }: CsvUploaderProps) {
 
 				// Create a unified Set for O(1) lookups to avoid slow array .includes()
 				const knownTags = new Set([...DEFAULT_TAGS, ...customTags]);
-				const hierarchyKeys = Object.keys(CATEGORY_HIERARCHY);
+				const hierarchySet = new Set(Object.keys(CATEGORY_HIERARCHY));
 
 				const uniqueParsed: Transaction[] = [];
 
@@ -77,17 +77,8 @@ export default function CsvUploader({ onComplete }: CsvUploaderProps) {
 
 					const parent = resolveToParent(t.category, t.merchant);
 
-					let isGenericParent = false;
-					if (parent === "Uncategorized") {
-						isGenericParent = true;
-					} else {
-						for (let k = 0; k < hierarchyKeys.length; k++) {
-							if (hierarchyKeys[k] === parent) {
-								isGenericParent = true;
-								break;
-							}
-						}
-					}
+					const isGenericParent =
+						parent === "Uncategorized" || hierarchySet.has(parent);
 
 					uniqueParsed.push({
 						...t,
@@ -248,7 +239,7 @@ export default function CsvUploader({ onComplete }: CsvUploaderProps) {
 						</div>
 					) : (
 						<div className="p-3 bg-gray-800 rounded-full text-gray-400">
-							<Upload size={24} />
+							<Import size={24} />
 						</div>
 					)}
 					<div>
@@ -261,7 +252,7 @@ export default function CsvUploader({ onComplete }: CsvUploaderProps) {
 									? "Invalid CSV Format"
 									: message?.type === "success"
 										? "Import Complete!"
-										: "Click or Drag CSV Here"}
+										: "Click or Drag transaction files here"}
 						</p>
 
 						{message?.type === "error" && (
@@ -289,9 +280,7 @@ export default function CsvUploader({ onComplete }: CsvUploaderProps) {
 										: "text-gray-500"
 								}`}
 							>
-								{message
-									? message.text
-									: "Supports Chase, Bank Of America, etc."}
+								{message ? message.text : "Support csv format."}
 							</p>
 						)}
 					</div>

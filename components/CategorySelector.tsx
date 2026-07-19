@@ -15,6 +15,7 @@ import {
 import { useCategoryHierarchy } from "@/hooks/useCategoryHierarchy";
 import { CategoryDropdownMenu } from "@/components/CategoryDropdownMenu";
 import { CategoryTrigger } from "@/components/CategoryTrigger";
+import { findParentCategory } from "@/constants/categories";
 
 interface CategorySelectorProps {
 	currentCategory: string;
@@ -94,7 +95,14 @@ export function CategorySelector({
 				variant={variant}
 				isOpen={isOpen}
 				onClick={() => {
-					setIsOpen(!isOpen);
+					const nextOpen = !isOpen;
+					setIsOpen(nextOpen);
+
+					// Run the reset logic exactly when the user opens the menu
+					if (nextOpen) {
+						setSelectedParent(findParentCategory(currentCategory));
+						setCatQuery("");
+					}
 				}}
 				currentCategory={currentCategory}
 				displayIcon={displayIcon}

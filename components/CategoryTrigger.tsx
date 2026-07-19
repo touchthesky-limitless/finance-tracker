@@ -45,17 +45,10 @@ export const CategoryTrigger = forwardRef<
 					type="button"
 					onClick={onClick}
 					{...props}
-					className={
-						variant === "filter"
-							? `flex items-center gap-2 text-xs font-black uppercase tracking-widest transition-colors px-3 py-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 ${
-									!isDefaultFilter
-										? "text-orange-500"
-										: "text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
-								}`
-							: `w-full p-4 bg-[#F8F9FB] dark:bg-[#0d0d0d] border border-gray-200 dark:border-white/5 rounded-2xl flex items-center justify-between transition-all hover:border-gray-300 dark:hover:border-white/10 shadow-sm`
-					}
+					className="flex items-center justify-between w-full px-2 py-1 rounded-lg border border-transparent group-hover:border-gray-300 dark:group-hover:border-white/20 transition-colors bg-transparent cursor-pointer"
 				>
-					<div className="flex items-center gap-2">
+					<div className="flex items-center gap-2 flex-1 min-w-0 pr-2">
+						{" "}
 						{variant === "filter" ? (
 							<>
 								{/* Compact Icon for Mobile */}
@@ -63,7 +56,8 @@ export const CategoryTrigger = forwardRef<
 
 								{/* Show selected category text on screens larger than mobile */}
 								{!isDefaultFilter && (
-									<span className="hidden sm:inline-block max-w-25 truncate">
+									<span className="text-[15px] font-normal text-gray-900 dark:text-white">
+										{" "}
 										{currentCategory}
 									</span>
 								)}
@@ -77,19 +71,20 @@ export const CategoryTrigger = forwardRef<
 										colorClass={displayColorClass}
 									/>
 								</div>
-								<span className="text-sm text-gray-900 dark:text-white font-bold">
+								<span className="text-sm text-gray-900 dark:text-white font-bold ">
 									{currentCategory}
 								</span>
 							</>
 						)}
 					</div>
 
-					{/* Only show the dropdown Chevron on the larger form variant */}
-					{variant === "form" && (
+					{/* Changed condition to allow Chevron in the table view, keeping rotation logic intact */}
+					{variant !== "filter" && (
 						<ChevronDown
-							size={20}
-							className={`transition-transform duration-300 shrink-0 ${
-								isOpen ? "rotate-180 text-orange-500" : "text-gray-400"
+							className={`w-4 h-4 shrink-0 text-gray-400 transition-all ${
+								isOpen
+									? "opacity-100 rotate-180"
+									: "opacity-0 group-hover:opacity-100"
 							}`}
 						/>
 					)}

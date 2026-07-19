@@ -49,3 +49,16 @@ export interface DashboardData {
 	mortgage: MortgageInnerData;
 	stock: StockData;
 }
+
+export interface Transaction {
+    id: string;
+    date: string;
+    merchant: string;
+    category: string;
+    amount: number;
+}
+
+export interface CellCoordinate {
+    rowId: string;
+    field: keyof Transaction;
+}
