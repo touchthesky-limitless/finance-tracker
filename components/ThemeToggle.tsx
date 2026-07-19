@@ -3,15 +3,11 @@
 import * as React from "react";
 import { Moon, Sun, Monitor } from "lucide-react";
 import { useTheme } from "next-themes";
+import { useMounted } from "@/hooks/useMounted";
 
 export default function ThemeToggle() {
 	const { setTheme, theme } = useTheme();
-	const [mounted, setMounted] = React.useState(false);
-
-	// Prevent hydration mismatch by only rendering after mount
-	React.useEffect(() => {
-		setMounted(true);
-	}, []);
+	const mounted = useMounted();
 
 	if (!mounted) return <div className="p-2 w-9 h-9" />;
 

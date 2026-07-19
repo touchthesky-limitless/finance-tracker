@@ -27,7 +27,7 @@ export default function LoginPage() {
 			router.refresh();
 
 			if (isLogin) {
-				router.push("/overview");
+				router.push("/dashboard");
 			} else {
 				router.push("/signup-success");
 			}

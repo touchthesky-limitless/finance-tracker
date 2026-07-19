@@ -16,7 +16,7 @@ interface BottomNavProps {
 }
 
 const BOTTOM_NAV_LINKS = [
-	{ name: "Overview", href: "/overview", icon: LayoutDashboard },
+	{ name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
 	{ name: "Budget", href: "/budget", icon: ReceiptText },
 	{ name: "Stocks", href: "/stocks", icon: BarChart3 },
 	{ name: "Wallet", href: "/wallet", icon: WalletCards },

@@ -10,7 +10,7 @@ import {
 	CheckCircle2,
 } from "lucide-react";
 
-export default function PulseOverviewPage() {
+export default function PulseDashboardage() {
 	return (
 		// Organic, soft gradient background instead of flat gray
 		<div className="min-h-screen bg-linear-to-br from-orange-50/50 via-[#F8F9FB] to-blue-50/50 dark:from-[#1a1412] dark:via-[#0a0a0a] dark:to-[#0d121a] text-slate-800 dark:text-slate-200 p-4 md:p-8 font-sans selection:bg-orange-500/30">

@@ -1,17 +1,17 @@
 import {
 	LayoutDashboard,
 	Receipt,
+	ChartPie,
 	BarChart3,
 	Compass,
-	Wallet,
-	Tags,
-	Calendar,
+	WalletCards,
+	Layers2,
 	Repeat,
 	RefreshCcw,
-	Smartphone,
-	Info,
 	LucideIcon,
 	ListTree,
+	Calculator,
+	ChartCandlestick,
 } from "lucide-react";
 
 export interface SidebarItemType {
@@ -23,99 +23,49 @@ export interface SidebarItemType {
 }
 
 export interface NavGroupType {
-	label: string;
+	// label: string;
 	items: SidebarItemType[];
 }
 
 export const FEATURE_LOCKS = {
-	MAP_INTEGRATION: true, // Generic for any map-related feature
+	MAP_INTEGRATION: true,
 	MEDIA_UPLOADS: true,
 	TRANSACTION_TEMPLATES: true,
-	RECURRING_ITEMS: true, // Generic for scheduled/recurring logic
+	RECURRING_ITEMS: true,
 	ADVANCED_ANALYTICS: true,
 } as const;
 
 export type FeatureKey = keyof typeof FEATURE_LOCKS;
 
-export const NAV_GROUPS: NavGroupType[] = [
-	{
-		label: "",
-		items: [{ name: "Dashboard", href: "/budget", icon: LayoutDashboard }],
-	},
-	{
-		label: "Transaction Data",
-		items: [
-			{
-				name: "Transaction Details",
-				href: "/budget/transactions",
-				icon: Receipt,
-				hasAdd: true,
-			},
-			{
-				name: "Statistics & Analysis",
-				href: "/budget/stats",
-				icon: BarChart3,
-			},
-			{
-				name: "Insights Explorer",
-				href: "/budget/insights",
-				icon: Compass,
-			},
-		],
-	},
-	{
-		label: "Basis Data",
-		items: [
-			{
-				name: "Transaction Categories",
-				href: "/budget/categories",
-				hasAdd: true,
-				icon: ListTree,
-				isLocked: false,
-			},
-			{
-				name: "Recurring",
-				href: "/budget/recurring",
-				icon: Repeat,
-				isLocked: false,
-			},
-			{
-				name: "Accounts",
-				href: "/budget/accounts",
-				icon: Wallet,
-				isLocked: true,
-			},
+// Add this helper to config/navigation.ts
+const createItem = (
+	name: string,
+	href: string,
+	icon: LucideIcon,
+	options?: { hasAdd?: boolean; isLocked?: boolean },
+): SidebarItemType => ({
+	name,
+	href,
+	icon,
+	hasAdd: options?.hasAdd ?? false,
+	isLocked: options?.isLocked ?? false,
+});
 
-			{
-				name: "Transaction Tags",
-				href: "/budget/tags",
-				hasAdd: false,
-				icon: Tags,
-				isLocked: true,
-			},
-			{
-				name: "Transaction Templates",
-				href: "/budget/templates",
-				icon: Calendar,
-				isLocked: true,
-			},
-		],
-	},
-	{
-		label: "Miscellaneous",
-		items: [
-			{
-				name: "Exchange Rates Data",
-				href: "/budget/exchange",
-				icon: RefreshCcw,
-				isLocked: true,
-			},
-			{
-				name: "Use on Mobile Device",
-				href: "/budget/mobile",
-				icon: Smartphone,
-			},
-			{ name: "About", href: "/budget/about", icon: Info },
-		],
-	},
+export const NAV_GROUPS: SidebarItemType[] = [
+	createItem("Dashboard", "/dashboard", LayoutDashboard),
+	createItem("Accounts", "/accounts", Layers2),
+	createItem("Transactions", "/transactions", Receipt),
+	createItem("Reports", "/reports", ChartPie),
+	createItem("Wallet", "/wallet", WalletCards),
+	createItem("Calculator", "/calculator", Calculator),
+	createItem("Stocks", "/stocks", ChartCandlestick),
+	createItem("Insights", "/insights", Compass),
+	createItem("Statistics", "/stats", BarChart3),
+	createItem("Recurring", "/recurring", Repeat),
+	createItem("Categories", "/categories", ListTree, {
+		hasAdd: true, isLocked: true,
+	}),
+	createItem("Exchange Rates", "/exchange", RefreshCcw, {
+		isLocked: true,
+	}),
 ];

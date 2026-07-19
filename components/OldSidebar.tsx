@@ -30,8 +30,8 @@ interface NavLinkProps {
 
 const NAV_LINKS = [
 	{
-		name: "Overview",
-		href: "/overview",
+		name: "Dashboard",
+		href: "/dashboard",
 		icon: <LayoutDashboard size={18} />,
 		isPrimary: true,
 	},
@@ -92,7 +92,7 @@ const NavLink = memo(
 );
 NavLink.displayName = "NavLink";
 
-const Sidebar = memo(function Sidebar() {
+const OldSidebar = memo(function OldSidebar() {
 	const [isOpen, setIsOpen] = useState(false);
 	const toggleMobile = useCallback(() => setIsOpen((prev) => !prev), []);
 	const closeMobile = useCallback(() => setIsOpen(false), []);
@@ -130,7 +130,7 @@ const Sidebar = memo(function Sidebar() {
 				<>
 					{/* LEGACY MOBILE HEADER */}
 					<header className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-white/80 dark:bg-[#050505]/80 backdrop-blur-md transform-gpu border-b border-gray-200 dark:border-white/5 px-6 flex justify-between items-center z-40">
-						<Link href="/overview">
+						<Link href="/dashboard">
 							<div className="flex items-center gap-2 font-black text-gray-900 dark:text-white tracking-tighter cursor-pointer transition-opacity hover:opacity-80">
 								<Zap className="text-orange-600 fill-orange-600" size={20} />
 								Budget Pro
@@ -163,7 +163,7 @@ const Sidebar = memo(function Sidebar() {
                 `}
 			>
 				<div className="p-8 flex items-center justify-between lg:block">
-					<Link href="/overview">
+					<Link href="/dashboard">
 						<div className="flex items-center gap-2 font-black text-gray-900 dark:text-white tracking-tighter cursor-pointer transition-opacity hover:opacity-80">
 							<Zap className="text-orange-600 fill-orange-600" size={20} />
 							Budget Pro
@@ -196,4 +196,4 @@ const Sidebar = memo(function Sidebar() {
 	);
 });
 
-export default Sidebar;
+export default OldSidebar;

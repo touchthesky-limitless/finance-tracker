@@ -731,6 +731,7 @@ export const useBudgetStore = create<BudgetState>()(
 				customRates: state.customRates,
 				preferredCards: state.preferredCards,
 				activeCategoryIds: state.activeCategoryIds,
+				transactions: state.transactions,
 			}),
 		},
 	),

@@ -50,9 +50,9 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
-  // 3. The Auto-Enter: If logged in and hits landing/login, go to overview
+  // 3. The Auto-Enter: If logged in and hits landing/login, go to dashboard
   if (user && (isLoginPage || isLandingPage)) {
-    return NextResponse.redirect(new URL("/overview", request.url));
+    return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
   return response;

@@ -8,7 +8,7 @@ export default function LandingPage() {
 		<div className="min-h-screen bg-white dark:bg-black text-gray-900 dark:text-white selection:bg-orange-500/30 transition-colors duration-300">
 			{/* Hero Section */}
 			<nav className="flex justify-between items-center p-6 max-w-7xl mx-auto">
-				<Link href="/overview">
+				<Link href="/dashboard">
 					<div className="flex items-center gap-2 font-black text-xl tracking-tighter cursor-pointer transition-opacity hover:opacity-80">
 						<Zap className="text-orange-600 fill-orange-600" size={24} />
 						BUDGET PRO

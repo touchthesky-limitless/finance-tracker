@@ -124,7 +124,7 @@ export const CATEGORY_HIERARCHY: Record<string, string[]> = {
 		"Other services",
 	],
 	"Transportation": [
-		"Gasoline & EV charing",
+		"Gas & EV charging",
 		"Car services",
 		"Public transit",
 		"Taxi & ride shares",

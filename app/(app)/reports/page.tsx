@@ -36,7 +36,7 @@ const DynamicSpendingChart = dynamic<SpendingChartProps>(
 	},
 );
 
-export default function OverviewPage() {
+export default function ReportsPage() {
 	const [timeFilter, setTimeFilter] = useState(DEFAULT_YEAR_FILTER);
 	const FALL_BACK_DATE = TIME_PRESETS.THIS_MONTH;
 

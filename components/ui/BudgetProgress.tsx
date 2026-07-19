@@ -26,7 +26,7 @@ export const BudgetProgress = memo(function BudgetProgress({
 	const isWarning = percentage > 90;
 
 	const handleClick = () => {
-		router.push(`/budget/transactions?category=${encodeURIComponent(name)}`);
+		router.push(`/transactions?category=${encodeURIComponent(name)}`);
 	};
 
 	return (

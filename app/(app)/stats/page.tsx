@@ -17,7 +17,7 @@ import {
     Activity
 } from "lucide-react";
 
-export default function ProOverviewPage() {
+export default function ProDashboardPage() {
     return (
         <div className="min-h-screen bg-[#F4F6F8] dark:bg-[#0a0a0a] text-slate-800 dark:text-slate-200 p-4 md:p-8 font-sans">
             
@@ -42,9 +42,9 @@ export default function ProOverviewPage() {
             {/* --- TOP ROW: IPAD (2 COLS) -> DESKTOP (12 COLS) --- */}
             <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-12 gap-6 mb-6">
                 
-                {/* 1. MONTHLY BUDGET OVERVIEW */}
+                {/* 1. MONTHLY BUDGET dashboard */}
                 {/* Full width on iPad, 5 cols on Desktop */}
-                <Card className="lg:col-span-2 xl:col-span-5" title="June Budget Overview">
+                <Card className="lg:col-span-2 xl:col-span-5" title="June Budget Dashboard">
                     <div className="flex flex-col sm:flex-row items-center gap-8 mt-4">
                         <div className="relative w-48 h-28 shrink-0">
                             <svg viewBox="0 0 200 110" className="w-full h-full overflow-visible drop-shadow-sm">

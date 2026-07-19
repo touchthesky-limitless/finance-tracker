@@ -8,7 +8,7 @@ import { StockData } from "@/lib/types";
 
 const HERO_SYMBOLS = ["MSFT", "VTI"];
 
-export default async function OverviewPage() {
+export default async function DashboardPage() {
 	// 1. Parallel fetching for speed
 	const [mortgage, ...featuredStocks] = await Promise.all([
 		getMortgageData(),

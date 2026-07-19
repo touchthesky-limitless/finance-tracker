@@ -141,7 +141,7 @@ export const SYSTEM_ICON_MAP: Record<string, LucideIcon> = {
 	"Property tax": FileText,
 
 	// Transportation
-	"Gasoline & EV charing": Fuel,
+	"Gas & EV charging": Fuel,
 	"Car services": Wrench,
 	"Public transit": Bus,
 	"Taxi & ride shares": CarTaxiFront,

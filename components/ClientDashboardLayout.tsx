@@ -1,56 +1,43 @@
 "use client";
 
-import Sidebar from "@/components/Sidebar";
-import StoreInitializer from "@/components/StoreInitializer";
-import GlobalShimmer from "@/components/GlobalShimmer";
+import Sidebar from "@/components/Sidebar/Sidebar";
 import { useBudgetStore } from "@/store/useBudgetStore";
-import WelcomeNotification from "@/components/WelcomeNotification";
-import { featureFlags } from "@/config/featureFlags";
+import { VersionProvider } from "@/app/context/VersionContext";
+import { UndoToast } from "@/components/ui/UndoToast";
 
 export default function ClientDashboardLayout({
 	children,
 }: {
 	children: React.ReactNode;
 }) {
-	const hasHydrated = useBudgetStore((state) => state.hasHydrated);
-	const isLoading = useBudgetStore((state) => state.isLoading);
-	const transactions = useBudgetStore((state) => state.transactions);
-
-	// Show shimmer ONLY on the very first load
-	const showShimmer = !hasHydrated || (isLoading && transactions.length === 0);
-
-	const enableBottomNav = featureFlags.ClientDashboardLayoutEnableBottomNav;
+	// Zustand selectors remain stable
+	const toast = useBudgetStore((state) => state.toast);
+	const setToast = useBudgetStore((state) => state.setToast);
+	const undoBulkUpdate = useBudgetStore((state) => state.undoBulkUpdate);
 
 	return (
-		<div
-			className={`flex min-h-screen bg-white dark:bg-[#050505] ${
-				enableBottomNav ? "pb-28 lg:pb-0" : ""
-			}`}
-		>
-			{/* Keeps your Zustand state synced with the server */}
-			<StoreInitializer />
+		<VersionProvider version="pro">
+			<div className="flex h-screen overflow-hidden bg-white dark:bg-[#0d0d0d]">
+				{/* Unified Sidebar is now global */}
+				<Sidebar />
 
-			<WelcomeNotification />
-
-			{/* Sidebar is fixed width or responsive drawer */}
-			<Sidebar />
-
-			{/* Content area takes remaining width */}
-			<div className="flex-1 flex flex-col min-w-0 overflow-x-hidden min-h-37.5">
-				{showShimmer ? (
-					<GlobalShimmer />
-				) : (
-					<main
-						className={
-							enableBottomNav
-								? "pt-[env(safe-area-inset-top,1rem)] lg:pt-0" // Immersive mode (protects from notch, flush on iPad/Desktop)
-								: "pt-16 lg:pt-0" // Legacy mode (makes room for the top header)
-						}
-					>
-						{children}
-					</main>
-				)}
+				<div className="flex-1 flex flex-col min-w-0 overflow-y-auto">
+					{children}
+				</div>
 			</div>
-		</div>
+
+			{/* Global Undo Toast */}
+			{toast && (
+				<UndoToast
+					show={!!toast}
+					message={`Updated ${toast.count} transactions`}
+					onUndo={() => {
+						undoBulkUpdate(toast.snapshot);
+						setToast(null);
+					}}
+					onClose={() => setToast(null)}
+				/>
+			)}
+		</VersionProvider>
 	);
 }

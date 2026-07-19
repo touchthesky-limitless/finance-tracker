@@ -52,14 +52,54 @@ export function formatThousandWithCommas(val: string | number) {
 	return parts.join(".");
 }
 
+// export function formatCurrency(num: number) {
+// 	if (isNaN(num) || num === undefined) {
+// 		return "$0.00";
+// 	}
+// 	const sign = num < 0 ? "-" : "";
+// 	const absNum = Math.abs(num);
+// 	return `${sign}$${numberFormatter.format(absNum)}`;
+// }
+
 export function formatCurrency(num: number) {
-	if (isNaN(num) || num === undefined) {
-		return "$0.00";
-	}
-	const sign = num < 0 ? "-" : "";
-	const absNum = Math.abs(num);
-	return `${sign}$${numberFormatter.format(absNum)}`;
+    if (isNaN(num) || num === undefined) {
+        return "$0.00";
+    }
+    // Remove the sign logic to ensure numbers are always positive
+    const absNum = Math.abs(num);
+    return `$${numberFormatter.format(absNum)}`;
 }
+
+// export function formatCurrency(num: number) {
+//     if (isNaN(num) || num === undefined) {
+//         return "$0.00";
+//     }
+
+//     const isNegative = num < 0;
+//     const absNum = Math.abs(num);
+
+//     // Handle thousands (k) formatting
+//     if (absNum >= 1000) {
+//         // Divide by 1000, round to 1 decimal place, and remove .0 if it's a whole number
+//         const formatted = (absNum / 1000).toFixed(1).replace(/\.0$/, "");
+//         return `${isNegative ? "-" : ""}$${formatted}k`;
+//     }
+
+//     // Standard formatting for under 1000
+//     return `${isNegative ? "-" : ""}$${numberFormatter.format(absNum)}`;
+// }
+
+export const formatChartValue = (value: number) => {
+    const isNegative = value < 0;
+    const absValue = Math.abs(value);
+    
+    if (absValue >= 1000) {
+        const formatted = (absValue / 1000).toFixed(1).replace(/\.0$/, "");
+        return `${isNegative ? "-" : ""}$${formatted}k`;
+    }
+    
+    return `${isNegative ? "-" : ""}$${absValue.toFixed(0)}`;
+  };
 
 export function formatCompact(num: number) {
 	if (isNaN(num) || num === undefined) {
