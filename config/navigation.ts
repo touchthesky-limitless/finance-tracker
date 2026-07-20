@@ -62,7 +62,7 @@ export const NAV_GROUPS: SidebarItemType[] = [
 	createItem("Insights", "/insights", Compass),
 	createItem("Statistics", "/stats", BarChart3),
 	createItem("Recurring", "/recurring", Repeat),
-	createItem("Categories", "/categories", ListTree, {
+	createItem("Tags", "/tags", ListTree, {
 		hasAdd: true, isLocked: true,
 	}),
 	createItem("Exchange Rates", "/exchange", RefreshCcw, {

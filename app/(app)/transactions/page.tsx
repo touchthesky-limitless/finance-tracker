@@ -13,6 +13,7 @@ import CsvUploader from "@/components/CsvUploader";
 import { TopToolbar } from "@/components/Transactions/TopToolbar";
 import { TableToolbar } from "@/components/Transactions/TableToolbar";
 import { SummarySidebar } from "@/components/Transactions/SummarySidebar";
+import { useUnifiedCategories } from "@/hooks/useUnifiedCategories";
 
 const EditTransactionModal = dynamic(
 	() => {
@@ -84,6 +85,8 @@ export default function TransactionsPage() {
 		}
 		return [{ id: "date", desc: true }];
 	});
+
+	const { allUnifiedCategories } = useUnifiedCategories("Expense", "All");
 
 	// --- Side Effects ---
 	useEffect(() => {
@@ -317,6 +320,12 @@ export default function TransactionsPage() {
 							currentView={currentView}
 							sorting={sorting}
 							onCategoryChange={handleCategoryChange}
+							getCategoryId={(name) => {
+								const found = allUnifiedCategories.find((c) => {
+									return c.name === name;
+								});
+								return found?.id ?? "unknown";
+							}}
 						/>
 					</div>
 				</div>

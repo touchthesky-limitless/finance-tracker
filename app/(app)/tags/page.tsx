@@ -22,7 +22,7 @@ import confetti from "canvas-confetti";
 
 type TransactionType = "Expense" | "Income" | "Transfer";
 
-export default function CategoriesPage() {
+export default function TagsPage() {
 	// --- UI States ---
 	const [transactionType, setTransactionType] =
 		useState<TransactionType>("Expense");

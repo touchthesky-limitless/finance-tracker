@@ -2,6 +2,7 @@
 "use no memo";
 
 import { useRef, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import {
 	useReactTable,
 	getCoreRowModel,
@@ -28,6 +29,8 @@ interface DataTableProps {
 	onMarkReviewed?: (id: string) => void;
 	sorting: SortingState;
 	onCategoryChange?: (id: string, newCategory: string) => void;
+	isCategoryView?: boolean;
+	getCategoryId?: (categoryName: string) => string | undefined;
 }
 
 const columnHelper = createColumnHelper<Transaction>();
@@ -43,8 +46,12 @@ export function DataTable({
 	onMarkReviewed,
 	sorting,
 	onCategoryChange,
+	isCategoryView = true,
+	getCategoryId,
 }: DataTableProps) {
 	const parentRef = useRef<HTMLDivElement>(null);
+
+	const router = useRouter();
 
 	const columns = useMemo(() => {
 		return [
@@ -114,15 +121,23 @@ export function DataTable({
 			columnHelper.accessor("category", {
 				size: 280,
 				cell: (info) => {
+					// Extract category name to use for routing
+					const categoryName = String(info.getValue());
+					const targetId = getCategoryId
+						? getCategoryId(categoryName)
+						: undefined;
+
 					return (
 						<div
-							onClick={(e) => e.stopPropagation()}
+							onClick={(e) => {
+								e.stopPropagation();
+							}}
 							className="group flex items-center gap-1.5 w-full h-full pr-2"
 						>
 							{/* Box 1: The Category Selector */}
 							<div className="flex-1 min-w-0">
 								<CategorySelector
-									currentCategory={String(info.getValue())}
+									currentCategory={categoryName}
 									onSelect={(newCategory) => {
 										if (onCategoryChange) {
 											onCategoryChange(info.row.original.id, newCategory);
@@ -132,31 +147,38 @@ export function DataTable({
 							</div>
 
 							{/* Box 2: View Category Button */}
-							<button
-								className="flex items-center justify-center w-8 h-8 rounded-lg border border-transparent group-hover:border-gray-300 dark:group-hover:border-white/20 opacity-0 group-hover:opacity-100 hover:bg-gray-100 dark:hover:bg-white/5 transition-all shrink-0 cursor-pointer"
-								title="View Category"
-							>
-								<ArrowRight
-									size={16}
-									className="text-gray-600 dark:text-gray-400"
-									strokeWidth={2}
-								/>
-							</button>
+							{isCategoryView && (
+								<button
+									onClick={(e) => {
+										e.stopPropagation();
+										// Safely encode the string (e.g. "Dining Out" -> "Dining%20Out")
+										// const encodedId = encodeURIComponent(categoryName);
+										const currentYear = new Date().getFullYear();
+
+										// 3. Construct URL and trigger navigation
+										const targetUrl = `/categories/${targetId}?breakdown=category&categories=${targetId}&date=${currentYear}-01-01&order=inverse_date&sankey=category&timeframe=year&view=breakdown`;
+										router.push(targetUrl);
+									}}
+									className="flex items-center justify-center w-8 h-8 rounded-lg border border-transparent group-hover:border-gray-300 dark:group-hover:border-white/20 opacity-0 group-hover:opacity-100 hover:bg-gray-100 dark:hover:bg-white/5 transition-all shrink-0 cursor-pointer"
+									title="View Category"
+								>
+									<ArrowRight
+										size={16}
+										className="text-gray-600 dark:text-gray-400"
+										strokeWidth={2}
+									/>
+								</button>
+							)}
 						</div>
 					);
 				},
 			}),
-
 			columnHelper.accessor("account", {
 				size: 300,
 				cell: (info) => {
 					return (
-						// Added overflow-hidden to the wrapper
 						<div className="flex items-center gap-2 overflow-hidden">
-							{/* Added shrink-0 so the icon doesn't squash */}
 							<div className="w-5 h-5 rounded-full border-4 border-[#2563EB] bg-white shrink-0" />
-
-							{/* Added truncate so long strings like "Customized Cash Rewards Visa..." get an ellipsis */}
 							<span
 								className="text-gray-700 dark:text-gray-200 text-[15px] truncate"
 								title={String(info.getValue())}
@@ -201,6 +223,7 @@ export function DataTable({
 				},
 			}),
 		];
+		// 4. Ensure router is in the dependency array
 	}, [
 		selectedIds,
 		isEditMode,
@@ -209,6 +232,9 @@ export function DataTable({
 		onMarkReviewed,
 		onRowClick,
 		onCategoryChange,
+		router,
+		isCategoryView,
+		getCategoryId,
 	]);
 
 	// eslint-disable-next-line
@@ -221,6 +247,7 @@ export function DataTable({
 				...columnVisibility,
 				date: false,
 				select: isEditMode || currentView === "review",
+				amount: columnVisibility.amount !== false,
 			},
 		},
 		getCoreRowModel: getCoreRowModel(),
@@ -232,7 +259,6 @@ export function DataTable({
 	const flatRows = useMemo(() => {
 		const result = [];
 
-		// 2. Single pass to calculate totals and cache formatted dates
 		const dateTotals = new Map<string, number>();
 		const rowDates = new Map<string, string>();
 
@@ -242,6 +268,7 @@ export function DataTable({
 				month: "long",
 				day: "numeric",
 				year: "numeric",
+				timeZone: "UTC",
 			});
 
 			rowDates.set(row.id, dateStr);
@@ -250,7 +277,6 @@ export function DataTable({
 			dateTotals.set(dateStr, currentTotal + Number(row.original.amount));
 		}
 
-		// 3. Build the final flat array
 		let lastDate = "";
 
 		for (let i = 0; i < rows.length; i++) {
@@ -270,7 +296,7 @@ export function DataTable({
 		}
 
 		return result;
-	}, [rows]); // 4. Depend ONLY on the extracted rows array
+	}, [rows]);
 
 	const rowVirtualizer = useVirtualizer({
 		count: flatRows.length,
@@ -285,12 +311,10 @@ export function DataTable({
 
 	const virtualItems = rowVirtualizer.getVirtualItems();
 
-	// Determine the active sticky header and calculate any push-up offset
 	let activeHeader = null;
 	if (virtualItems.length > 0) {
 		const scrollTop = parentRef.current?.scrollTop || 0;
 
-		// 1. Find the actual item touching the top of the viewport (ignoring overscan)
 		let currentTopIndex = virtualItems[0].index;
 		for (const v of virtualItems) {
 			if (v.start <= scrollTop) {
@@ -300,7 +324,6 @@ export function DataTable({
 			}
 		}
 
-		// 2. Find the closest header for that specific item
 		let stickyIdx = -1;
 		for (let i = currentTopIndex; i >= 0; i--) {
 			if (flatRows[i]?.type === "header") {
@@ -309,7 +332,6 @@ export function DataTable({
 			}
 		}
 
-		// 3. Calculate push-up effect
 		if (stickyIdx !== -1) {
 			let translateY = 0;
 			const nextHeader = virtualItems.find((v) => {
@@ -345,8 +367,7 @@ export function DataTable({
 						}}
 					>
 						<span>{activeHeader.item.date}</span>
-						{/* Add the || 0 fallback here */}
-						<span>${Math.abs(activeHeader.item.total || 0).toFixed(2)}</span>
+						<span>{formatCurrency(activeHeader.item.total || 0)}</span>
 					</div>
 				)}
 			</div>
@@ -369,15 +390,13 @@ export function DataTable({
 								style={{ height: 48, transform: `translateY(${vRow.start}px)` }}
 							>
 								<span>{item.date}</span>
-								<span>${Math.abs(item.total || 0).toFixed(2)}</span>
+								<span>{formatCurrency(item.total || 0)}</span>
 							</div>
 						);
 					}
 
-					// --- TYPE GUARD: 'row' is now treated as the correct TanStack Row type ---
 					const row = item;
 
-					// Check if the object has the getVisibleCells method
 					if (!("getVisibleCells" in row)) return null;
 
 					return (
@@ -388,6 +407,7 @@ export function DataTable({
 						>
 							{row.getVisibleCells().map((cell, index) => {
 								const isAmount = cell.column.id === "amount";
+
 								return (
 									<div
 										key={cell.id}
