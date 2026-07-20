@@ -15,6 +15,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { Transaction } from "@/store/useBudgetStore";
 import { ChevronRight, ArrowRight, Check } from "lucide-react";
 import { CategorySelector } from "@/components/CategorySelector";
+import { formatCurrency } from "@/utils/formatters";
 
 interface DataTableProps {
 	transactions: Transaction[];
@@ -115,33 +116,33 @@ export function DataTable({
 				cell: (info) => {
 					return (
 						<div
-				onClick={(e) => e.stopPropagation()}
-				className="group flex items-center gap-1.5 w-full h-full pr-2"
-			>
-				{/* Box 1: The Category Selector */}
-				<div className="flex-1 min-w-0">
-					<CategorySelector
-						currentCategory={String(info.getValue())}
-						onSelect={(newCategory) => {
-							if (onCategoryChange) {
-								onCategoryChange(info.row.original.id, newCategory);
-							}
-						}}
-					/>
-				</div>
+							onClick={(e) => e.stopPropagation()}
+							className="group flex items-center gap-1.5 w-full h-full pr-2"
+						>
+							{/* Box 1: The Category Selector */}
+							<div className="flex-1 min-w-0">
+								<CategorySelector
+									currentCategory={String(info.getValue())}
+									onSelect={(newCategory) => {
+										if (onCategoryChange) {
+											onCategoryChange(info.row.original.id, newCategory);
+										}
+									}}
+								/>
+							</div>
 
-				{/* Box 2: View Category Button */}
-				<button
-					className="flex items-center justify-center w-8 h-8 rounded-lg border border-transparent group-hover:border-gray-300 dark:group-hover:border-white/20 opacity-0 group-hover:opacity-100 hover:bg-gray-100 dark:hover:bg-white/5 transition-all shrink-0 cursor-pointer"
-					title="View Category"
-				>
-					<ArrowRight
-						size={16}
-						className="text-gray-600 dark:text-gray-400"
-						strokeWidth={2}
-					/>
-				</button>
-			</div>
+							{/* Box 2: View Category Button */}
+							<button
+								className="flex items-center justify-center w-8 h-8 rounded-lg border border-transparent group-hover:border-gray-300 dark:group-hover:border-white/20 opacity-0 group-hover:opacity-100 hover:bg-gray-100 dark:hover:bg-white/5 transition-all shrink-0 cursor-pointer"
+								title="View Category"
+							>
+								<ArrowRight
+									size={16}
+									className="text-gray-600 dark:text-gray-400"
+									strokeWidth={2}
+								/>
+							</button>
+						</div>
 					);
 				},
 			}),
@@ -168,6 +169,12 @@ export function DataTable({
 			}),
 			columnHelper.accessor("amount", {
 				size: 140,
+				sortingFn: (rowA, rowB, columnId) => {
+					const aVal = Number(rowA.getValue(columnId));
+					const bVal = Number(rowB.getValue(columnId));
+
+					return Math.abs(aVal) - Math.abs(bVal);
+				},
 				cell: (info) => {
 					const val = Number(info.getValue());
 					const isPositive = val > 0;
@@ -177,7 +184,8 @@ export function DataTable({
 							<span
 								className={`text-right ${isPositive ? "text-emerald-700 dark:text-emerald-500" : "text-gray-900 dark:text-white"}`}
 							>
-								{isPositive ? "+" : ""}${Math.abs(val).toFixed(2)}
+								{isPositive ? "+" : ""}
+								{formatCurrency(val)}
 							</span>
 							<button
 								onClick={(e) => {
@@ -212,7 +220,7 @@ export function DataTable({
 			columnVisibility: {
 				...columnVisibility,
 				date: false,
-				select: isEditMode || currentView === "review", // <-- Add this override
+				select: isEditMode || currentView === "review",
 			},
 		},
 		getCoreRowModel: getCoreRowModel(),
@@ -356,7 +364,7 @@ export function DataTable({
 					if (item.type === "header") {
 						return (
 							<div
-								key={item.id}
+								key={`header-${item.id}-${vRow.index}`}
 								className="absolute w-full px-6 flex items-center justify-between bg-[#F9FAFB] dark:bg-[#232323] text-gray-500 dark:text-gray-400 font-bold text-sm border-b border-gray-200 dark:border-white/5 transition-colors duration-200"
 								style={{ height: 48, transform: `translateY(${vRow.start}px)` }}
 							>
