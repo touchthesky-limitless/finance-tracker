@@ -6,107 +6,162 @@ import {
 	UnifiedCategory,
 } from "@/constants";
 
+function createCategoryKey(name: string, parentName?: string | null): string {
+	const normalizedName = name.trim().toLowerCase();
+	const normalizedParent = parentName
+		? parentName.trim().toLowerCase()
+		: "root";
+
+	return `${normalizedName}|${normalizedParent}`;
+}
+
 export function useUnifiedCategories(
 	transactionType: string,
 	activePrimary: string,
 ) {
 	const customCategories = useBudgetStore((state) => state.customCategories);
 
-	// 1. Merge System + Custom into one Master List
+	/*
+	 * Build one unified list containing:
+	 *
+	 * 1. Static parent categories
+	 * 2. Static system subcategories with their Supabase UUIDs
+	 * 3. User-created custom categories
+	 */
 	const allUnifiedCategories = useMemo(
 		function () {
-			const customItems: UnifiedCategory[] = [];
-			const customKeys = new Set<string>();
+			const results: UnifiedCategory[] = [];
 
-			// Single pass to build custom items and their lookup keys
-			for (let i = 0; i < customCategories.length; i++) {
-				const cat = customCategories[i];
-				const themeKey = cat.parent_name || cat.color_key;
-				const theme = getCategoryTheme(themeKey);
+			/*
+			 * Only system categories belong in this lookup.
+			 * Their database rows provide stable UUIDs for URLs.
+			 */
+			const systemCategoryByKey = new Map<
+				string,
+				(typeof customCategories)[number]
+			>();
 
-				const customItem: UnifiedCategory = {
-					id: cat.id,
-					name: cat.name,
-					isCustom: true,
-					parentName: cat.parent_name || undefined,
-					theme: theme,
-					icon: cat.icon_name,
-				};
+			for (let index = 0; index < customCategories.length; index++) {
+				const category = customCategories[index];
 
-				customItems.push(customItem);
+				if (!category.is_system) {
+					continue;
+				}
 
-				const key = `${customItem.name.toLowerCase()}|${(customItem.parentName || "root").toLowerCase()}`;
-				customKeys.add(key);
+				const key = createCategoryKey(category.name, category.parent_name);
+
+				systemCategoryByKey.set(key, category);
 			}
 
-			const staticItems: UnifiedCategory[] = [];
+			/*
+			 * Build system categories in the same order as
+			 * CATEGORY_HIERARCHY.
+			 */
 			const hierarchyEntries = Object.entries(CATEGORY_HIERARCHY);
 
-			// Single pass to generate static items and filter out custom overrides simultaneously
-			for (let i = 0; i < hierarchyEntries.length; i++) {
-				const [parent, subs] = hierarchyEntries[i];
-				const parentTheme = getCategoryTheme(parent);
-				const parentKey = `${parent.toLowerCase()}|root`;
+			for (let index = 0; index < hierarchyEntries.length; index++) {
+				const [parent, subcategories] = hierarchyEntries[index];
 
-				// Only create and push the static parent if it wasn't overridden
-				if (!customKeys.has(parentKey)) {
-					staticItems.push({
-						name: parent,
+				const parentTheme = getCategoryTheme(parent);
+
+				/*
+				 * Parent categories remain static.
+				 * They do not need database IDs.
+				 */
+				results.push({
+					name: parent,
+					isCustom: false,
+					theme: parentTheme,
+					icon: parent,
+				});
+
+				for (
+					let subcategoryIndex = 0;
+					subcategoryIndex < subcategories.length;
+					subcategoryIndex++
+				) {
+					const subcategoryName = subcategories[subcategoryIndex];
+
+					const systemCategory = systemCategoryByKey.get(
+						createCategoryKey(subcategoryName, parent),
+					);
+
+					results.push({
+						id: systemCategory?.id,
+						name: subcategoryName,
 						isCustom: false,
+						parentName: parent,
 						theme: parentTheme,
-						icon: parent,
+						icon: systemCategory?.icon_name ?? subcategoryName,
 					});
 				}
+			}
 
-				// Only create and push the static sub-categories if they weren't overridden
-				for (let j = 0; j < subs.length; j++) {
-					const sub = subs[j];
-					const subKey = `${sub.toLowerCase()}|${parent.toLowerCase()}`;
+			/*
+			 * Append actual user-created categories.
+			 * System rows were already added above.
+			 */
+			for (let index = 0; index < customCategories.length; index++) {
+				const category = customCategories[index];
 
-					if (!customKeys.has(subKey)) {
-						staticItems.push({
-							name: sub,
-							isCustom: false,
-							parentName: parent,
-							theme: parentTheme,
-							icon: sub,
-						});
-					}
+				if (category.is_system) {
+					continue;
 				}
+
+				const parentName = category.parent_name ?? undefined;
+
+				/*
+				 * This always resolves to a string because
+				 * category.name is required.
+				 */
+				const themeKey =
+					category.parent_name ?? category.color_key ?? category.name;
+
+				results.push({
+					id: category.id,
+					name: category.name,
+					isCustom: true,
+					parentName,
+					theme: getCategoryTheme(themeKey),
+					icon: category.icon_name ?? category.name,
+				});
 			}
 
-			// Combine arrays efficiently
-			const result: UnifiedCategory[] = [];
-			for (let i = 0; i < staticItems.length; i++) {
-				result.push(staticItems[i]);
-			}
-			for (let i = 0; i < customItems.length; i++) {
-				result.push(customItems[i]);
-			}
-
-			return result;
+			return results;
 		},
 		[customCategories],
 	);
 
-	// 2. Derive Sidebar Primaries
+	// Derive the primary parent-category list.
 	const primaryCategories = useMemo(
 		function () {
 			const results: UnifiedCategory[] = [];
 
-			for (let i = 0; i < allUnifiedCategories.length; i++) {
-				const cat = allUnifiedCategories[i];
+			for (let index = 0; index < allUnifiedCategories.length; index++) {
+				const category = allUnifiedCategories[index];
 
-				if (!cat.parentName) {
-					if (transactionType === "Income") {
-						if (cat.name === "Income") results.push(cat);
-					} else if (transactionType === "Transfer") {
-						if (cat.name === "Transfers") results.push(cat);
-					} else {
-						if (cat.name !== "Income" && cat.name !== "Transfers") {
-							results.push(cat);
-						}
+				if (category.parentName) {
+					continue;
+				}
+
+				if (transactionType === "Income") {
+					if (category.name === "Income") {
+						results.push(category);
 					}
+
+					continue;
+				}
+
+				if (transactionType === "Transfer") {
+					if (category.name === "Transfers") {
+						results.push(category);
+					}
+
+					continue;
+				}
+
+				if (category.name !== "Income" && category.name !== "Transfers") {
+					results.push(category);
 				}
 			}
 
@@ -115,16 +170,20 @@ export function useUnifiedCategories(
 		[allUnifiedCategories, transactionType],
 	);
 
-	// 3. Derive Table Display List
+	// Derive the categories displayed for the selected parent.
 	const displayList = useMemo(
 		function () {
-			if (activePrimary === "All") return primaryCategories;
+			if (activePrimary === "All") {
+				return primaryCategories;
+			}
 
 			const results: UnifiedCategory[] = [];
-			for (let i = 0; i < allUnifiedCategories.length; i++) {
-				const cat = allUnifiedCategories[i];
-				if (cat.parentName === activePrimary) {
-					results.push(cat);
+
+			for (let index = 0; index < allUnifiedCategories.length; index++) {
+				const category = allUnifiedCategories[index];
+
+				if (category.parentName === activePrimary) {
+					results.push(category);
 				}
 			}
 
@@ -133,15 +192,18 @@ export function useUnifiedCategories(
 		[activePrimary, primaryCategories, allUnifiedCategories],
 	);
 
-	// 4. Derive Active Context
+	// Find the selected primary category object.
 	const activeCategory = useMemo(
 		function () {
-			if (activePrimary === "All") return null;
+			if (activePrimary === "All") {
+				return null;
+			}
 
-			for (let i = 0; i < allUnifiedCategories.length; i++) {
-				const cat = allUnifiedCategories[i];
-				if (cat.name === activePrimary && !cat.parentName) {
-					return cat;
+			for (let index = 0; index < allUnifiedCategories.length; index++) {
+				const category = allUnifiedCategories[index];
+
+				if (category.name === activePrimary && !category.parentName) {
+					return category;
 				}
 			}
 

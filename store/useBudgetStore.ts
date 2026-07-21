@@ -32,12 +32,13 @@ export interface Rule {
 
 export interface CustomCategory {
 	id: string;
-	user_id: string;
+	user_id: string | null;
 	name: string;
 	parent_name: string | null;
-	icon_name: string;
-	color_key: string;
+	icon_name: string | null;
+	color_key: string | null;
 	created_at: string;
+	is_system: boolean;
 }
 
 export interface CreditCard {
@@ -92,7 +93,7 @@ interface BudgetState {
 		parent?: string;
 		icon: string;
 		color: string;
-	}) => Promise<void>;
+	}) => Promise<CustomCategory>;
 	deleteCustomCategory: (id: string) => Promise<void>;
 	updateCustomCategory: (
 		id: string,
@@ -581,71 +582,111 @@ export const useBudgetStore = create<BudgetState>()(
 				set({ transactions: previousTransactions }),
 
 			addCustomCategory: async (category) => {
-				// 1. Get the current user
 				const {
 					data: { user },
 				} = await supabase.auth.getUser();
-				if (!user) return;
 
-				// Get existing categories from the current store state
-				const existing = get().customCategories;
-
-				if (
-					existing.some(
-						(c) => c.name.toLowerCase() === category.name.toLowerCase(),
-					)
-				) {
-					throw new Error("Category already exists");
+				if (!user) {
+					throw new Error("You must be signed in to create a category.");
 				}
 
-				// 2. Insert into your Supabase table
+				const normalizedName = category.name.trim().toLowerCase();
+
+				if (!normalizedName) {
+					throw new Error("Category name is required.");
+				}
+
+				const existingCategories = get().customCategories;
+
+				// Prevent matching any built-in/system subcategory
+				const conflictsWithSystemCategory = existingCategories.some(
+					(existingCategory) => {
+						return (
+							existingCategory.is_system === true &&
+							existingCategory.name.trim().toLowerCase() === normalizedName
+						);
+					},
+				);
+
+				if (conflictsWithSystemCategory) {
+					throw new Error(
+						`"${category.name.trim()}" is already a built-in category.`,
+					);
+				}
+
+				// Prevent matching another custom category owned by this user
+				const conflictsWithCustomCategory = existingCategories.some(
+					(existingCategory) => {
+						return (
+							existingCategory.is_system === false &&
+							existingCategory.user_id === user.id &&
+							existingCategory.name.trim().toLowerCase() === normalizedName
+						);
+					},
+				);
+
+				if (conflictsWithCustomCategory) {
+					throw new Error("Category already exists.");
+				}
+
 				const { data, error } = await supabase
 					.from("custom_categories")
 					.insert({
 						user_id: user.id,
-						name: category.name,
-						parent_name: category.parent || null,
+						name: category.name.trim(),
+						parent_name: category.parent?.trim() || null,
 						icon_name: category.icon,
 						color_key: category.color,
+						is_system: false,
 					})
-					.select()
-					.single(); //Get the created row back
+					.select("*")
+					.single();
 
 				if (error) {
 					console.error("Error adding category:", error);
 					throw error;
 				}
 
-				// Update local state so the UI re-renders immediately
-				if (data) {
-					set((state) => ({
-						customCategories: [
-							...state.customCategories,
-							data as CustomCategory,
-						],
-					}));
+				if (!data) {
+					throw new Error("The created category was not returned.");
 				}
 
-				// 3. Optional: Trigger a re-fetch or manually update local state
-				// If you want the UI to update immediately without a refresh,
-				// you would merge this new data into your local hierarchy here.
-				// console.log("Category added successfully:", data);
+				const createdCategory = data as CustomCategory;
+
+				set((state) => ({
+					customCategories: [...state.customCategories, createdCategory],
+				}));
+
+				return createdCategory;
 			},
 
 			fetchCustomCategories: async () => {
+				const {
+					data: { user },
+				} = await supabase.auth.getUser();
+
+				if (!user) {
+					set({ customCategories: [] });
+					return;
+				}
+
 				const { data, error } = await supabase
 					.from("custom_categories")
-					.select("*")
-					.order("created_at", { ascending: true });
-
-				if (!error && data) {
-					set({ customCategories: data as CustomCategory[] });
-				}
+					.select(
+						"id, user_id, name, parent_name, icon_name, color_key, created_at, is_system",
+					)
+					.or(`is_system.eq.true,user_id.eq.${user.id}`)
+					.order("parent_name", { ascending: true })
+					.order("name", { ascending: true });
 
 				if (error) {
 					console.error("Error fetching categories:", error);
 					return;
 				}
+
+				set({
+					customCategories: (data ?? []) as CustomCategory[],
+				});
 			},
 
 			deleteCustomCategory: async (id) => {

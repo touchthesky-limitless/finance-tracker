@@ -13,7 +13,6 @@ import CsvUploader from "@/components/CsvUploader";
 import { TopToolbar } from "@/components/Transactions/TopToolbar";
 import { TableToolbar } from "@/components/Transactions/TableToolbar";
 import { SummarySidebar } from "@/components/Transactions/SummarySidebar";
-import { useUnifiedCategories } from "@/hooks/useUnifiedCategories";
 
 const EditTransactionModal = dynamic(
 	() => {
@@ -85,8 +84,6 @@ export default function TransactionsPage() {
 		}
 		return [{ id: "date", desc: true }];
 	});
-
-	const { allUnifiedCategories } = useUnifiedCategories("Expense", "All");
 
 	// --- Side Effects ---
 	useEffect(() => {
@@ -272,6 +269,36 @@ export default function TransactionsPage() {
 		setColumnVisibility({});
 	};
 
+	const customCategories = useBudgetStore((state) => state.customCategories);
+
+	const fetchCustomCategories = useBudgetStore(
+		(state) => state.fetchCustomCategories,
+	);
+
+	useEffect(() => {
+		void fetchCustomCategories();
+	}, [fetchCustomCategories]);
+
+	const subcategoryIdByName = useMemo(() => {
+		const lookup = new Map<string, string>();
+
+		for (const category of customCategories) {
+			const nameKey = category.name.trim().toLowerCase();
+
+			lookup.set(nameKey, category.id);
+		}
+
+		return lookup;
+	}, [customCategories]);
+
+	const getSubcategoryId = useCallback(
+		(name: string): string | undefined => {
+			return subcategoryIdByName.get(name.trim().toLowerCase());
+		},
+		[subcategoryIdByName],
+	);
+
+
 	// --- Render Guards ---
 	if (!isMounted) {
 		return <div className="h-screen bg-gray-50 dark:bg-[#121212]" />;
@@ -320,12 +347,7 @@ export default function TransactionsPage() {
 							currentView={currentView}
 							sorting={sorting}
 							onCategoryChange={handleCategoryChange}
-							getCategoryId={(name) => {
-								const found = allUnifiedCategories.find((c) => {
-									return c.name === name;
-								});
-								return found?.id ?? "unknown";
-							}}
+							getCategoryId={getSubcategoryId}
 						/>
 					</div>
 				</div>

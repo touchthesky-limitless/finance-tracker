@@ -55,14 +55,16 @@ export function useCategoryHierarchy(
 		function () {
 			const base: Record<string, UnifiedCategory[]> = {};
 
-			// --- OPTIMIZATION: Create an O(1) Lookup Map ---
 			const categoryMap = new Map<string, UnifiedCategory>();
+
 			for (let i = 0; i < allUnifiedCategories.length; i++) {
-				categoryMap.set(allUnifiedCategories[i].name, allUnifiedCategories[i]);
+				const category = allUnifiedCategories[i];
+
+				categoryMap.set(category.name.trim().toLowerCase(), category);
 			}
 
-			// --- OPTIMIZATION: Single-pass hierarchy building ---
 			const hierarchyKeys = Object.keys(CATEGORY_HIERARCHY);
+
 			for (let i = 0; i < hierarchyKeys.length; i++) {
 				const parent = hierarchyKeys[i];
 				const subs = CATEGORY_HIERARCHY[parent];
@@ -71,47 +73,53 @@ export function useCategoryHierarchy(
 				for (let j = 0; j < subs.length; j++) {
 					const subName = subs[j];
 
-					// Instant O(1) lookup instead of O(N) .find()
-					const foundCat = categoryMap.get(subName);
+					const foundCat = categoryMap.get(subName.trim().toLowerCase());
 
 					if (foundCat) {
-						mappedSubs.push(foundCat);
+						mappedSubs.push({
+							...foundCat,
+							name: subName,
+							parentName: parent,
+							isCustom: false,
+						});
 					} else {
 						mappedSubs.push({
 							name: subName,
+							parentName: parent,
 							icon: subName,
 							theme: getCategoryTheme(parent),
 							isCustom: false,
-						} as UnifiedCategory);
+						});
 					}
 				}
 
 				base[parent] = mappedSubs;
 			}
 
-			// Handle Custom Categories
+			// Add only real user-created categories.
 			for (let i = 0; i < allUnifiedCategories.length; i++) {
-				const cat = allUnifiedCategories[i];
+				const category = allUnifiedCategories[i];
 
-				if (!cat.isCustom) continue;
+				if (!category.isCustom) {
+					continue;
+				}
 
-				if (cat.parentName && base[cat.parentName]) {
-					const parentList = base[cat.parentName];
-					let exists = false;
+				if (category.parentName && base[category.parentName]) {
+					const parentList = base[category.parentName];
 
-					for (let j = 0; j < parentList.length; j++) {
-						if (parentList[j].name === cat.name) {
-							exists = true;
-							break;
-						}
+					const alreadyExists = parentList.some((existing) => {
+						return (
+							existing.name.trim().toLowerCase() ===
+							category.name.trim().toLowerCase()
+						);
+					});
+
+					if (!alreadyExists) {
+						parentList.push(category);
 					}
-
-					if (!exists) {
-						parentList.push(cat);
-					}
-				} else if (!cat.parentName) {
-					if (!base[cat.name]) {
-						base[cat.name] = [];
+				} else if (!category.parentName) {
+					if (!base[category.name]) {
+						base[category.name] = [];
 					}
 				}
 			}

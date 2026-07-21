@@ -1,7 +1,7 @@
 "use client";
 "use no memo";
 
-import { useRef, useMemo } from "react";
+import { useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
 	useReactTable,
@@ -155,9 +155,25 @@ export function DataTable({
 										// const encodedId = encodeURIComponent(categoryName);
 										const currentYear = new Date().getFullYear();
 
+										if (!targetId) {
+											console.error(
+												`No subcategory ID found for "${categoryName}"`,
+											);
+											return;
+										}
+
 										// 3. Construct URL and trigger navigation
-										const targetUrl = `/categories/${targetId}?breakdown=category&categories=${targetId}&date=${currentYear}-01-01&order=inverse_date&sankey=category&timeframe=year&view=breakdown`;
-										router.push(targetUrl);
+										const params = new URLSearchParams({
+											breakdown: "category",
+											categories: targetId,
+											date: `${currentYear}-01-01`,
+											order: "inverse_date",
+											sankey: "category",
+											timeframe: "year",
+											view: "breakdown",
+										});
+
+										router.push(`/categories/${targetId}?${params.toString()}`);
 									}}
 									className="flex items-center justify-center w-8 h-8 rounded-lg border border-transparent group-hover:border-gray-300 dark:group-hover:border-white/20 opacity-0 group-hover:opacity-100 hover:bg-gray-100 dark:hover:bg-white/5 transition-all shrink-0 cursor-pointer"
 									title="View Category"
