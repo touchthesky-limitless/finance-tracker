@@ -11,7 +11,7 @@ import { createJSONStorage, persist } from "zustand/middleware";
 const supabase = createClient();
 
 const TRANSACTION_COLUMNS =
-	"id, user_id, date, merchant, description, amount, category, account_id, account, needs_review, needs_subcat, created_at";
+	"id, user_id, date, merchant, merchant_id, description, amount, category, account_id, account, needs_review, needs_subcat, created_at";
 const CUSTOM_CATEGORY_COLUMNS =
 	"id, user_id, name, parent_name, icon_name, color_key, created_at, is_system";
 const DATABASE_BATCH_SIZE = 100;
@@ -65,6 +65,7 @@ export interface Transaction {
 	id: string;
 	date: string;
 	merchant: string;
+	merchant_id?: string | null;
 	description?: string;
 	amount: number;
 	category: string;
@@ -90,6 +91,7 @@ export type TransactionUpdate = Partial<
 		Transaction,
 		| "date"
 		| "merchant"
+		| "merchant_id"
 		| "description"
 		| "amount"
 		| "category"
@@ -136,6 +138,14 @@ export interface CustomCategory {
 	color_key: string | null;
 	created_at: string;
 	is_system: boolean;
+}
+
+export interface Merchant {
+	id: string;
+	user_id: string | null;
+	name: string;
+	is_system: boolean;
+	created_at: string;
 }
 
 export interface CreditCard {
@@ -215,6 +225,12 @@ interface BudgetState {
 	setCustomRates: (rates: Record<string, Record<string, number>>) => void;
 
 	fetchAccounts: (force?: boolean) => Promise<void>;
+
+	merchants: Merchant[];
+
+	fetchMerchants: () => Promise<void>;
+
+	addCustomMerchant: (name: string) => Promise<Merchant>;
 }
 
 interface PreparedRule extends Rule {
@@ -439,6 +455,7 @@ export const useBudgetStore = create<BudgetState>()(
 			preferredCards: {},
 			activeCategoryIds: [...DEFAULT_CATEGORIES],
 			accounts: [],
+			merchants: [],
 
 			reorderActiveCategories: async (newOrder: CategoryId[]) => {
 				const previous = get().activeCategoryIds;
@@ -1307,6 +1324,89 @@ export const useBudgetStore = create<BudgetState>()(
 				}));
 			},
 
+			fetchMerchants: async () => {
+				const {
+					data: { user },
+					error: authError,
+				} = await supabase.auth.getUser();
+
+				if (authError) {
+					console.error("Failed to load current user:", authError.message);
+					return;
+				}
+
+				if (!user) {
+					set({ merchants: [] });
+					return;
+				}
+
+				const { data, error } = await supabase
+					.from("merchants")
+					.select("id, user_id, name, is_system, created_at")
+					.or(`is_system.eq.true,user_id.eq.${user.id}`)
+					.order("name", { ascending: true });
+
+				if (error) {
+					console.error("Failed to fetch merchants:", error.message);
+					return;
+				}
+
+				set({
+					merchants: (data ?? []) as Merchant[],
+				});
+			},
+
+			addCustomMerchant: async (merchantName) => {
+				const name = merchantName.trim();
+
+				if (!name) {
+					throw new Error("Merchant name is required.");
+				}
+
+				const {
+					data: { user },
+					error: authError,
+				} = await supabase.auth.getUser();
+
+				if (authError) {
+					throw authError;
+				}
+
+				if (!user) {
+					throw new Error("You must be signed in to create a merchant.");
+				}
+
+				const duplicate = get().merchants.some((merchant) => {
+					return merchant.name.trim().toLowerCase() === name.toLowerCase();
+				});
+
+				if (duplicate) {
+					throw new Error("Merchant already exists.");
+				}
+
+				const { data, error } = await supabase
+					.from("merchants")
+					.insert({
+						user_id: user.id,
+						name,
+						is_system: false,
+					})
+					.select("id, user_id, name, is_system, created_at")
+					.single();
+
+				if (error) {
+					throw error;
+				}
+
+				const createdMerchant = data as Merchant;
+
+				set((state) => ({
+					merchants: [...state.merchants, createdMerchant],
+				}));
+
+				return createdMerchant;
+			},
+
 			confirmRecurring: (merchantName) => {
 				const name = merchantName.trim();
 
@@ -1435,6 +1535,7 @@ export const useBudgetStore = create<BudgetState>()(
 					void state?.fetchActiveCategories();
 					void state?.fetchPreferredCards();
 					void state?.fetchCustomCategories();
+					void state?.fetchMerchants();
 				};
 			},
 			partialize: (state) => ({

@@ -24,6 +24,10 @@ import { ArrowRight, Check, ChevronRight } from "lucide-react";
 import { CategorySelector } from "@/components/CategorySelector";
 import { Transaction } from "@/store/useBudgetStore";
 import { formatCurrency } from "@/utils/formatters";
+import {
+	getTransactionMerchantId,
+	useUnifiedMerchants,
+} from "@/hooks/useUnifiedMerchants";
 
 interface DataTableProps {
 	transactions: Transaction[];
@@ -46,6 +50,13 @@ interface DataTableProps {
 	isCategoryView?: boolean;
 
 	getCategoryId?: (categoryName: string) => string | undefined;
+
+	isMerchantNavigationEnabled?: boolean;
+
+	getMerchantId?: (
+		merchantName: string,
+	) => string | undefined;
+
 }
 
 type DateHeaderItem = {
@@ -128,6 +139,8 @@ export function DataTable({
 	onCategoryChange,
 	isCategoryView = true,
 	getCategoryId,
+	isMerchantNavigationEnabled = true,
+	getMerchantId: getMerchantIdOverride,
 }: DataTableProps) {
 	const parentRef = useRef<HTMLDivElement>(null);
 
@@ -136,6 +149,12 @@ export function DataTable({
 	const selectedIdSet = useMemo(() => {
 		return new Set(selectedIds);
 	}, [selectedIds]);
+
+	const { getMerchantId: getUnifiedMerchantId } =
+		useUnifiedMerchants();
+
+	const resolveMerchantId =
+		getMerchantIdOverride ?? getUnifiedMerchantId;
 
 	const navigateToCategory = useCallback(
 		(categoryName: string, targetId: string | undefined) => {
@@ -238,28 +257,85 @@ export function DataTable({
 				},
 			}),
 
+
 			columnHelper.accessor("merchant", {
 				size: 330,
-				cell: (info) => {
-					const merchant = String(info.getValue() || "Unknown merchant");
 
-					const initial = merchant.charAt(0).toUpperCase() || "?";
+				cell: (info) => {
+					const merchantName = String(
+						info.getValue() || "Unknown merchant",
+					);
+
+					const merchantId =
+						getTransactionMerchantId(
+							info.row.original,
+						) ?? resolveMerchantId(merchantName);
+
+					const canNavigate = Boolean(merchantId);
+
+					const initial =
+						merchantName.charAt(0).toUpperCase() || "?";
 
 					return (
-						<div className="flex items-center gap-3 w-full min-w-0">
-							<div
-								aria-hidden="true"
-								className="w-7 h-7 rounded-full bg-gray-100 dark:bg-white flex items-center justify-center text-[#FF5A35] font-black text-sm shrink-0"
-							>
-								{initial}
+						<div
+							onClick={(event) => {
+								event.stopPropagation();
+							}}
+							className="group flex h-full w-full items-center gap-1.5 pr-2"
+						>
+							<div className="flex min-w-0 flex-1 items-center gap-3">
+								<div
+									aria-hidden="true"
+									className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gray-100 text-sm font-black text-[#FF5A35] dark:bg-white"
+								>
+									{initial}
+								</div>
+
+								<span
+									title={merchantName}
+									className="truncate text-[15px] font-medium text-gray-900 dark:text-white"
+								>
+									{merchantName}
+								</span>
 							</div>
 
-							<span
-								title={merchant}
-								className="font-medium text-gray-900 dark:text-white text-[15px] truncate"
-							>
-								{merchant}
-							</span>
+							{isMerchantNavigationEnabled && (
+								<button
+									type="button"
+									disabled={!canNavigate}
+									onClick={(event) => {
+										event.stopPropagation();
+
+										if (!merchantId) {
+											return;
+										}
+
+										router.push(
+											`/merchants/${encodeURIComponent(
+												merchantId,
+											)}`,
+										);
+									}}
+									aria-label={`View ${merchantName} merchant`}
+									title={
+										merchantId
+											? "View merchant"
+											: `Merchant ID unavailable for ${merchantName}`
+									}
+									className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-transparent opacity-0 transition-all group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 ${
+										merchantId
+											? "cursor-pointer hover:border-gray-300 hover:bg-gray-100 dark:hover:border-white/20 dark:hover:bg-white/5"
+											: "cursor-not-allowed"
+									}`}
+								>
+									<ArrowRight
+										size={16}
+										strokeWidth={2}
+										aria-hidden="true"
+										className="text-gray-600 dark:text-gray-400"
+									/>
+								</button>
+							)}
 						</div>
 					);
 				},
@@ -329,84 +405,6 @@ export function DataTable({
 				},
 			}),
 
-			// columnHelper.accessor("account", {
-			// 	size: 300,
-
-			// 	cell: (info) => {
-			// 		const transaction = info.row.original;
-
-			// 		const accountName =
-			// 			transaction.account || "Unknown account";
-
-			// 		const accountId =
-			// 			transaction.account_id;
-
-			// 		const canNavigate =
-			// 			Boolean(accountId);
-
-			// 		return (
-			// 			<div
-			// 				onClick={(event) => {
-			// 					event.stopPropagation();
-			// 				}}
-			// 				className="group flex items-center gap-1.5 w-full h-full pr-2"
-			// 			>
-			// 				<div className="flex items-center gap-2 overflow-hidden min-w-0 flex-1">
-			// 					<div
-			// 						aria-hidden="true"
-			// 						className="w-5 h-5 rounded-full border-4 border-[#2563EB] bg-white shrink-0"
-			// 					/>
-
-			// 					<span
-			// 						className="text-gray-700 dark:text-gray-200 text-[15px] truncate"
-			// 						title={accountName}
-			// 					>
-			// 						{accountName}
-			// 					</span>
-			// 				</div>
-
-			// 				<button
-			// 					type="button"
-			// 					disabled={!canNavigate}
-			// 					onClick={(event) => {
-			// 						event.stopPropagation();
-
-			// 						if (!accountId) {
-			// 							return;
-			// 						}
-
-			// 						router.push(
-			// 							`/accounts/details/${accountId}`,
-			// 						);
-			// 					}}
-			// 					aria-label={`View ${accountName} account`}
-			// 					title={
-			// 						canNavigate
-			// 							? "View Account"
-			// 							: "Account ID unavailable"
-			// 					}
-			// 					className={`flex items-center justify-center w-8 h-8 rounded-lg border border-transparent opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 group-hover:border-gray-300 dark:group-hover:border-white/20 hover:bg-gray-100 dark:hover:bg-white/5 transition-all shrink-0 ${
-			// 						canNavigate
-			// 							? "cursor-pointer"
-			// 							: "cursor-not-allowed"
-			// 					}`}
-			// 				>
-			// 					<ArrowRight
-			// 						size={16}
-			// 						strokeWidth={2}
-			// 						aria-hidden="true"
-			// 						className={
-			// 							canNavigate
-			// 								? "text-gray-600 dark:text-gray-400"
-			// 								: "text-gray-300 dark:text-gray-600"
-			// 						}
-			// 					/>
-			// 				</button>
-			// 			</div>
-			// 		);
-			// 	},
-			// }),
-
 			columnHelper.accessor("account", {
 				size: 300,
 
@@ -438,9 +436,6 @@ export function DataTable({
 							title={
 								canNavigate ? `View ${accountName}` : "Account ID unavailable"
 							}
-							// flex items-center justify-between w-full px-2 py-1
-							// rounded-lg border border-transparent group-hover:border-gray-300
-							// dark:group-hover:border-white/20 transition-colors bg-transparent cursor-pointer
 							className={`
 		group 
 		flex w-full min-w-0
@@ -577,6 +572,8 @@ export function DataTable({
 		isCategoryView,
 		onCategoryChange,
 		navigateToCategory,
+		resolveMerchantId,
+		isMerchantNavigationEnabled,
 		router,
 		onRowClick,
 	]);
