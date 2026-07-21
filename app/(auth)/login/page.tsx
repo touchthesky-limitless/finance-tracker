@@ -107,7 +107,7 @@ export default function LoginPage() {
 						{loading ? (
 							<>
 								<Loader2 className="animate-spin" size={18} />{" "}
-								Processing...{" "}
+								Signing in...{" "}
 							</>
 						) : (
 							<>

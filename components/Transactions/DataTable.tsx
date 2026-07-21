@@ -418,6 +418,9 @@ export function DataTable({
 							<div className="flex-1 min-w-0">
 								<CategorySelector
 									currentCategory={categoryName}
+									variant="form"
+									showChevron
+									hideChevronUntilHover
 									onSelect={(newCategory) => {
 										if (newCategory === categoryName) {
 											return;

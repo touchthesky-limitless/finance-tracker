@@ -5,13 +5,25 @@ import dynamic from "next/dynamic";
 import { SortingState, VisibilityState } from "@tanstack/react-table";
 import { X } from "lucide-react";
 
+import { CATEGORY_HIERARCHY, findParentCategory } from "@/constants";
 import { Transaction, useBudgetStore } from "@/store/useBudgetStore";
 import { DataTable } from "@/components/Transactions/DataTable";
 import { UndoToast } from "@/components/ui/UndoToast";
 import CsvUploader from "@/components/CsvUploader";
-import { TopToolbar } from "@/components/Transactions/TopToolbar";
+import {
+	TopToolbar,
+	type TransactionDateRange,
+} from "@/components/Transactions/TopToolbar";
 import { TableToolbar } from "@/components/Transactions/TableToolbar";
 import { SummarySidebar } from "@/components/Transactions/SummarySidebar";
+import {
+	EMPTY_TRANSACTION_FILTERS,
+	hasTransactionFilters,
+	matchesTransactionFilters,
+	type TransactionFilterData,
+	type TransactionFilterOption,
+	type TransactionFilters,
+} from "@/components/Transactions/transactionFilters";
 
 const DEFAULT_SORTING: SortingState = [
 	{
@@ -79,8 +91,30 @@ export default function TransactionsPage() {
 		(state) => state.fetchCustomCategories,
 	);
 
+	const accounts = useBudgetStore((state) => state.accounts);
+
+	const fetchAccounts = useBudgetStore((state) => state.fetchAccounts);
+
+	const merchants = useBudgetStore((state) => state.merchants);
+
+	const fetchMerchants = useBudgetStore((state) => state.fetchMerchants);
+
+	const customTags = useBudgetStore((state) => state.customTags);
+
+	const confirmedRecurringMerchants = useBudgetStore(
+		(state) => state.confirmedRecurringMerchants,
+	);
+
 	// Page state
 	const [searchQuery, setSearchQuery] = useState("");
+
+	const [dateRange, setDateRange] = useState<TransactionDateRange>({
+		startDate: "",
+		endDate: "",
+	});
+
+	const [transactionFilters, setTransactionFilters] =
+		useState<TransactionFilters>(EMPTY_TRANSACTION_FILTERS);
 
 	const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
@@ -115,8 +149,12 @@ export default function TransactionsPage() {
 
 	// Load system and user-created subcategories
 	useEffect(() => {
-		void fetchCustomCategories();
-	}, [fetchCustomCategories]);
+		void Promise.all([
+			fetchCustomCategories(),
+			fetchAccounts(),
+			fetchMerchants(),
+		]);
+	}, [fetchAccounts, fetchCustomCategories, fetchMerchants]);
 
 	// Persist sorting
 	useEffect(() => {
@@ -154,35 +192,358 @@ export default function TransactionsPage() {
 		};
 	}, []);
 
+	const filterData = useMemo<TransactionFilterData>(() => {
+		const categoryOptions: TransactionFilterOption[] = [];
+		const seenLeafNames = new Set<string>();
+		const seenParentNames = new Set<string>();
+
+		const categoryRecordsByParent = new Map<string, typeof customCategories>();
+		const rootCategoryByName = new Map<
+			string,
+			(typeof customCategories)[number]
+		>();
+
+		for (const category of customCategories) {
+			const categoryName = category.name.trim();
+
+			if (!categoryName) {
+				continue;
+			}
+
+			if (!category.parent_name?.trim()) {
+				rootCategoryByName.set(normalizeCategoryName(categoryName), category);
+				continue;
+			}
+
+			const parentKey = normalizeCategoryName(category.parent_name);
+			const children = categoryRecordsByParent.get(parentKey) ?? [];
+			children.push(category);
+			categoryRecordsByParent.set(parentKey, children);
+		}
+
+		const addParentOption = (
+			parentName: string,
+			source?: (typeof customCategories)[number],
+		) => {
+			const normalizedParent = normalizeCategoryName(parentName);
+
+			if (!parentName || seenParentNames.has(normalizedParent)) {
+				return;
+			}
+
+			seenParentNames.add(normalizedParent);
+			categoryOptions.push({
+				value: `__parent__:${parentName}`,
+				label: parentName,
+				isParent: true,
+				iconName: source?.icon_name?.trim() || parentName,
+				colorKey: source?.color_key?.trim() || parentName,
+			});
+		};
+
+		const addLeafOption = (
+			categoryName: string,
+			parentName: string,
+			source?: (typeof customCategories)[number],
+		) => {
+			const normalizedName = normalizeCategoryName(categoryName);
+
+			if (!categoryName || seenLeafNames.has(normalizedName)) {
+				return;
+			}
+
+			seenLeafNames.add(normalizedName);
+			categoryOptions.push({
+				value: categoryName,
+				label: categoryName,
+				group: parentName,
+				iconName: source?.icon_name?.trim() || categoryName,
+				colorKey: source?.color_key?.trim() || parentName,
+				secondaryLabel: source && !source.is_system ? "Custom" : undefined,
+			});
+		};
+
+		/*
+		 * CATEGORY_HIERARCHY is the canonical display order. Database-backed
+		 * categories still provide the current names, icons, colors, and custom
+		 * additions shown in Settings.
+		 */
+		for (const [parentName, hierarchyChildren] of Object.entries(
+			CATEGORY_HIERARCHY,
+		)) {
+			const parentKey = normalizeCategoryName(parentName);
+			const parentRecord = rootCategoryByName.get(parentKey);
+			const configuredChildren = categoryRecordsByParent.get(parentKey) ?? [];
+
+			addParentOption(parentName, parentRecord);
+
+			const configuredChildByName = new Map(
+				configuredChildren.map((category) => {
+					return [normalizeCategoryName(category.name), category] as const;
+				}),
+			);
+
+			/*
+			 * Once Settings data is loaded, it is the source of truth. The static
+			 * hierarchy is only a fallback before those records are available.
+			 */
+			const useStaticFallback = configuredChildren.length === 0;
+
+			for (const childName of hierarchyChildren) {
+				const configuredChild = configuredChildByName.get(
+					normalizeCategoryName(childName),
+				);
+
+				if (!configuredChild && !useStaticFallback) {
+					continue;
+				}
+
+				addLeafOption(
+					configuredChild?.name.trim() || childName,
+					parentName,
+					configuredChild,
+				);
+			}
+
+			// Custom children follow the built-in children without alphabetizing.
+			for (const child of configuredChildren) {
+				addLeafOption(child.name.trim(), parentName, child);
+			}
+		}
+
+		// Append custom parent groups after the built-in hierarchy.
+		for (const category of customCategories) {
+			if (category.parent_name?.trim()) {
+				continue;
+			}
+
+			const parentName = category.name.trim();
+
+			if (
+				!parentName ||
+				seenParentNames.has(normalizeCategoryName(parentName))
+			) {
+				continue;
+			}
+
+			addParentOption(parentName, category);
+
+			const children =
+				categoryRecordsByParent.get(normalizeCategoryName(parentName)) ?? [];
+
+			for (const child of children) {
+				addLeafOption(child.name.trim(), parentName, child);
+			}
+		}
+
+		// Keep transaction-only legacy categories available at the end.
+		for (const transaction of transactions) {
+			const categoryName = transaction.category?.trim();
+
+			if (
+				!categoryName ||
+				seenLeafNames.has(normalizeCategoryName(categoryName))
+			) {
+				continue;
+			}
+
+			const resolvedParent = findParentCategory(categoryName);
+			const parentName =
+				resolvedParent !== categoryName || CATEGORY_HIERARCHY[resolvedParent]
+					? resolvedParent
+					: "Other categories";
+
+			addParentOption(parentName);
+			addLeafOption(categoryName, parentName);
+		}
+
+		const merchantCounts = new Map<string, number>();
+		const merchantNameByKey = new Map<string, string>();
+
+		for (const merchant of merchants) {
+			const merchantName = merchant.name.trim();
+			const key = merchantName.toLowerCase();
+
+			if (merchantName && !merchantNameByKey.has(key)) {
+				merchantNameByKey.set(key, merchantName);
+			}
+		}
+
+		for (const transaction of transactions) {
+			const merchantName = transaction.merchant?.trim();
+
+			if (!merchantName) {
+				continue;
+			}
+
+			const key = merchantName.toLowerCase();
+			merchantNameByKey.set(key, merchantNameByKey.get(key) ?? merchantName);
+			merchantCounts.set(key, (merchantCounts.get(key) ?? 0) + 1);
+		}
+
+		const merchantOptions = [...merchantNameByKey.entries()]
+			.map(([key, merchantName]) => {
+				return {
+					value: merchantName,
+					label: merchantName,
+					count: merchantCounts.get(key) ?? 0,
+				};
+			})
+			.sort((first, second) => {
+				return (
+					(second.count ?? 0) - (first.count ?? 0) ||
+					first.label.localeCompare(second.label)
+				);
+			});
+
+		const accountNameByKey = new Map<string, string>();
+
+		for (const account of accounts) {
+			const accountName = account.name.trim();
+
+			if (accountName) {
+				accountNameByKey.set(accountName.toLowerCase(), accountName);
+			}
+		}
+
+		for (const transaction of transactions) {
+			const accountName = transaction.account?.trim();
+
+			if (accountName) {
+				accountNameByKey.set(
+					accountName.toLowerCase(),
+					accountNameByKey.get(accountName.toLowerCase()) ?? accountName,
+				);
+			}
+		}
+
+		const accountOptions = [...accountNameByKey.values()]
+			.sort((first, second) => first.localeCompare(second))
+			.map((accountName) => {
+				return {
+					value: accountName,
+					label: accountName,
+					group: "Accounts",
+				};
+			});
+
+		const tagNameByKey = new Map<string, string>();
+
+		for (const tag of customTags) {
+			const tagName = tag.trim();
+
+			if (tagName) {
+				tagNameByKey.set(tagName.toLowerCase(), tagName);
+			}
+		}
+
+		for (const transaction of transactions) {
+			for (const tag of transaction.tags ?? []) {
+				const tagName = tag.trim();
+
+				if (tagName) {
+					tagNameByKey.set(
+						tagName.toLowerCase(),
+						tagNameByKey.get(tagName.toLowerCase()) ?? tagName,
+					);
+				}
+			}
+		}
+
+		const tagOptions = [...tagNameByKey.values()]
+			.sort((first, second) => first.localeCompare(second))
+			.map((tagName) => {
+				return {
+					value: tagName,
+					label: tagName,
+				};
+			});
+
+		return {
+			categories: categoryOptions,
+			merchants: merchantOptions,
+			accounts: accountOptions,
+			tags: tagOptions,
+			goals: [],
+		};
+	}, [accounts, customCategories, customTags, merchants, transactions]);
+
+	const normalizedRecurringMerchants = useMemo(() => {
+		return new Set(
+			confirmedRecurringMerchants.map((merchantName) => {
+				return merchantName.trim().toLowerCase();
+			}),
+		);
+	}, [confirmedRecurringMerchants]);
+
 	// Filter visible transactions
 	const filteredTransactions = useMemo(() => {
-		const normalizedQuery = searchQuery.trim().toLowerCase();
+		const normalizedSearch = searchQuery.trim().toLowerCase();
 
-		return transactions.filter((transaction) => {
+		let filtered = transactions.filter((transaction) => {
+			if (normalizedSearch) {
+				const searchableValues = [
+					transaction.merchant,
+					transaction.category,
+					transaction.description,
+					transaction.account,
+					transaction.note,
+					String(transaction.amount),
+					String(Math.abs(Number(transaction.amount))),
+					...(transaction.tags ?? []),
+				];
+
+				const matchesSearch = searchableValues.some((value) => {
+					return String(value ?? "")
+						.toLowerCase()
+						.includes(normalizedSearch);
+				});
+
+				if (!matchesSearch) {
+					return false;
+				}
+			}
+
+			const transactionDate = transaction.date.slice(0, 10);
+
+			if (dateRange.startDate && transactionDate < dateRange.startDate) {
+				return false;
+			}
+
+			if (dateRange.endDate && transactionDate > dateRange.endDate) {
+				return false;
+			}
+
 			if (
-				currentView === "review" &&
-				!transaction.needs_review &&
-				transaction.category !== "Uncategorized"
+				!matchesTransactionFilters(
+					transaction,
+					transactionFilters,
+					normalizedRecurringMerchants,
+				)
 			) {
 				return false;
 			}
 
-			if (!normalizedQuery) {
-				return true;
-			}
-
-			const merchant = transaction.merchant?.toLowerCase() ?? "";
-
-			const category = transaction.category?.toLowerCase() ?? "";
-			// Search account
-			// const account = transaction.account?.toLowerCase() ?? "";
-
-			return (
-				merchant.includes(normalizedQuery) || category.includes(normalizedQuery)
-				// || account.includes(normalizedQuery)
-			);
+			return true;
 		});
-	}, [transactions, searchQuery, currentView]);
+
+		if (currentView === "review") {
+			filtered = filtered.filter((transaction) => {
+				return (
+					transaction.needs_review || transaction.category === "Uncategorized"
+				);
+			});
+		}
+
+		return filtered;
+	}, [
+		transactions,
+		searchQuery,
+		dateRange,
+		transactionFilters,
+		normalizedRecurringMerchants,
+		currentView,
+	]);
 
 	// Summary statistics for the complete transaction list
 	const summaryStats = useMemo(() => {
@@ -316,8 +677,12 @@ export default function TransactionsPage() {
 		},
 	);
 
+	const hasDateFilter = Boolean(dateRange.startDate || dateRange.endDate);
+
 	const hasActiveFilters =
-		searchQuery.trim().length > 0 ||
+		Boolean(searchQuery) ||
+		hasDateFilter ||
+		hasTransactionFilters(transactionFilters) ||
 		isSortModified ||
 		isColumnsModified ||
 		currentView !== "all";
@@ -327,6 +692,11 @@ export default function TransactionsPage() {
 		setCurrentView("all");
 		setSorting(DEFAULT_SORTING);
 		setColumnVisibility({});
+		setDateRange({
+			startDate: "",
+			endDate: "",
+		});
+		setTransactionFilters(EMPTY_TRANSACTION_FILTERS);
 	}, []);
 
 	if (!isMounted) {
@@ -338,12 +708,17 @@ export default function TransactionsPage() {
 			<TopToolbar
 				searchQuery={searchQuery}
 				setSearchQuery={setSearchQuery}
+				dateRange={dateRange}
+				setDateRange={setDateRange}
 				setShowUploader={setShowUploader}
 				onAddTransaction={handleAddTransaction}
 				isSummaryVisible={isSummaryVisible}
 				setIsSummaryVisible={setIsSummaryVisible}
 				hasActiveFilters={hasActiveFilters}
 				onClearAll={handleClearAll}
+				filters={transactionFilters}
+				filterData={filterData}
+				onFiltersChange={setTransactionFilters}
 			/>
 
 			<div className="flex flex-1 min-h-0 overflow-hidden p-6 gap-6">
@@ -425,7 +800,7 @@ export default function TransactionsPage() {
 				<EditTransactionModal
 					key={selectedTransaction.id}
 					transaction={selectedTransaction}
-					isOpen={selectedTransaction !== null}
+					isOpen
 					onClose={() => {
 						setSelectedTransaction(null);
 					}}

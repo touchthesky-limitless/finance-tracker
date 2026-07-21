@@ -716,6 +716,7 @@ export const useBudgetStore = create<BudgetState>()(
 						account_id: accountId,
 						needs_review: processed.needs_review ?? true,
 						needs_subcat: processed.needs_subcat ?? true,
+						tags: processed.tags ?? [],
 					};
 				});
 
@@ -951,6 +952,7 @@ export const useBudgetStore = create<BudgetState>()(
 					account: transaction.account,
 					needs_review: transaction.needs_review,
 					needs_subcat: transaction.needs_subcat,
+					tags: transaction.tags ?? [],
 				}));
 
 				const { error } = await supabase.from("transactions").insert(rows);

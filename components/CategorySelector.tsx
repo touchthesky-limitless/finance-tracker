@@ -1,35 +1,43 @@
-import { useState, useMemo, useDeferredValue, useRef } from "react";
-import { searchCategories } from "@/constants";
+import { useDeferredValue, useMemo, useRef, useState } from "react";
 import {
-	useFloating,
-	offset,
-	flip,
-	shift,
+	FloatingPortal,
 	autoUpdate,
+	flip,
+	offset,
+	shift,
+	size,
 	useClick,
 	useDismiss,
+	useFloating,
 	useInteractions,
-	FloatingPortal,
-	size,
 } from "@floating-ui/react";
-import { useCategoryHierarchy } from "@/hooks/useCategoryHierarchy";
+
 import { CategoryDropdownMenu } from "@/components/CategoryDropdownMenu";
 import { CategoryTrigger } from "@/components/CategoryTrigger";
+import { searchCategories } from "@/constants";
 import { findParentCategory } from "@/constants/categories";
+import { useCategoryHierarchy } from "@/hooks/useCategoryHierarchy";
 
 interface CategorySelectorProps {
 	currentCategory: string;
 	onSelect: (category: string, parent: string) => void;
+	placeholder?: string;
+	showChevron?: boolean;
+	hideChevronUntilHover?: boolean;
 	variant?: "form" | "filter";
 }
 
 export function CategorySelector({
 	currentCategory,
 	onSelect,
-	variant,
+	variant = "form",
+	placeholder = "Search categories...",
+	showChevron = false,
+	hideChevronUntilHover = false,
 }: CategorySelectorProps) {
 	const [isOpen, setIsOpen] = useState(false);
 	const [catQuery, setCatQuery] = useState("");
+
 	const inputRef = useRef<HTMLInputElement>(null);
 	const deferredQuery = useDeferredValue(catQuery);
 
@@ -43,7 +51,7 @@ export function CategorySelector({
 
 	const displayIcon = selectedCategoryData?.icon || currentCategory;
 	const displayColorClass =
-		selectedCategoryData?.theme?.text || "text-gray-400";
+		selectedCategoryData?.theme?.text ?? "text-gray-400";
 
 	const {
 		refs: { setReference, setFloating },
@@ -51,13 +59,27 @@ export function CategorySelector({
 		context,
 	} = useFloating({
 		open: isOpen,
-		onOpenChange: setIsOpen,
-		whileElementsMounted: (reference, floating, update) => {
+
+		onOpenChange(nextOpen) {
+			setIsOpen(nextOpen);
+
+			if (nextOpen) {
+				setSelectedParent(findParentCategory(currentCategory));
+				setCatQuery("");
+
+				window.requestAnimationFrame(() => {
+					inputRef.current?.focus();
+				});
+			}
+		},
+
+		whileElementsMounted(reference, floating, update) {
 			return autoUpdate(reference, floating, update, {
 				animationFrame: false,
 				elementResize: true,
 			});
 		},
+
 		middleware: [
 			offset(8),
 			flip(),
@@ -66,12 +88,14 @@ export function CategorySelector({
 				apply({ rects, elements }) {
 					Object.assign(elements.floating.style, {
 						minWidth: `${Math.max(rects.reference.width, 360)}px`,
-						maxWidth: "90vw",
+						maxWidth: "calc(100vw - 32px)",
 					});
 				},
 			}),
 		],
 	});
+
+	const click = useClick(context);
 
 	const dismiss = useDismiss(context, {
 		outsidePress: true,
@@ -79,7 +103,7 @@ export function CategorySelector({
 	});
 
 	const { getReferenceProps, getFloatingProps } = useInteractions([
-		useClick(context),
+		click,
 		dismiss,
 	]);
 
@@ -88,25 +112,18 @@ export function CategorySelector({
 	}, [catQuery]);
 
 	return (
-		<div className="relative">
+		<div className="group relative">
 			<CategoryTrigger
 				ref={setReference}
 				{...getReferenceProps()}
 				variant={variant}
 				isOpen={isOpen}
-				onClick={() => {
-					const nextOpen = !isOpen;
-					setIsOpen(nextOpen);
-
-					// Run the reset logic exactly when the user opens the menu
-					if (nextOpen) {
-						setSelectedParent(findParentCategory(currentCategory));
-						setCatQuery("");
-					}
-				}}
 				currentCategory={currentCategory}
 				displayIcon={displayIcon}
 				displayColorClass={displayColorClass}
+				placeholder={placeholder}
+				showChevron={showChevron}
+	hideChevronUntilHover={hideChevronUntilHover}
 			/>
 
 			{isOpen && (
