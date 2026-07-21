@@ -53,10 +53,7 @@ interface DataTableProps {
 
 	isMerchantNavigationEnabled?: boolean;
 
-	getMerchantId?: (
-		merchantName: string,
-	) => string | undefined;
-
+	getMerchantId?: (merchantName: string) => string | undefined;
 }
 
 type DateHeaderItem = {
@@ -150,11 +147,9 @@ export function DataTable({
 		return new Set(selectedIds);
 	}, [selectedIds]);
 
-	const { getMerchantId: getUnifiedMerchantId } =
-		useUnifiedMerchants();
+	const { getMerchantId: getUnifiedMerchantId } = useUnifiedMerchants();
 
-	const resolveMerchantId =
-		getMerchantIdOverride ?? getUnifiedMerchantId;
+	const resolveMerchantId = getMerchantIdOverride ?? getUnifiedMerchantId;
 
 	const navigateToCategory = useCallback(
 		(categoryName: string, targetId: string | undefined) => {
@@ -257,51 +252,45 @@ export function DataTable({
 				},
 			}),
 
+			columnHelper.accessor("merchant", {
+				size: 360,
 
-columnHelper.accessor("merchant", {
-	size: 360,
+				cell: (info) => {
+					const merchantName = String(info.getValue() || "Unknown merchant");
 
-	cell: (info) => {
-		const merchantName = String(
-			info.getValue() || "Unknown merchant",
-		);
+					const merchantId =
+						getTransactionMerchantId(info.row.original) ??
+						resolveMerchantId(merchantName);
 
-		const merchantId =
-			getTransactionMerchantId(info.row.original) ??
-			resolveMerchantId(merchantName);
+					const canNavigate = Boolean(merchantId);
 
-		const canNavigate = Boolean(merchantId);
+					const initial = merchantName.charAt(0).toUpperCase() || "?";
 
-		const initial =
-			merchantName.charAt(0).toUpperCase() || "?";
+					const handleMerchantClick = () => {
+						if (!merchantId) {
+							return;
+						}
 
-		const handleMerchantClick = () => {
-			if (!merchantId) {
-				return;
-			}
+						router.push(`/merchants/${encodeURIComponent(merchantId)}`);
+					};
 
-			router.push(
-				`/merchants/${encodeURIComponent(merchantId)}`,
-			);
-		};
-
-		return (
-			<div
-				onClick={(event) => {
-					event.stopPropagation();
-				}}
-				className="group flex h-full w-full items-center gap-1.5 pr-2"
-			>
-				<div className="min-w-0 flex-1">
-					<button
-						type="button"
-						disabled={!canNavigate}
-						onClick={(event) => {
-							event.stopPropagation();
-							handleMerchantClick();
-						}}
-						aria-label={`Open ${merchantName} merchant`}
-						className={`
+					return (
+						<div
+							onClick={(event) => {
+								event.stopPropagation();
+							}}
+							className="group flex h-full w-full items-center gap-1.5 pr-2"
+						>
+							<div className="min-w-0 flex-1">
+								<button
+									type="button"
+									disabled={!canNavigate}
+									onClick={(event) => {
+										event.stopPropagation();
+										handleMerchantClick();
+									}}
+									aria-label={`Open ${merchantName} merchant`}
+									className={`
 							flex h-10 w-full min-w-0 items-center
 							gap-3 rounded-xl border border-transparent
 							px-3 text-left transition-all
@@ -319,59 +308,63 @@ columnHelper.accessor("merchant", {
 
 							disabled:cursor-not-allowed
 						`}
-					>
-						<div
-							aria-hidden="true"
-							className="
+								>
+									<div
+										aria-hidden="true"
+										className="
 								flex h-7 w-7 shrink-0 items-center
 								justify-center rounded-full
 								bg-gray-100 text-sm font-black
 								text-[#FF5A35]
 								dark:bg-white
 							"
-						>
-							{initial}
-						</div>
+									>
+										{initial}
+									</div>
 
-						<span
-							title={merchantName}
-							className="
+									<span
+										title={merchantName}
+										className="
 								min-w-0 flex-1 truncate
 								text-[15px] font-medium
 								text-gray-900 dark:text-white
 							"
-						>
-							{merchantName}
-						</span>
+									>
+										{merchantName}
+									</span>
 
-						<ChevronDown
-							size={16}
-							strokeWidth={2}
-							aria-hidden="true"
-							className="
-								shrink-0 text-gray-500
-								transition-transform
-								dark:text-gray-400
-							"
-						/>
-					</button>
-				</div>
+									<ChevronDown
+										size={16}
+										strokeWidth={2}
+										aria-hidden="true"
+										className="
+		shrink-0
+		text-gray-500
+		opacity-0
+		transition-all
+		group-hover:opacity-100
+		group-focus-within:opacity-100
+		dark:text-gray-400
+	"
+									/>
+								</button>
+							</div>
 
-				{isMerchantNavigationEnabled && (
-					<button
-						type="button"
-						disabled={!canNavigate}
-						onClick={(event) => {
-							event.stopPropagation();
-							handleMerchantClick();
-						}}
-						aria-label={`View ${merchantName} merchant`}
-						title={
-							canNavigate
-								? "View merchant"
-								: `Merchant ID unavailable for ${merchantName}`
-						}
-						className={`
+							{isMerchantNavigationEnabled && (
+								<button
+									type="button"
+									disabled={!canNavigate}
+									onClick={(event) => {
+										event.stopPropagation();
+										handleMerchantClick();
+									}}
+									aria-label={`View ${merchantName} merchant`}
+									title={
+										canNavigate
+											? "View merchant"
+											: `Merchant ID unavailable for ${merchantName}`
+									}
+									className={`
 							flex h-8 w-8 shrink-0 items-center
 							justify-center rounded-lg
 							border border-transparent
@@ -387,29 +380,25 @@ columnHelper.accessor("merchant", {
 							hover:bg-gray-100
 							dark:hover:bg-white/5
 
-							${
-								canNavigate
-									? "cursor-pointer"
-									: "cursor-not-allowed"
-							}
+							${canNavigate ? "cursor-pointer" : "cursor-not-allowed"}
 						`}
-					>
-						<ArrowRight
-							size={16}
-							strokeWidth={2}
-							aria-hidden="true"
-							className={
-								canNavigate
-									? "text-gray-600 dark:text-gray-400"
-									: "text-gray-300 dark:text-gray-600"
-							}
-						/>
-					</button>
-				)}
-			</div>
-		);
-	},
-}),
+								>
+									<ArrowRight
+										size={16}
+										strokeWidth={2}
+										aria-hidden="true"
+										className={
+											canNavigate
+												? "text-gray-600 dark:text-gray-400"
+												: "text-gray-300 dark:text-gray-600"
+										}
+									/>
+								</button>
+							)}
+						</div>
+					);
+				},
+			}),
 
 			columnHelper.accessor("category", {
 				size: 360,

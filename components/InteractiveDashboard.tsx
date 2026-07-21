@@ -243,15 +243,30 @@ function TagPicker({
 		t.toLowerCase().includes(search.toLowerCase()),
 	);
 
-	const handleDeleteTag = (tagToDelete: string) => {
-		if (!window.confirm(`Delete tag "${tagToDelete}" from ALL transactions?`))
+	const handleDeleteTag = async (tagToDelete: string) => {
+		if (!window.confirm(`Delete tag "${tagToDelete}" from ALL transactions?`)) {
 			return;
-		const affected = transactions.filter((t) => t.tags?.includes(tagToDelete));
-		affected.forEach((t) => {
-			const newTags = t.tags?.filter((tag) => tag !== tagToDelete);
-			updateTransaction(t.id, { tags: newTags });
+		}
+
+		const affected = transactions.filter((transaction) => {
+			return transaction.tags?.includes(tagToDelete);
 		});
-		if (search === tagToDelete) setSearch("");
+
+		await Promise.all(
+			affected.map((transaction) => {
+				const newTags = (transaction.tags ?? []).filter((tag) => {
+					return tag !== tagToDelete;
+				});
+
+				return updateTransaction(transaction.id, {
+					tags: newTags,
+				});
+			}),
+		);
+
+		if (search === tagToDelete) {
+			setSearch("");
+		}
 	};
 
 	return (

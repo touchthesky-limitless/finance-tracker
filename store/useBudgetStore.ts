@@ -11,7 +11,7 @@ import { createJSONStorage, persist } from "zustand/middleware";
 const supabase = createClient();
 
 const TRANSACTION_COLUMNS =
-	"id, user_id, date, merchant, merchant_id, description, amount, category, account_id, account, needs_review, needs_subcat, created_at";
+	"id, user_id, date, merchant, merchant_id, description, amount, category, account_id, account, needs_review, needs_subcat, tags, created_at";
 const CUSTOM_CATEGORY_COLUMNS =
 	"id, user_id, name, parent_name, icon_name, color_key, created_at, is_system";
 const DATABASE_BATCH_SIZE = 100;
@@ -99,6 +99,7 @@ export type TransactionUpdate = Partial<
 		| "account_id"
 		| "needs_review"
 		| "needs_subcat"
+		| "tags"
 	>
 >;
 
