@@ -1,11 +1,65 @@
+import {
+	CATEGORY_DICTIONARY,
+	DEFAULT_CATEGORIES,
+	type CategoryId,
+} from "@/config/categoryDictionary";
+import { CATEGORY_HIERARCHY } from "@/constants";
 import { createClient } from "@/lib/supabase";
 import { create } from "zustand";
-import { persist, createJSONStorage } from "zustand/middleware";
-import { CATEGORY_HIERARCHY } from "@/constants";
-import { CATEGORY_DICTIONARY } from "@/config/categoryDictionary";
-import { DEFAULT_CATEGORIES } from "@/config/categoryDictionary";
+import { createJSONStorage, persist } from "zustand/middleware";
 
 const supabase = createClient();
+
+const TRANSACTION_COLUMNS =
+	"id, user_id, date, merchant, description, amount, category, account, needs_review, needs_subcat, created_at";
+const CUSTOM_CATEGORY_COLUMNS =
+	"id, user_id, name, parent_name, icon_name, color_key, created_at, is_system";
+const DATABASE_BATCH_SIZE = 100;
+
+const DEFAULT_WALLET_IDS = [
+	"amex-bce",
+	"amex-ed",
+	"amex-hilton-aspire",
+	"amex-hilton-no-af",
+	"amex-bbp",
+	"boa-cash-rewards",
+	"boa-alaska-biz",
+	"c1-vx",
+	"chase-csp",
+	"chase-cfu",
+	"chase-cff",
+	"chase-cip",
+	"chase-cic",
+	"chase-united-biz",
+	"citi-custom-cash",
+	"citi-aa-biz",
+	"citi-aa-plat",
+	"discover-it",
+	"usbank-triple-cash",
+	"wf-signify",
+];
+
+const normalize = (value?: string | null): string => {
+	return value?.trim().toLowerCase() ?? "";
+};
+
+const BUILT_IN_CATEGORY_NAMES = new Set<string>();
+const GENERIC_CATEGORY_NAMES = new Set<string>([normalize("Uncategorized")]);
+
+for (const [parent, children] of Object.entries(CATEGORY_HIERARCHY)) {
+	BUILT_IN_CATEGORY_NAMES.add(normalize(parent));
+	GENERIC_CATEGORY_NAMES.add(normalize(parent));
+
+	for (const child of children) {
+		BUILT_IN_CATEGORY_NAMES.add(normalize(child));
+	}
+}
+
+const CATEGORY_BY_ID = new Map(
+	CATEGORY_DICTIONARY.map((category) => {
+		return [category.id, category] as const;
+	}),
+);
 
 export interface Transaction {
 	[key: string]: string | number | boolean | string[] | undefined;
@@ -23,6 +77,20 @@ export interface Transaction {
 	tags?: string[];
 	note?: string;
 }
+
+export type TransactionUpdate = Partial<
+	Pick<
+		Transaction,
+		| "date"
+		| "merchant"
+		| "description"
+		| "amount"
+		| "category"
+		| "account"
+		| "needs_review"
+		| "needs_subcat"
+	>
+>;
 
 export interface Rule {
 	keyword: string;
@@ -64,30 +132,39 @@ interface BudgetState {
 	globalCards: CreditCard[];
 	walletIds: string[];
 	customRates: Record<string, Record<string, number>>;
-	preferredCards: Record<string, string>; // Maps Category ID to Card ID
-	activeCategoryIds: string[];
-	addActiveCategory: (id: string) => void;
-	setPreferredCard: (categoryId: string, cardId: string | null) => void;
-	fetchCustomCategories: () => Promise<void>;
+	preferredCards: Record<string, string>;
+	activeCategoryIds: CategoryId[];
+
+	addActiveCategory: (id: CategoryId) => Promise<void>;
+	removeActiveCategory: (id: CategoryId) => Promise<void>;
+	reorderActiveCategories: (newOrder: CategoryId[]) => Promise<void>;
+	fetchActiveCategories: () => Promise<void>;
+	setPreferredCard: (
+		categoryId: string,
+		cardId: string | null,
+	) => Promise<void>;
+	fetchPreferredCards: () => Promise<void>;
+
 	setHasHydrated: (state: boolean) => void;
 	setToast: (toast: { count: number; snapshot: Transaction[] } | null) => void;
+	setLoading: (loading: boolean) => void;
+	setTransactions: (transactions: Transaction[]) => void;
+	clearData: () => void;
+
+	addTransactions: (transactions: Transaction[]) => Promise<void>;
+	fetchTransactions: (force?: boolean) => Promise<void>;
+	updateTransaction: (id: string, updates: TransactionUpdate) => Promise<void>;
+	deleteTransaction: (id: string) => Promise<void>;
+	bulkDeleteTransactions: (ids: string[]) => Promise<void>;
+	undoDelete: (transactions: Transaction[]) => Promise<void>;
+	undoBulkUpdate: (previousTransactions: Transaction[]) => void;
+	getCategoryTotals: () => Record<string, number>;
+
 	saveRule: (rule: Rule, oldKeyword?: string) => Promise<void>;
 	deleteRule: (keyword: string) => Promise<void>;
+
 	addCustomTag: (tag: string) => void;
-	setLoading: (loading: boolean) => void;
-	addTransactions: (newTxs: Transaction[]) => Promise<void>;
-	fetchTransactions: () => Promise<void>;
-	setTransactions: (txs: Transaction[]) => void;
-	clearData: () => void;
-	deleteTransaction: (id: string) => Promise<void>;
-	updateTransaction: (
-		id: string,
-		updates: Partial<Transaction>,
-	) => Promise<void>;
-	getCategoryTotals: () => Record<string, number>;
-	undoBulkUpdate: (previousTransactions: Transaction[]) => void;
-	bulkDeleteTransactions: (ids: string[]) => Promise<void>;
-	undoDelete: (restoredTxs: Transaction[]) => Promise<void>;
+	fetchCustomCategories: () => Promise<void>;
 	addCustomCategory: (category: {
 		name: string;
 		parent?: string;
@@ -100,555 +177,781 @@ interface BudgetState {
 		updates: { name: string; icon: string; color: string },
 	) => Promise<void>;
 	resetCustomCategories: () => Promise<void>;
+
 	confirmRecurring: (merchantName: string) => void;
-	fetchGlobalCards: () => Promise<void>;
-	fetchPreferredCards: () => Promise<void>;
+	fetchGlobalCards: (force?: boolean) => Promise<void>;
+	getVisibleCategories: () => (typeof CATEGORY_DICTIONARY)[number][];
 	setWalletIds: (ids: string[]) => void;
 	setCustomRates: (rates: Record<string, Record<string, number>>) => void;
-	fetchActiveCategories: () => Promise<void>;
-	removeActiveCategory: (id: string) => void;
-	reorderActiveCategories: (newOrder: string[]) => void;
 }
 
-const applyRulesToTransaction = (
-	tx: Transaction,
-	rules: Rule[],
-): Transaction => {
-	const updatedTx = { ...tx };
+interface PreparedRule extends Rule {
+	normalizedKeyword: string;
+	normalizedMatchCategory: string;
+}
 
-	// Sort rules by keyword length (descending) so "Amazon Prime" matches before "Amazon"
-	const sortedRules = [...rules].sort(
-		(a, b) => b.keyword.length - a.keyword.length,
-	);
+const uniqueStrings = (values: string[]): string[] => {
+	const result: string[] = [];
+	const seen = new Set<string>();
 
-	for (const rule of sortedRules) {
-		const nameMatch = updatedTx.merchant
-			?.toLowerCase()
-			.includes(rule.keyword.toLowerCase());
-		const categoryMatch =
-			!rule.matchCategory || updatedTx.category === rule.matchCategory;
+	for (const value of values) {
+		const trimmed = value.trim();
 
-		if (nameMatch && categoryMatch) {
-			updatedTx.category = rule.category;
-			updatedTx.needs_review = false;
-			updatedTx.needs_subcat = false;
-			break; // Stop after first match
+		if (trimmed && !seen.has(trimmed)) {
+			seen.add(trimmed);
+			result.push(trimmed);
 		}
 	}
 
-	return updatedTx;
+	return result;
 };
+
+const getUserId = async (): Promise<string | null> => {
+	const {
+		data: { session },
+		error,
+	} = await supabase.auth.getSession();
+
+	if (error) {
+		console.error("Failed to read session:", error.message);
+		return null;
+	}
+
+	return session?.user.id ?? null;
+};
+
+const savePreferences = async (
+	userId: string,
+	updates: {
+		active_categories?: string[];
+		preferred_cards?: Record<string, string>;
+	},
+): Promise<void> => {
+	const { error } = await supabase.from("user_preferences").upsert(
+		{
+			user_id: userId,
+			...updates,
+		},
+		{ onConflict: "user_id" },
+	);
+
+	if (error) {
+		throw error;
+	}
+};
+
+const prepareRules = (rules: Rule[]): PreparedRule[] => {
+	return rules
+		.map((rule) => {
+			return {
+				...rule,
+				normalizedKeyword: normalize(rule.keyword),
+				normalizedMatchCategory: normalize(rule.matchCategory),
+			};
+		})
+		.filter((rule) => rule.normalizedKeyword)
+		.sort((a, b) => {
+			return b.normalizedKeyword.length - a.normalizedKeyword.length;
+		});
+};
+
+const matchesRule = (transaction: Transaction, rule: PreparedRule): boolean => {
+	if (!normalize(transaction.merchant).includes(rule.normalizedKeyword)) {
+		return false;
+	}
+
+	return (
+		!rule.normalizedMatchCategory ||
+		normalize(transaction.category) === rule.normalizedMatchCategory
+	);
+};
+
+const applyRules = (
+	transaction: Transaction,
+	rules: PreparedRule[],
+): Transaction => {
+	for (const rule of rules) {
+		if (!matchesRule(transaction, rule)) {
+			continue;
+		}
+
+		const needsReview = GENERIC_CATEGORY_NAMES.has(normalize(rule.category));
+
+		return {
+			...transaction,
+			category: rule.category,
+			needs_review: needsReview,
+			needs_subcat: needsReview,
+		};
+	}
+
+	return transaction;
+};
+
+const splitIntoBatches = <T>(values: T[]): T[][] => {
+	const batches: T[][] = [];
+
+	for (let index = 0; index < values.length; index += DATABASE_BATCH_SIZE) {
+		batches.push(values.slice(index, index + DATABASE_BATCH_SIZE));
+	}
+
+	return batches;
+};
+
+function uniqueCategoryIds(ids: readonly CategoryId[]): CategoryId[] {
+	return Array.from(new Set(ids));
+}
+
+function isCategoryId(value: unknown): value is CategoryId {
+	return typeof value === "string" && CATEGORY_BY_ID.has(value as CategoryId);
+}
+
+function parseCategoryIds(value: unknown): CategoryId[] {
+	if (!Array.isArray(value)) {
+		return [];
+	}
+
+	const result: CategoryId[] = [];
+	const seen = new Set<CategoryId>();
+
+	for (const item of value) {
+		if (!isCategoryId(item)) {
+			continue;
+		}
+
+		if (seen.has(item)) {
+			continue;
+		}
+
+		seen.add(item);
+		result.push(item);
+	}
+
+	return result;
+}
 
 export const useBudgetStore = create<BudgetState>()(
 	persist(
 		(set, get) => ({
 			transactions: [],
+			isLoading: false,
 			customTags: [],
 			customCategories: [],
-			rules: [],
-			isLoading: false,
 			hasHydrated: false,
+			rules: [],
 			toast: null,
 			confirmedRecurringMerchants: [],
 			globalCards: [],
+			walletIds: [...DEFAULT_WALLET_IDS],
+			customRates: {},
 			preferredCards: {},
+			activeCategoryIds: [...DEFAULT_CATEGORIES],
 
-			// The state only holds strings now
-			activeCategoryIds: DEFAULT_CATEGORIES,
+			reorderActiveCategories: async (newOrder: CategoryId[]) => {
+				const previous = get().activeCategoryIds;
 
-			reorderActiveCategories: async (newOrder) => {
-				// 1. Instantly update UI
-				set({ activeCategoryIds: newOrder });
+				const updated = uniqueCategoryIds(newOrder);
 
-				// 2. Save new order to Supabase
-				const {
-					data: { session },
-				} = await supabase.auth.getSession();
-
-				if (session) {
-					await supabase.from("user_preferences").upsert({
-						user_id: session.user.id,
-						active_categories: newOrder,
-					});
+				if (
+					updated.length === previous.length &&
+					updated.every((id, index) => {
+						return id === previous[index];
+					})
+				) {
+					return;
 				}
-			},
 
-			addActiveCategory: async (categoryId) => {
-				const current = get().activeCategoryIds;
-
-				if (current.includes(categoryId)) return;
-
-				const updated = [...current, categoryId];
-
-				// 1. Optimistic Update (UI updates instantly)
-				set({ activeCategoryIds: updated });
+				set({
+					activeCategoryIds: updated,
+				});
 
 				try {
-					const { data } = await supabase.auth.getSession();
-					if (!data.session) return;
+					const userId = await getUserId();
 
-					const { error } = await supabase.from("user_preferences").upsert({
-						user_id: data.session.user.id,
+					if (!userId) {
+						throw new Error("No authenticated user.");
+					}
+
+					await savePreferences(userId, {
 						active_categories: updated,
 					});
+				} catch (error) {
+					set({
+						activeCategoryIds: previous,
+					});
 
-					if (error) {
-						// 2. Rollback if Supabase fails (Safety Net)
-						set({ activeCategoryIds: current });
-						console.error("Supabase sync error:", error.message);
-					}
-				} catch (err) {
-					// 2. Rollback on crash
-					set({ activeCategoryIds: current });
-					console.error("Failed to save category:", err);
+					console.error("Failed to reorder categories:", error);
 				}
 			},
 
-			removeActiveCategory: async (categoryId: string) => {
-				const current = get().activeCategoryIds;
-				const updated = current.filter((id) => id !== categoryId);
+			addActiveCategory: async (categoryId: CategoryId) => {
+				const previous = get().activeCategoryIds;
 
-				set({ activeCategoryIds: updated });
+				if (previous.includes(categoryId)) {
+					return;
+				}
 
-				const {
-					data: { session },
-				} = await supabase.auth.getSession();
-				if (session) {
-					await supabase.from("user_preferences").upsert({
-						user_id: session.user.id,
+				const updated: CategoryId[] = [...previous, categoryId];
+
+				set({
+					activeCategoryIds: updated,
+				});
+
+				try {
+					const userId = await getUserId();
+
+					if (!userId) {
+						throw new Error("No authenticated user.");
+					}
+
+					await savePreferences(userId, {
 						active_categories: updated,
 					});
+				} catch (error) {
+					set({
+						activeCategoryIds: previous,
+					});
+
+					console.error("Failed to add category:", error);
+				}
+			},
+
+			removeActiveCategory: async (categoryId: CategoryId) => {
+				const previous = get().activeCategoryIds;
+
+				const updated = previous.filter((id) => {
+					return id !== categoryId;
+				});
+
+				if (updated.length === previous.length) {
+					return;
+				}
+
+				set({
+					activeCategoryIds: updated,
+				});
+
+				try {
+					const userId = await getUserId();
+
+					if (!userId) {
+						throw new Error("No authenticated user.");
+					}
+
+					await savePreferences(userId, {
+						active_categories: updated,
+					});
+				} catch (error) {
+					set({
+						activeCategoryIds: previous,
+					});
+
+					console.error("Failed to remove category:", error);
 				}
 			},
 
 			fetchActiveCategories: async () => {
-				const {
-					data: { session },
-				} = await supabase.auth.getSession();
-				if (!session) return;
+				const userId = await getUserId();
+
+				if (!userId) {
+					return;
+				}
 
 				const { data, error } = await supabase
 					.from("user_preferences")
 					.select("active_categories")
-					.eq("user_id", session.user.id)
-					.single();
+					.eq("user_id", userId)
+					.maybeSingle();
 
 				if (error) {
-					// If error is because no row exists (PGRST116), that's fine!
-					// Otherwise, log it so you know why your app failed to load.
-					if (error.code !== "PGRST116") {
-						console.error("Error loading categories:", error.message);
-					}
-					return; // Stop here if there's no data to load
+					console.error("Failed to load categories:", error.message);
+
+					return;
 				}
 
-				if (data && data.active_categories) {
-					set({ activeCategoryIds: data.active_categories });
+				const activeCategoryIds = parseCategoryIds(data?.active_categories);
+
+				set({
+					activeCategoryIds,
+				});
+			},
+
+			setPreferredCard: async (categoryId, cardId) => {
+				const previous = get().preferredCards;
+				const updated = { ...previous };
+
+				if (cardId === null) {
+					delete updated[categoryId];
+				} else {
+					updated[categoryId] = cardId;
+				}
+
+				set({ preferredCards: updated });
+
+				try {
+					const userId = await getUserId();
+
+					if (!userId) {
+						throw new Error("No authenticated user.");
+					}
+
+					await savePreferences(userId, {
+						preferred_cards: updated,
+					});
+				} catch (error) {
+					set({ preferredCards: previous });
+					console.error("Failed to save preferred card:", error);
 				}
 			},
 
-			// Put your 20 card IDs here so they are in your wallet by default!
-			walletIds: [
-				"amex-bce",
-				"amex-ed",
-				"amex-hilton-aspire",
-				"amex-hilton-no-af",
-				"amex-bbp",
-				"boa-cash-rewards",
-				"boa-alaska-biz",
-				"c1-vx",
-				"chase-csp",
-				"chase-cfu",
-				"chase-cff",
-				"chase-cip",
-				"chase-cic",
-				"chase-united-biz",
-				"citi-custom-cash",
-				"citi-aa-biz",
-				"citi-aa-plat",
-				"discover-it",
-				"usbank-triple-cash",
-				"wf-signify",
-			],
-			customRates: {},
+			fetchPreferredCards: async () => {
+				const userId = await getUserId();
 
-			setToast: (toastValue) => set({ toast: toastValue }),
-			setHasHydrated: (state: boolean) => set({ hasHydrated: state }),
-			setTransactions: (txs) => set({ transactions: txs }),
-			setLoading: (loading) => set({ isLoading: loading }),
+				if (!userId) {
+					return;
+				}
 
-			addTransactions: async (newTxs: Transaction[]) => {
-				const {
-					data: { user },
-				} = await supabase.auth.getUser();
-				if (!user) return;
+				const { data, error } = await supabase
+					.from("user_preferences")
+					.select("preferred_cards")
+					.eq("user_id", userId)
+					.maybeSingle();
 
-				const { rules } = get(); // Get existing rules from the store
+				if (error) {
+					console.error("Failed to load preferred cards:", error.message);
+					return;
+				}
 
-				const txsToInsert = newTxs.map((tx) => {
-					// --- THE FIX: Apply rules here before sending to DB ---
-					const processedTx = applyRulesToTransaction(tx, rules);
+				if (data?.preferred_cards) {
+					set({ preferredCards: data.preferred_cards });
+				}
+			},
+
+			setToast: (toast) => set({ toast }),
+			setHasHydrated: (hasHydrated) => set({ hasHydrated }),
+			setTransactions: (transactions) => set({ transactions }),
+			setLoading: (isLoading) => set({ isLoading }),
+
+			addTransactions: async (newTransactions) => {
+				if (newTransactions.length === 0) {
+					return;
+				}
+
+				const userId = await getUserId();
+
+				if (!userId) {
+					throw new Error("You must be signed in to add transactions.");
+				}
+
+				const rules = prepareRules(get().rules);
+				const rows = newTransactions.map((transaction) => {
+					const processed = applyRules(transaction, rules);
 
 					return {
-						user_id: user.id,
-						date: processedTx.date,
-						merchant: processedTx.merchant,
-						amount: processedTx.amount,
-						category: processedTx.category || "Uncategorized",
-						account: processedTx.account,
-						description: processedTx.description || "",
-						needs_review: processedTx.needs_review ?? true,
-						needs_subcat: processedTx.needs_subcat ?? true,
+						user_id: userId,
+						date: processed.date,
+						merchant: processed.merchant,
+						description: processed.description ?? "",
+						amount: processed.amount,
+						category: processed.category || "Uncategorized",
+						account: processed.account,
+						needs_review: processed.needs_review ?? true,
+						needs_subcat: processed.needs_subcat ?? true,
 					};
 				});
 
 				const { data, error } = await supabase
 					.from("transactions")
-					.insert(txsToInsert)
-					.select();
+					.insert(rows)
+					.select(TRANSACTION_COLUMNS);
 
-				if (error) throw error;
+				if (error) {
+					throw error;
+				}
 
 				set((state) => ({
-					transactions: [...(data as Transaction[]), ...state.transactions],
+					transactions: [
+						...((data ?? []) as Transaction[]),
+						...state.transactions,
+					],
 				}));
 			},
 
-			fetchTransactions: async () => {
+			fetchTransactions: async (force = false) => {
 				const { transactions, isLoading } = get();
-				if (transactions.length > 0 || isLoading) return;
+
+				if (isLoading || (!force && transactions.length > 0)) {
+					return;
+				}
 
 				set({ isLoading: true });
 
 				try {
-					const {
-						data: { user },
-					} = await supabase.auth.getUser();
-					if (!user) {
-						set({ isLoading: false, hasHydrated: true });
+					const userId = await getUserId();
+
+					if (!userId) {
+						set({ transactions: [], rules: [], isLoading: false });
 						return;
 					}
 
-					const [txResponse, rulesResponse] = await Promise.all([
+					const [transactionResponse, ruleResponse] = await Promise.all([
 						supabase
 							.from("transactions")
-							.select("*")
-							.order("date", { ascending: false }),
+							.select(TRANSACTION_COLUMNS)
+							.order("date", { ascending: false })
+							.order("created_at", { ascending: false }),
 						supabase.from("rules").select("keyword, category, match_category"),
 					]);
 
-					// Map snake_case from DB back to camelCase for local state
-					const mappedRules: Rule[] = (rulesResponse.data || []).map((r) => ({
-						keyword: r.keyword,
-						category: r.category,
-						matchCategory: r.match_category,
-					}));
+					if (transactionResponse.error) {
+						throw transactionResponse.error;
+					}
+
+					if (ruleResponse.error) {
+						throw ruleResponse.error;
+					}
 
 					set({
-						transactions: (txResponse.data as Transaction[]) || [],
-						rules: mappedRules,
+						transactions: (transactionResponse.data ?? []) as Transaction[],
+						rules: (ruleResponse.data ?? []).map((rule) => ({
+							keyword: rule.keyword,
+							category: rule.category,
+							matchCategory: rule.match_category ?? undefined,
+						})),
 						isLoading: false,
-						hasHydrated: true,
 					});
 				} catch (error) {
-					console.error("Fetch Error:", error);
-					set({ isLoading: false, hasHydrated: true });
+					console.error("Failed to fetch transactions:", error);
+					set({ isLoading: false });
 				}
-			},
-
-			fetchGlobalCards: async () => {
-				// Make sure you import supabase at the top of the file!
-				const { data, error } = await supabase.from("credit_cards").select("*");
-				if (!error && data) {
-					set({ globalCards: data as CreditCard[] });
-				}
-			},
-
-			fetchPreferredCards: async () => {
-				try {
-					// 1. Ask Supabase who is logged in
-					const {
-						data: { session },
-					} = await supabase.auth.getSession();
-
-					// 2. If no user, just exit silently
-					if (!session) return;
-
-					// 3. Fetch their specific row from the database
-					const { data, error } = await supabase
-						.from("user_preferences")
-						.select("preferred_cards")
-						.eq("user_id", session.user.id)
-						.single(); // .single() because each user only has one row
-
-					// 4. Handle errors (Ignore PGRST116, which just means "User has no row yet")
-					if (error && error.code !== "PGRST116") {
-						console.error("Error fetching preferences:", error.message);
-						return;
-					}
-
-					// 5. If data exists, inject it into the Zustand store
-					if (data && data.preferred_cards) {
-						set({ preferredCards: data.preferred_cards });
-					}
-				} catch (err) {
-					console.error("Failed to fetch preferences:", err);
-				}
-			},
-
-			// The UI will call this to build the Bento Box
-			getVisibleCategories: () => {
-				const { activeCategoryIds } = get();
-				// Reattach the icons and colors right before rendering
-				return CATEGORY_DICTIONARY.filter((cat) =>
-					activeCategoryIds.includes(cat.id),
-				);
-			},
-
-			setWalletIds: (ids) => set({ walletIds: ids }),
-			setCustomRates: (rates) => set({ customRates: rates }),
-			setPreferredCard: async (categoryId, cardId) => {
-				// 1. Get the current state
-				const currentState = get().preferredCards;
-				const updated = { ...currentState };
-
-				// 2. Apply your existing logic
-				if (cardId === null) {
-					delete updated[categoryId]; // Un-starring
-				} else {
-					updated[categoryId] = cardId; // Starring
-				}
-
-				// 3. Update the UI instantly (Optimistic UI update)
-				set({ preferredCards: updated });
-
-				// 4. Persist to Supabase in the background
-				try {
-					// A. Ask Supabase who is currently logged in
-					const {
-						data: { session },
-					} = await supabase.auth.getSession();
-
-					// B. If nobody is logged in, stop here so we don't crash the database
-					if (!session) {
-						console.error("Cannot save: No user is logged in.");
-						return;
-					}
-
-					// C. Grab their real, unique ID
-					const activeUserId = session.user.id;
-
-					// D. Save the data attached to their real ID
-					const { error } = await supabase.from("user_preferences").upsert({
-						user_id: activeUserId,
-						preferred_cards: updated,
-					});
-
-					if (error) {
-						console.error("Supabase update error:", error.message);
-					}
-				} catch (err) {
-					console.error("Failed to sync preferred cards:", err);
-				}
-			},
-
-			saveRule: async (newRule, oldKeyword) => {
-				const {
-					data: { user },
-				} = await supabase.auth.getUser();
-				if (!user) return;
-
-				if (oldKeyword && oldKeyword !== newRule.keyword) {
-					await supabase.from("rules").delete().eq("keyword", oldKeyword);
-				}
-
-				const { error } = await supabase.from("rules").upsert(
-					{
-						user_id: user.id,
-						keyword: newRule.keyword,
-						category: newRule.category,
-						match_category: newRule.matchCategory,
-					},
-					{ onConflict: "user_id,keyword" },
-				);
-
-				if (error) {
-					console.error("Rule Sync Error:", error.message);
-					return;
-				}
-
-				set((state) => {
-					const updatedTransactions = state.transactions.map((tx) => {
-						const nameMatches = tx.merchant
-							?.toLowerCase()
-							.includes(newRule.keyword.toLowerCase());
-						const categoryMatches =
-							!newRule.matchCategory || tx.category === newRule.matchCategory;
-
-						if (nameMatches && categoryMatches) {
-							const isGenericParent =
-								Object.keys(CATEGORY_HIERARCHY).includes(newRule.category) ||
-								newRule.category === "Uncategorized";
-
-							return {
-								...tx,
-								category: newRule.category,
-								needs_subcat: isGenericParent,
-								needs_review: isGenericParent,
-							};
-						}
-						return tx;
-					});
-
-					const otherRules = state.rules.filter(
-						(r) => r.keyword !== (oldKeyword || newRule.keyword),
-					);
-
-					return {
-						rules: [...otherRules, newRule],
-						transactions: updatedTransactions,
-					};
-				});
-			},
-
-			deleteRule: async (keyword) => {
-				const { error } = await supabase
-					.from("rules")
-					.delete()
-					.eq("keyword", keyword);
-				if (error) return;
-				set((state) => ({
-					rules: state.rules.filter((r) => r.keyword !== keyword),
-				}));
 			},
 
 			updateTransaction: async (id, updates) => {
+				const original = get().transactions.find((transaction) => {
+					return transaction.id === id;
+				});
+
+				if (!original || Object.keys(updates).length === 0) {
+					return;
+				}
+
 				set((state) => ({
-					transactions: state.transactions.map((t) =>
-						t.id === id ? { ...t, ...updates } : t,
-					),
+					transactions: state.transactions.map((transaction) => {
+						return transaction.id === id
+							? { ...transaction, ...updates }
+							: transaction;
+					}),
 				}));
 
 				const { error } = await supabase
 					.from("transactions")
 					.update(updates)
 					.eq("id", id);
-				if (error) get().fetchTransactions();
+
+				if (error) {
+					set((state) => ({
+						transactions: state.transactions.map((transaction) => {
+							return transaction.id === id ? original : transaction;
+						}),
+					}));
+					throw error;
+				}
 			},
 
 			deleteTransaction: async (id) => {
-				set((state) => ({
-					transactions: state.transactions.filter((t) => t.id !== id),
-				}));
-				await supabase.from("transactions").delete().eq("id", id);
+				const previous = get().transactions;
+				const next = previous.filter((transaction) => transaction.id !== id);
+
+				if (next.length === previous.length) {
+					return;
+				}
+
+				set({ transactions: next });
+
+				const { error } = await supabase
+					.from("transactions")
+					.delete()
+					.eq("id", id);
+
+				if (error) {
+					set({ transactions: previous });
+					throw error;
+				}
 			},
 
 			bulkDeleteTransactions: async (ids) => {
-				set((state) => ({
-					transactions: state.transactions.filter((t) => !ids.includes(t.id)),
-				}));
-				await supabase.from("transactions").delete().in("id", ids);
+				const uniqueIds = uniqueStrings(ids);
+
+				if (uniqueIds.length === 0) {
+					return;
+				}
+
+				const idSet = new Set(uniqueIds);
+				const previous = get().transactions;
+
+				set({
+					transactions: previous.filter((transaction) => {
+						return !idSet.has(transaction.id);
+					}),
+				});
+
+				for (const batch of splitIntoBatches(uniqueIds)) {
+					const { error } = await supabase
+						.from("transactions")
+						.delete()
+						.in("id", batch);
+
+					if (error) {
+						set({ transactions: previous });
+						throw error;
+					}
+				}
 			},
 
-			undoDelete: async (restoredTxs) => {
-				set((state) => ({
-					transactions: [...restoredTxs, ...state.transactions],
+			undoDelete: async (restoredTransactions) => {
+				if (restoredTransactions.length === 0) {
+					return;
+				}
+
+				const userId = await getUserId();
+
+				if (!userId) {
+					throw new Error("You must be signed in to restore transactions.");
+				}
+
+				const previous = get().transactions;
+				set({ transactions: [...restoredTransactions, ...previous] });
+
+				const rows = restoredTransactions.map((transaction) => ({
+					id: transaction.id,
+					user_id: userId,
+					date: transaction.date,
+					merchant: transaction.merchant,
+					description: transaction.description ?? "",
+					amount: transaction.amount,
+					category: transaction.category,
+					account: transaction.account,
+					needs_review: transaction.needs_review,
+					needs_subcat: transaction.needs_subcat,
 				}));
-				await supabase.from("transactions").insert(restoredTxs);
+
+				const { error } = await supabase.from("transactions").insert(rows);
+
+				if (error) {
+					set({ transactions: previous });
+					throw error;
+				}
 			},
 
-			clearData: () => set({ transactions: [], customTags: [], rules: [] }),
+			clearData: () => {
+				set({ transactions: [], customTags: [], rules: [], toast: null });
+			},
 
 			getCategoryTotals: () => {
-				const { transactions } = get();
 				const totals: Record<string, number> = {};
-				transactions.forEach((tx) => {
-					if (tx.category === "Income" || tx.category === "Debt payments")
-						return;
-					const cat = tx.category || "Uncategorized";
-					totals[cat] = (totals[cat] || 0) + Math.abs(tx.amount || 0);
-				});
+
+				for (const transaction of get().transactions) {
+					if (
+						normalize(transaction.category) === normalize("Income") ||
+						normalize(transaction.category) === normalize("Debt payments")
+					) {
+						continue;
+					}
+
+					const category = transaction.category || "Uncategorized";
+					totals[category] =
+						(totals[category] ?? 0) + Math.abs(transaction.amount || 0);
+				}
+
 				return totals;
 			},
 
-			addCustomTag: (tag) =>
-				set((state) => ({
-					customTags: state.customTags.includes(tag)
-						? state.customTags
-						: [...state.customTags, tag],
-				})),
+			undoBulkUpdate: (previousTransactions) => {
+				set({ transactions: previousTransactions });
+			},
 
-			undoBulkUpdate: (previousTransactions) =>
-				set({ transactions: previousTransactions }),
+			saveRule: async (newRule, oldKeyword) => {
+				const rule: Rule = {
+					keyword: newRule.keyword.trim(),
+					category: newRule.category.trim(),
+					matchCategory: newRule.matchCategory?.trim() || undefined,
+				};
+
+				if (!rule.keyword || !rule.category) {
+					throw new Error("Rule keyword and category are required.");
+				}
+
+				const userId = await getUserId();
+
+				if (!userId) {
+					throw new Error("You must be signed in to save a rule.");
+				}
+
+				const preparedRule = prepareRules([rule])[0];
+				const needsReview = GENERIC_CATEGORY_NAMES.has(
+					normalize(rule.category),
+				);
+				const matchingIds = get()
+					.transactions.filter((transaction) => {
+						return matchesRule(transaction, preparedRule);
+					})
+					.map((transaction) => transaction.id);
+
+				const { error: saveError } = await supabase.from("rules").upsert(
+					{
+						user_id: userId,
+						keyword: rule.keyword,
+						category: rule.category,
+						match_category: rule.matchCategory ?? null,
+					},
+					{ onConflict: "user_id,keyword" },
+				);
+
+				if (saveError) {
+					throw saveError;
+				}
+
+				for (const batch of splitIntoBatches(matchingIds)) {
+					const { error } = await supabase
+						.from("transactions")
+						.update({
+							category: rule.category,
+							needs_review: needsReview,
+							needs_subcat: needsReview,
+						})
+						.in("id", batch);
+
+					if (error) {
+						throw error;
+					}
+				}
+
+				if (oldKeyword && normalize(oldKeyword) !== normalize(rule.keyword)) {
+					const { error } = await supabase
+						.from("rules")
+						.delete()
+						.eq("user_id", userId)
+						.eq("keyword", oldKeyword);
+
+					if (error) {
+						throw error;
+					}
+				}
+
+				set((state) => ({
+					rules: [
+						...state.rules.filter((existingRule) => {
+							return (
+								normalize(existingRule.keyword) !== normalize(rule.keyword) &&
+								normalize(existingRule.keyword) !== normalize(oldKeyword)
+							);
+						}),
+						rule,
+					],
+					transactions: state.transactions.map((transaction) => {
+						if (!matchesRule(transaction, preparedRule)) {
+							return transaction;
+						}
+
+						return {
+							...transaction,
+							category: rule.category,
+							needs_review: needsReview,
+							needs_subcat: needsReview,
+						};
+					}),
+				}));
+			},
+
+			deleteRule: async (keyword) => {
+				const userId = await getUserId();
+
+				if (!userId) {
+					throw new Error("You must be signed in to delete a rule.");
+				}
+
+				const { error } = await supabase
+					.from("rules")
+					.delete()
+					.eq("user_id", userId)
+					.eq("keyword", keyword);
+
+				if (error) {
+					throw error;
+				}
+
+				set((state) => ({
+					rules: state.rules.filter((rule) => {
+						return normalize(rule.keyword) !== normalize(keyword);
+					}),
+				}));
+			},
+
+			addCustomTag: (tag) => {
+				const value = tag.trim();
+
+				if (!value) {
+					return;
+				}
+
+				set((state) => {
+					if (
+						state.customTags.some((existing) => {
+							return normalize(existing) === normalize(value);
+						})
+					) {
+						return {};
+					}
+
+					return { customTags: [...state.customTags, value] };
+				});
+			},
 
 			addCustomCategory: async (category) => {
-				const {
-					data: { user },
-				} = await supabase.auth.getUser();
+				const userId = await getUserId();
 
-				if (!user) {
+				if (!userId) {
 					throw new Error("You must be signed in to create a category.");
 				}
 
-				const normalizedName = category.name.trim().toLowerCase();
+				const name = category.name.trim();
+				const normalizedName = normalize(name);
 
 				if (!normalizedName) {
 					throw new Error("Category name is required.");
 				}
 
-				const existingCategories = get().customCategories;
-
-				// Prevent matching any built-in/system subcategory
-				const conflictsWithSystemCategory = existingCategories.some(
-					(existingCategory) => {
-						return (
-							existingCategory.is_system === true &&
-							existingCategory.name.trim().toLowerCase() === normalizedName
-						);
-					},
-				);
-
-				if (conflictsWithSystemCategory) {
-					throw new Error(
-						`"${category.name.trim()}" is already a built-in category.`,
-					);
+				if (BUILT_IN_CATEGORY_NAMES.has(normalizedName)) {
+					throw new Error(`"${name}" is already a built-in category.`);
 				}
 
-				// Prevent matching another custom category owned by this user
-				const conflictsWithCustomCategory = existingCategories.some(
-					(existingCategory) => {
-						return (
-							existingCategory.is_system === false &&
-							existingCategory.user_id === user.id &&
-							existingCategory.name.trim().toLowerCase() === normalizedName
-						);
-					},
-				);
+				const duplicate = get().customCategories.some((existing) => {
+					return (
+						!existing.is_system &&
+						existing.user_id === userId &&
+						normalize(existing.name) === normalizedName
+					);
+				});
 
-				if (conflictsWithCustomCategory) {
+				if (duplicate) {
 					throw new Error("Category already exists.");
 				}
 
 				const { data, error } = await supabase
 					.from("custom_categories")
 					.insert({
-						user_id: user.id,
-						name: category.name.trim(),
+						user_id: userId,
+						name,
 						parent_name: category.parent?.trim() || null,
-						icon_name: category.icon,
-						color_key: category.color,
+						icon_name: category.icon.trim() || name,
+						color_key: category.color.trim() || null,
 						is_system: false,
 					})
-					.select("*")
+					.select(CUSTOM_CATEGORY_COLUMNS)
 					.single();
 
 				if (error) {
-					console.error("Error adding category:", error);
 					throw error;
-				}
-
-				if (!data) {
-					throw new Error("The created category was not returned.");
 				}
 
 				const createdCategory = data as CustomCategory;
@@ -661,118 +964,251 @@ export const useBudgetStore = create<BudgetState>()(
 			},
 
 			fetchCustomCategories: async () => {
-				const {
-					data: { user },
-				} = await supabase.auth.getUser();
+				const userId = await getUserId();
 
-				if (!user) {
+				if (!userId) {
 					set({ customCategories: [] });
 					return;
 				}
 
 				const { data, error } = await supabase
 					.from("custom_categories")
-					.select(
-						"id, user_id, name, parent_name, icon_name, color_key, created_at, is_system",
-					)
-					.or(`is_system.eq.true,user_id.eq.${user.id}`)
+					.select(CUSTOM_CATEGORY_COLUMNS)
+					.or(`is_system.eq.true,user_id.eq.${userId}`)
 					.order("parent_name", { ascending: true })
 					.order("name", { ascending: true });
 
 				if (error) {
-					console.error("Error fetching categories:", error);
+					console.error("Failed to fetch categories:", error.message);
 					return;
 				}
 
-				set({
-					customCategories: (data ?? []) as CustomCategory[],
-				});
+				set({ customCategories: (data ?? []) as CustomCategory[] });
 			},
 
 			deleteCustomCategory: async (id) => {
+				const category = get().customCategories.find((item) => item.id === id);
+
+				if (!category) {
+					return;
+				}
+
+				if (category.is_system) {
+					throw new Error("Built-in categories cannot be deleted.");
+				}
+
+				const userId = await getUserId();
+
+				if (!userId) {
+					throw new Error("You must be signed in to delete a category.");
+				}
+
 				const { error } = await supabase
 					.from("custom_categories")
 					.delete()
-					.eq("id", id);
+					.eq("id", id)
+					.eq("user_id", userId)
+					.eq("is_system", false);
 
-				if (error) throw error;
+				if (error) {
+					throw error;
+				}
 
-				// Update local state to remove the item
 				set((state) => ({
-					customCategories: state.customCategories.filter(
-						(cat) => cat.id !== id,
-					),
+					customCategories: state.customCategories.filter((item) => {
+						return item.id !== id;
+					}),
 				}));
 			},
 
 			updateCustomCategory: async (id, updates) => {
-				const { error } = await supabase
+				const userId = await getUserId();
+				const current = get().customCategories.find((item) => item.id === id);
+
+				if (!userId) {
+					throw new Error("You must be signed in to update a category.");
+				}
+
+				if (!current || current.is_system) {
+					throw new Error("Category cannot be edited.");
+				}
+
+				const name = updates.name.trim();
+				const normalizedName = normalize(name);
+
+				if (!normalizedName) {
+					throw new Error("Category name is required.");
+				}
+
+				if (BUILT_IN_CATEGORY_NAMES.has(normalizedName)) {
+					throw new Error(`"${name}" is already a built-in category.`);
+				}
+
+				const duplicate = get().customCategories.some((item) => {
+					return (
+						item.id !== id &&
+						!item.is_system &&
+						item.user_id === userId &&
+						normalize(item.name) === normalizedName
+					);
+				});
+
+				if (duplicate) {
+					throw new Error("Category already exists.");
+				}
+
+				const { data, error } = await supabase
 					.from("custom_categories")
 					.update({
-						name: updates.name,
-						icon_name: updates.icon,
-						color_key: updates.color,
+						name,
+						icon_name: updates.icon.trim() || name,
+						color_key: updates.color.trim() || null,
 					})
-					.eq("id", id);
+					.eq("id", id)
+					.eq("user_id", userId)
+					.eq("is_system", false)
+					.select(CUSTOM_CATEGORY_COLUMNS)
+					.single();
 
-				if (error) throw error;
+				if (error) {
+					throw error;
+				}
 
-				// Update local state immediately
+				const updatedCategory = data as CustomCategory;
+
 				set((state) => ({
-					customCategories: state.customCategories.map((cat) =>
-						cat.id === id
-							? {
-									...cat,
-									...updates,
-									icon_name: updates.icon,
-									color_key: updates.color,
-								}
-							: cat,
-					),
+					customCategories: state.customCategories.map((item) => {
+						return item.id === id ? updatedCategory : item;
+					}),
 				}));
 			},
 
 			resetCustomCategories: async () => {
-				// 1. Delete from Supabase
+				const userId = await getUserId();
+
+				if (!userId) {
+					throw new Error("You must be signed in to reset categories.");
+				}
+
 				const { error } = await supabase
 					.from("custom_categories")
 					.delete()
-					.neq("id", "00000000-0000-0000-0000-000000000000"); // Standard way to delete all rows
+					.eq("user_id", userId)
+					.eq("is_system", false);
 
-				if (error) throw error;
+				if (error) {
+					throw error;
+				}
 
-				// 2. Clear local state
-				set({ customCategories: [] });
+				set((state) => ({
+					customCategories: state.customCategories.filter((category) => {
+						return category.is_system;
+					}),
+				}));
 			},
 
-			confirmRecurring: (name: string) =>
-				set((state) => ({
-					confirmedRecurringMerchants: [
-						...state.confirmedRecurringMerchants,
-						name,
-					],
-				})),
+			confirmRecurring: (merchantName) => {
+				const name = merchantName.trim();
+
+				if (!name) {
+					return;
+				}
+
+				set((state) => {
+					if (
+						state.confirmedRecurringMerchants.some((existing) => {
+							return normalize(existing) === normalize(name);
+						})
+					) {
+						return {};
+					}
+
+					return {
+						confirmedRecurringMerchants: [
+							...state.confirmedRecurringMerchants,
+							name,
+						],
+					};
+				});
+			},
+
+			fetchGlobalCards: async (force = false) => {
+				if (!force && get().globalCards.length > 0) {
+					return;
+				}
+
+				const { data, error } = await supabase
+					.from("credit_cards")
+					.select(
+						"id, name, issuer, network, color, currency, multipliers, image_url",
+					);
+
+				if (error) {
+					console.error("Failed to fetch cards:", error.message);
+					return;
+				}
+
+				set({ globalCards: (data ?? []) as CreditCard[] });
+			},
+
+			getVisibleCategories: () => {
+				const result: (typeof CATEGORY_DICTIONARY)[number][] = [];
+
+				for (const id of get().activeCategoryIds) {
+					const category = CATEGORY_BY_ID.get(id);
+
+					if (category) {
+						result.push(category);
+					}
+				}
+
+				return result;
+			},
+
+			setWalletIds: (ids) => set({ walletIds: uniqueStrings(ids) }),
+			setCustomRates: (customRates) => {
+				set({ customRates: { ...customRates } });
+			},
 		}),
 		{
-			name: `budget-storage`,
-			version: 1,
-			storage: createJSONStorage(() => localStorage), // Use localStorage
-			onRehydrateStorage: () => (state) => {
-				// Sets hydration to true once data is loaded from disk
-				state?.setHasHydrated(true);
-				//FORCE a fetch from Supabase whenever the app rehydrates
-				state?.fetchActiveCategories();
+			name: "budget-storage",
+			version: 2,
+			storage: createJSONStorage(() => localStorage),
+			migrate: (persistedState) => {
+				const state = persistedState as Partial<BudgetState>;
+
+				return {
+					customTags: state.customTags ?? [],
+					confirmedRecurringMerchants: state.confirmedRecurringMerchants ?? [],
+					walletIds: state.walletIds ?? [...DEFAULT_WALLET_IDS],
+					customRates: state.customRates ?? {},
+					preferredCards: state.preferredCards ?? {},
+					activeCategoryIds: state.activeCategoryIds ?? [...DEFAULT_CATEGORIES],
+				};
 			},
-			// Optional: Only persist specific fields
+			onRehydrateStorage: () => {
+				return (state, error) => {
+					if (error) {
+						console.error("Failed to rehydrate budget store:", error);
+
+						return;
+					}
+
+					state?.setHasHydrated(true);
+
+					void state?.fetchTransactions(true);
+					void state?.fetchActiveCategories();
+					void state?.fetchPreferredCards();
+					void state?.fetchCustomCategories();
+				};
+			},
 			partialize: (state) => ({
-				rules: state.rules,
 				customTags: state.customTags,
-				customCategories: state.customCategories,
+				confirmedRecurringMerchants: state.confirmedRecurringMerchants,
 				walletIds: state.walletIds,
 				customRates: state.customRates,
 				preferredCards: state.preferredCards,
 				activeCategoryIds: state.activeCategoryIds,
-				transactions: state.transactions,
 			}),
 		},
 	),

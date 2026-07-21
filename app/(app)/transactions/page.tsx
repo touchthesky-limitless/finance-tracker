@@ -1,190 +1,208 @@
 "use client";
 
-import React, { useMemo, useState, useEffect, useCallback } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
-import { VisibilityState, SortingState } from "@tanstack/react-table";
-import { Trash2, X } from "lucide-react";
+import { SortingState, VisibilityState } from "@tanstack/react-table";
+import { X } from "lucide-react";
 
-import { useBudgetStore, Transaction } from "@/store/useBudgetStore";
+import { Transaction, useBudgetStore } from "@/store/useBudgetStore";
 import { DataTable } from "@/components/Transactions/DataTable";
 import { UndoToast } from "@/components/ui/UndoToast";
-import ClearDataModal from "@/components/ClearDataModal";
 import CsvUploader from "@/components/CsvUploader";
 import { TopToolbar } from "@/components/Transactions/TopToolbar";
 import { TableToolbar } from "@/components/Transactions/TableToolbar";
 import { SummarySidebar } from "@/components/Transactions/SummarySidebar";
 
+const DEFAULT_SORTING: SortingState = [
+	{
+		id: "date",
+		desc: true,
+	},
+];
+
 const EditTransactionModal = dynamic(
 	() => {
 		return import("@/components/Budget/EditTransactionModal");
 	},
-	{ ssr: false },
+	{
+		ssr: false,
+	},
 );
 
-export default function TransactionsPage() {
-	// --- Store Selectors ---
-	const transactions = useBudgetStore((state) => {
-		return state.transactions;
-	});
-	const updateTransaction = useBudgetStore((state) => {
-		return state.updateTransaction;
-	});
-	const bulkDeleteTransactions = useBudgetStore((state) => {
-		return state.bulkDeleteTransactions;
-	});
-	const setToast = useBudgetStore((state) => {
-		return state.setToast;
-	});
-	const toast = useBudgetStore((state) => {
-		return state.toast;
-	});
+function readLocalStorage<T>(key: string, fallback: T): T {
+	if (typeof window === "undefined") {
+		return fallback;
+	}
 
-	// --- Core State ---
+	try {
+		const storedValue = window.localStorage.getItem(key);
+
+		if (!storedValue) {
+			return fallback;
+		}
+
+		return JSON.parse(storedValue) as T;
+	} catch (error) {
+		console.error(`Failed to read localStorage key "${key}":`, error);
+
+		window.localStorage.removeItem(key);
+
+		return fallback;
+	}
+}
+
+function writeLocalStorage(key: string, value: unknown): void {
+	try {
+		window.localStorage.setItem(key, JSON.stringify(value));
+	} catch (error) {
+		console.error(`Failed to write localStorage key "${key}":`, error);
+	}
+}
+
+function normalizeCategoryName(name: string): string {
+	return name.trim().toLowerCase();
+}
+
+export default function TransactionsPage() {
+	// Store selectors
+	const transactions = useBudgetStore((state) => state.transactions);
+
+	const updateTransaction = useBudgetStore((state) => state.updateTransaction);
+
+	const setToast = useBudgetStore((state) => state.setToast);
+
+	const toast = useBudgetStore((state) => state.toast);
+
+	const customCategories = useBudgetStore((state) => state.customCategories);
+
+	const fetchCustomCategories = useBudgetStore(
+		(state) => state.fetchCustomCategories,
+	);
+
+	// Page state
 	const [searchQuery, setSearchQuery] = useState("");
+
 	const [selectedIds, setSelectedIds] = useState<string[]>([]);
+
 	const [selectedTransaction, setSelectedTransaction] =
 		useState<Transaction | null>(null);
+
 	const [currentView, setCurrentView] = useState<"all" | "review">("all");
+
 	const [isEditMode, setIsEditMode] = useState(false);
+
 	const [isSummaryVisible, setIsSummaryVisible] = useState(false);
-	const [showClearModal, setShowClearModal] = useState(false);
+
 	const [showUploader, setShowUploader] = useState(false);
-	const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
-	const [, setDeleteToast] = useState<{
-		count: number;
-		snapshot: Transaction[];
-	} | null>(null);
 
-	// --- Hydration & Lazy Init State ---
 	const [isMounted, setIsMounted] = useState(false);
-
-	useEffect(() => {
-		// eslint-disable-next-line
-		setIsMounted(true);
-	}, []);
 
 	const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(
 		() => {
-			if (typeof window !== "undefined") {
-				const saved = window.localStorage.getItem("monarch_cols");
-				if (saved) {
-					return JSON.parse(saved);
-				}
-			}
-			return {};
+			return readLocalStorage<VisibilityState>("sort_cols", {});
 		},
 	);
 
 	const [sorting, setSorting] = useState<SortingState>(() => {
-		if (typeof window !== "undefined") {
-			const saved = window.localStorage.getItem("monarch_sort");
-			if (saved) {
-				return JSON.parse(saved);
-			}
-		}
-		return [{ id: "date", desc: true }];
+		return readLocalStorage<SortingState>("custom_sort", DEFAULT_SORTING);
 	});
 
-	// --- Side Effects ---
+	// Mount guard
 	useEffect(() => {
-		if (isMounted) {
-			window.localStorage.setItem("monarch_sort", JSON.stringify(sorting));
+		// eslint-disable-next-line react-hooks/set-state-in-effect
+		setIsMounted(true);
+	}, []);
+
+	// Load system and user-created subcategories
+	useEffect(() => {
+		void fetchCustomCategories();
+	}, [fetchCustomCategories]);
+
+	// Persist sorting
+	useEffect(() => {
+		if (!isMounted) {
+			return;
 		}
+
+		writeLocalStorage("custom_sort", sorting);
 	}, [sorting, isMounted]);
 
+	// Persist column visibility
 	useEffect(() => {
-		if (isMounted) {
-			window.localStorage.setItem(
-				"monarch_cols",
-				JSON.stringify(columnVisibility),
-			);
+		if (!isMounted) {
+			return;
 		}
+
+		writeLocalStorage("sort_cols", columnVisibility);
 	}, [columnVisibility, isMounted]);
 
+	// Escape exits edit mode
 	useEffect(() => {
-		const handleEsc = (e: KeyboardEvent) => {
-			if (e.key === "Escape") {
-				setIsEditMode(false);
-				setSelectedIds([]);
+		const handleEscape = (event: KeyboardEvent) => {
+			if (event.key !== "Escape") {
+				return;
 			}
+
+			setIsEditMode(false);
+			setSelectedIds([]);
 		};
-		window.addEventListener("keydown", handleEsc);
+
+		window.addEventListener("keydown", handleEscape);
+
 		return () => {
-			window.removeEventListener("keydown", handleEsc);
+			window.removeEventListener("keydown", handleEscape);
 		};
 	}, []);
 
-	// --- Derived State & Computations ---
-	// const filteredTransactions = useMemo(() => {
-	// 	let filtered = transactions.filter((t) => {
-	// 		return (
-	// 			!searchQuery ||
-	// 			t.merchant?.toLowerCase().includes(searchQuery.toLowerCase())
-	// 		);
-	// 	});
-
-	// 	if (currentView === "review") {
-	// 		filtered = filtered.filter((t) => {
-	// 			return t.needs_review || t.category === "Uncategorized";
-	// 		});
-	// 	}
-
-	// 	const sortDef = sorting[0];
-	// 	if (sortDef) {
-	// 		return [...filtered].sort((a, b) => {
-	// 			const aVal = a[sortDef.id as keyof Transaction] ?? "";
-	// 			const bVal = b[sortDef.id as keyof Transaction] ?? "";
-
-	// 			if (sortDef.id === "amount") {
-	// 				return sortDef.desc
-	// 					? Math.abs(Number(bVal)) - Math.abs(Number(aVal))
-	// 					: Math.abs(Number(aVal)) - Math.abs(Number(bVal));
-	// 			}
-	// 			if (sortDef.id === "date") {
-	// 				return sortDef.desc
-	// 					? new Date(bVal as string).getTime() -
-	// 							new Date(aVal as string).getTime()
-	// 					: new Date(aVal as string).getTime() -
-	// 							new Date(bVal as string).getTime();
-	// 			}
-	// 			return (
-	// 				String(aVal).localeCompare(String(bVal)) * (sortDef.desc ? -1 : 1)
-	// 			);
-	// 		});
-	// 	}
-
-	// 	return filtered;
-	// }, [transactions, searchQuery, currentView, sorting]);
-
+	// Filter visible transactions
 	const filteredTransactions = useMemo(() => {
-		let filtered = transactions.filter((t) => {
+		const normalizedQuery = searchQuery.trim().toLowerCase();
+
+		return transactions.filter((transaction) => {
+			if (
+				currentView === "review" &&
+				!transaction.needs_review &&
+				transaction.category !== "Uncategorized"
+			) {
+				return false;
+			}
+
+			if (!normalizedQuery) {
+				return true;
+			}
+
+			const merchant = transaction.merchant?.toLowerCase() ?? "";
+
+			const category = transaction.category?.toLowerCase() ?? "";
+			// Search account
+			// const account = transaction.account?.toLowerCase() ?? "";
+
 			return (
-				!searchQuery ||
-				t.merchant?.toLowerCase().includes(searchQuery.toLowerCase())
+				merchant.includes(normalizedQuery) || category.includes(normalizedQuery)
+				// || account.includes(normalizedQuery)
 			);
 		});
-
-		if (currentView === "review") {
-			filtered = filtered.filter((t) => {
-				return t.needs_review || t.category === "Uncategorized";
-			});
-		}
-
-		// Return ONLY the filtered data. Let the DataTable handle the sorting!
-		return filtered;
 	}, [transactions, searchQuery, currentView]);
 
+	// Summary statistics for the complete transaction list
 	const summaryStats = useMemo(() => {
 		let largestTransaction = 0;
 		let largestExpense = 0;
-		transactions.forEach((t) => {
-			if (Math.abs(t.amount) > largestTransaction) {
-				largestTransaction = Math.abs(t.amount);
+
+		for (let index = 0; index < transactions.length; index++) {
+			const transaction = transactions[index];
+
+			const absoluteAmount = Math.abs(transaction.amount);
+
+			if (absoluteAmount > largestTransaction) {
+				largestTransaction = absoluteAmount;
 			}
-			if (t.amount < 0 && Math.abs(t.amount) > largestExpense) {
-				largestExpense = Math.abs(t.amount);
+
+			if (transaction.amount < 0 && absoluteAmount > largestExpense) {
+				largestExpense = absoluteAmount;
 			}
-		});
+		}
+
 		return {
 			total: transactions.length,
 			largestTx: largestTransaction,
@@ -192,62 +210,105 @@ export default function TransactionsPage() {
 		};
 	}, [transactions]);
 
-	// --- Handlers ---
-	const handleSelectRow = useCallback((id: string, e: React.MouseEvent) => {
-		e.stopPropagation();
-		setSelectedIds((prev) => {
-			if (prev.includes(id)) {
-				return prev.filter((i) => {
-					return i !== id;
+	// Build category name -> UUID lookup
+	const subcategoryIdByName = useMemo(() => {
+		const lookup = new Map<string, string>();
+
+		/*
+		 * Add system categories first.
+		 * In the event of bad duplicate data,
+		 * the system category keeps priority.
+		 */
+		for (let index = 0; index < customCategories.length; index++) {
+			const category = customCategories[index];
+
+			if (!category.is_system) {
+				continue;
+			}
+
+			const key = normalizeCategoryName(category.name);
+
+			lookup.set(key, category.id);
+		}
+
+		// Add user-created categories second.
+		for (let index = 0; index < customCategories.length; index++) {
+			const category = customCategories[index];
+
+			if (category.is_system) {
+				continue;
+			}
+
+			const key = normalizeCategoryName(category.name);
+
+			const existingId = lookup.get(key);
+
+			if (existingId) {
+				console.warn(`Duplicate category name detected: "${category.name}".`);
+
+				continue;
+			}
+
+			lookup.set(key, category.id);
+		}
+
+		return lookup;
+	}, [customCategories]);
+
+	const getSubcategoryId = useCallback(
+		(categoryName: string): string | undefined => {
+			return subcategoryIdByName.get(normalizeCategoryName(categoryName));
+		},
+		[subcategoryIdByName],
+	);
+
+	// Row selection
+	const handleSelectRow = useCallback((id: string, event: React.MouseEvent) => {
+		event.stopPropagation();
+
+		setSelectedIds((previousSelectedIds) => {
+			if (previousSelectedIds.includes(id)) {
+				return previousSelectedIds.filter((selectedId) => {
+					return selectedId !== id;
 				});
 			}
-			return [...prev, id];
+
+			return [...previousSelectedIds, id];
 		});
 	}, []);
 
-	const handleBulkDelete = async () => {
-		const snapshotBackup = transactions.filter((t) => {
-			return selectedIds.includes(t.id);
-		});
-		await bulkDeleteTransactions(selectedIds);
-		setDeleteToast({ count: selectedIds.length, snapshot: snapshotBackup });
-		setSelectedIds([]);
-		setShowBulkDeleteConfirm(false);
-	};
-
+	// Update only the category field
 	const handleCategoryChange = useCallback(
 		(id: string, newCategory: string) => {
-			const transaction = transactions.find((t) => {
-				return t.id === id;
+			void updateTransaction(id, {
+				category: newCategory,
 			});
-
-			if (transaction) {
-				updateTransaction(transaction.id, {
-					...transaction,
-					category: newCategory,
-				});
-			}
 		},
-		[transactions, updateTransaction],
+		[updateTransaction],
 	);
 
+	// Create a blank transaction for the editor
 	const handleAddTransaction = useCallback(() => {
+		const currentDate = new Date().toISOString().split("T")[0];
+
 		setSelectedTransaction({
 			id: crypto.randomUUID(),
 			merchant: "",
 			amount: 0,
 			category: "Uncategorized",
-			date: new Date().toISOString().split("T")[0],
+			date: currentDate,
 			account: "",
 			needs_review: false,
 			needs_subcat: false,
 		});
 	}, []);
 
-	// 1. Calculate if ANY filter, sort, or view modification is active
-	const isSortModified =
-		sorting.length > 0 &&
-		(sorting[0].id !== "date" || sorting[0].desc !== true);
+	const isDefaultSorting =
+		sorting.length === 1 &&
+		sorting[0]?.id === "date" &&
+		sorting[0]?.desc === true;
+
+	const isSortModified = !isDefaultSorting;
 
 	const isColumnsModified = Object.values(columnVisibility).some(
 		(isVisible) => {
@@ -256,50 +317,18 @@ export default function TransactionsPage() {
 	);
 
 	const hasActiveFilters =
-		!!searchQuery ||
+		searchQuery.trim().length > 0 ||
 		isSortModified ||
 		isColumnsModified ||
 		currentView !== "all";
 
-	// 2. Create the handler to wipe everything back to default
-	const handleClearAll = () => {
+	const handleClearAll = useCallback(() => {
 		setSearchQuery("");
 		setCurrentView("all");
-		setSorting([{ id: "date", desc: true }]);
+		setSorting(DEFAULT_SORTING);
 		setColumnVisibility({});
-	};
+	}, []);
 
-	const customCategories = useBudgetStore((state) => state.customCategories);
-
-	const fetchCustomCategories = useBudgetStore(
-		(state) => state.fetchCustomCategories,
-	);
-
-	useEffect(() => {
-		void fetchCustomCategories();
-	}, [fetchCustomCategories]);
-
-	const subcategoryIdByName = useMemo(() => {
-		const lookup = new Map<string, string>();
-
-		for (const category of customCategories) {
-			const nameKey = category.name.trim().toLowerCase();
-
-			lookup.set(nameKey, category.id);
-		}
-
-		return lookup;
-	}, [customCategories]);
-
-	const getSubcategoryId = useCallback(
-		(name: string): string | undefined => {
-			return subcategoryIdByName.get(name.trim().toLowerCase());
-		},
-		[subcategoryIdByName],
-	);
-
-
-	// --- Render Guards ---
 	if (!isMounted) {
 		return <div className="h-screen bg-gray-50 dark:bg-[#121212]" />;
 	}
@@ -317,9 +346,7 @@ export default function TransactionsPage() {
 				onClearAll={handleClearAll}
 			/>
 
-			{/* MAIN CONTENT AREA */}
 			<div className="flex flex-1 min-h-0 overflow-hidden p-6 gap-6">
-				{/* LEFT CARD (Table + Toolbar) */}
 				<div className="flex-1 flex flex-col min-w-0 bg-white dark:bg-[#191919] border border-gray-200 dark:border-white/5 rounded-2xl shadow-sm overflow-hidden transition-colors duration-200">
 					<TableToolbar
 						isEditMode={isEditMode}
@@ -335,7 +362,6 @@ export default function TransactionsPage() {
 						setColumnVisibility={setColumnVisibility}
 					/>
 
-					{/* MAIN TABLE */}
 					<div className="flex-1 overflow-hidden relative">
 						<DataTable
 							transactions={filteredTransactions}
@@ -355,21 +381,26 @@ export default function TransactionsPage() {
 				<SummarySidebar isVisible={isSummaryVisible} stats={summaryStats} />
 			</div>
 
-			{/* Modals & Popovers (Kept at the Page level for stacking context) */}
 			{showUploader && (
 				<div className="fixed inset-0 z-100 flex items-center justify-center p-4">
-					<div
+					<button
+						type="button"
+						aria-label="Close CSV uploader"
 						className="absolute inset-0 bg-black/60 backdrop-blur-md transform-gpu"
 						onClick={() => {
 							setShowUploader(false);
 						}}
 					/>
+
 					<div className="relative bg-white dark:bg-[#121212] border border-gray-200 dark:border-white/10 w-full max-w-xl rounded-3xl shadow-2xl overflow-hidden">
 						<div className="p-6 border-b border-gray-200 dark:border-white/5 flex justify-between items-center">
 							<h3 className="text-lg font-black tracking-tight text-gray-900 dark:text-white">
 								Import CSV Statement
 							</h3>
+
 							<button
+								type="button"
+								aria-label="Close CSV uploader"
 								onClick={() => {
 									setShowUploader(false);
 								}}
@@ -378,6 +409,7 @@ export default function TransactionsPage() {
 								<X size={20} />
 							</button>
 						</div>
+
 						<div className="p-8">
 							<CsvUploader
 								onComplete={() => {
@@ -388,26 +420,22 @@ export default function TransactionsPage() {
 					</div>
 				</div>
 			)}
-			{showClearModal && (
-				<ClearDataModal
-					isOpen={showClearModal}
-					onClose={() => {
-						setShowClearModal(false);
-					}}
-				/>
-			)}
 
 			{selectedTransaction && (
 				<EditTransactionModal
 					key={selectedTransaction.id}
 					transaction={selectedTransaction}
-					isOpen={!!selectedTransaction}
+					isOpen={selectedTransaction !== null}
 					onClose={() => {
 						setSelectedTransaction(null);
 					}}
 					onUpdate={updateTransaction}
 					onRuleSaved={(count, snapshot) => {
-						setToast({ count, snapshot });
+						setToast({
+							count,
+							snapshot,
+						});
+
 						setSelectedTransaction(null);
 					}}
 				/>
@@ -415,57 +443,17 @@ export default function TransactionsPage() {
 
 			{toast && (
 				<UndoToast
-					show={!!toast}
+					show={true}
 					message={`Updated ${toast.count} transactions`}
 					onUndo={() => {
 						useBudgetStore.getState().undoBulkUpdate(toast.snapshot);
+
 						setToast(null);
 					}}
 					onClose={() => {
 						setToast(null);
 					}}
 				/>
-			)}
-
-			{showBulkDeleteConfirm && (
-				<div className="fixed inset-0 z-100 flex items-center justify-center p-4">
-					<div
-						className="absolute inset-0 bg-black/60 backdrop-blur-md animate-in fade-in duration-200"
-						onClick={() => {
-							setShowBulkDeleteConfirm(false);
-						}}
-					/>
-					<div className="relative bg-white dark:bg-[#1E1E1E] border border-gray-200 dark:border-white/10 w-full max-w-sm rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-						<div className="p-6 text-center">
-							<div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center mx-auto mb-4">
-								<Trash2 className="text-red-500" size={28} strokeWidth={2.5} />
-							</div>
-							<h3 className="text-xl font-black text-gray-900 dark:text-white mb-2">
-								Delete {selectedIds.length} Transactions?
-							</h3>
-							<p className="text-sm text-gray-500 dark:text-gray-400 mb-8 px-2">
-								This action cannot be undone. These transactions will be
-								permanently removed from your budget.
-							</p>
-							<div className="flex gap-3">
-								<button
-									onClick={() => {
-										setShowBulkDeleteConfirm(false);
-									}}
-									className="flex-1 py-3 px-4 bg-gray-100 hover:bg-gray-200 dark:bg-white/5 dark:hover:bg-white/10 text-gray-900 dark:text-white font-bold rounded-xl transition-all"
-								>
-									Cancel
-								</button>
-								<button
-									onClick={handleBulkDelete}
-									className="flex-1 py-3 px-4 bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl transition-all shadow-lg shadow-red-600/20"
-								>
-									Yes, Delete
-								</button>
-							</div>
-						</div>
-					</div>
-				</div>
 			)}
 		</div>
 	);
