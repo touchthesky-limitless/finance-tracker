@@ -1,11 +1,12 @@
+import { CategoryId } from "@/config/categoryDictionary";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { EllipsisVertical, SquarePen, Trash2 } from "lucide-react";
 import React from "react";
 
 interface CardActionsMenuProps {
-	categoryId: string;
-	onEdit: (id: string) => void;
-	onDelete: (id: string) => void;
+	categoryId: CategoryId;
+	onEdit: (id: CategoryId) => void;
+	onDelete: (id: CategoryId) => void;
 }
 
 export function CardActionsMenu({

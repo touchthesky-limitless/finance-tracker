@@ -329,26 +329,182 @@ export function DataTable({
 				},
 			}),
 
+			// columnHelper.accessor("account", {
+			// 	size: 300,
+
+			// 	cell: (info) => {
+			// 		const transaction = info.row.original;
+
+			// 		const accountName =
+			// 			transaction.account || "Unknown account";
+
+			// 		const accountId =
+			// 			transaction.account_id;
+
+			// 		const canNavigate =
+			// 			Boolean(accountId);
+
+			// 		return (
+			// 			<div
+			// 				onClick={(event) => {
+			// 					event.stopPropagation();
+			// 				}}
+			// 				className="group flex items-center gap-1.5 w-full h-full pr-2"
+			// 			>
+			// 				<div className="flex items-center gap-2 overflow-hidden min-w-0 flex-1">
+			// 					<div
+			// 						aria-hidden="true"
+			// 						className="w-5 h-5 rounded-full border-4 border-[#2563EB] bg-white shrink-0"
+			// 					/>
+
+			// 					<span
+			// 						className="text-gray-700 dark:text-gray-200 text-[15px] truncate"
+			// 						title={accountName}
+			// 					>
+			// 						{accountName}
+			// 					</span>
+			// 				</div>
+
+			// 				<button
+			// 					type="button"
+			// 					disabled={!canNavigate}
+			// 					onClick={(event) => {
+			// 						event.stopPropagation();
+
+			// 						if (!accountId) {
+			// 							return;
+			// 						}
+
+			// 						router.push(
+			// 							`/accounts/details/${accountId}`,
+			// 						);
+			// 					}}
+			// 					aria-label={`View ${accountName} account`}
+			// 					title={
+			// 						canNavigate
+			// 							? "View Account"
+			// 							: "Account ID unavailable"
+			// 					}
+			// 					className={`flex items-center justify-center w-8 h-8 rounded-lg border border-transparent opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 group-hover:border-gray-300 dark:group-hover:border-white/20 hover:bg-gray-100 dark:hover:bg-white/5 transition-all shrink-0 ${
+			// 						canNavigate
+			// 							? "cursor-pointer"
+			// 							: "cursor-not-allowed"
+			// 					}`}
+			// 				>
+			// 					<ArrowRight
+			// 						size={16}
+			// 						strokeWidth={2}
+			// 						aria-hidden="true"
+			// 						className={
+			// 							canNavigate
+			// 								? "text-gray-600 dark:text-gray-400"
+			// 								: "text-gray-300 dark:text-gray-600"
+			// 						}
+			// 					/>
+			// 				</button>
+			// 			</div>
+			// 		);
+			// 	},
+			// }),
+
 			columnHelper.accessor("account", {
 				size: 300,
 
 				cell: (info) => {
-					const account = String(info.getValue() || "Unknown account");
+					const transaction = info.row.original;
+
+					const accountName = transaction.account?.trim() || "Unknown account";
+
+					const accountId = transaction.account_id;
+
+					const canNavigate = Boolean(accountId);
 
 					return (
-						<div className="flex items-center gap-2 overflow-hidden min-w-0">
-							<div
-								aria-hidden="true"
-								className="w-5 h-5 rounded-full border-4 border-[#2563EB] bg-white shrink-0"
-							/>
+						<button
+							type="button"
+							disabled={!canNavigate}
+							onClick={(event) => {
+								event.stopPropagation();
 
+								if (!accountId) {
+									return;
+								}
+
+								router.push(
+									`/accounts/details/${encodeURIComponent(accountId)}`,
+								);
+							}}
+							aria-label={`View ${accountName} account`}
+							title={
+								canNavigate ? `View ${accountName}` : "Account ID unavailable"
+							}
+							// flex items-center justify-between w-full px-2 py-1
+							// rounded-lg border border-transparent group-hover:border-gray-300
+							// dark:group-hover:border-white/20 transition-colors bg-transparent cursor-pointer
+							className={`
+		group 
+		flex w-full min-w-0
+		items-center gap-3
+		rounded-lg
+		border border-transparent
+		px-2 py-1 text-left
+		bg-transparent
+		group-hover:border-gray-300
+		dark:group-hover:border-white/20
+		transition-colors
+		focus-visible:outline-none
+		focus-visible:border-blue-500/60
+		focus-visible:ring-2
+		focus-visible:ring-blue-500/20
+		${
+			canNavigate
+				? `
+					cursor-pointer
+					hover:border-gray-300
+					hover:bg-gray-50
+					dark:hover:border-white/20
+					dark:hover:bg-white/4
+				`
+				: `
+					cursor-not-allowed
+					opacity-50
+				`
+		}
+	`}
+						>
 							<span
-								className="text-gray-700 dark:text-gray-200 text-[15px] truncate"
-								title={account}
+								className="
+			min-w-0 flex-1 truncate
+			text-[15px] font-semibold
+			text-gray-900 dark:text-white
+		"
+								title={accountName}
 							>
-								{account}
+								{accountName}
 							</span>
-						</div>
+
+							<ArrowRight
+								size={16}
+								strokeWidth={2}
+								aria-hidden="true"
+								className={
+									accountId
+										? `
+				shrink-0
+				opacity-0
+				text-gray-600 dark:text-gray-400
+				transition-opacity duration-150
+				group-hover:opacity-100
+				group-focus-visible:opacity-100
+			`
+										: `
+				shrink-0
+				opacity-0
+				text-gray-300 dark:text-gray-600
+			`
+								}
+							/>
+						</button>
 					);
 				},
 			}),
@@ -418,15 +574,30 @@ export function DataTable({
 		onMarkReviewed,
 		onSelectRow,
 		getCategoryId,
-		onCategoryChange,
 		isCategoryView,
+		onCategoryChange,
 		navigateToCategory,
+		router,
 		onRowClick,
 	]);
 
+	const uniqueTransactions = useMemo(() => {
+		const seen = new Set<string>();
+
+		return transactions.filter((transaction) => {
+			if (!transaction.id || seen.has(transaction.id)) {
+				return false;
+			}
+
+			seen.add(transaction.id);
+
+			return true;
+		});
+	}, [transactions]);
+
 	// eslint-disable-next-line react-hooks/incompatible-library
 	const table = useReactTable({
-		data: transactions,
+		data: uniqueTransactions,
 		columns,
 
 		getRowId: (transaction) => {

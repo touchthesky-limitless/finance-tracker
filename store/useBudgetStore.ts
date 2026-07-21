@@ -11,7 +11,7 @@ import { createJSONStorage, persist } from "zustand/middleware";
 const supabase = createClient();
 
 const TRANSACTION_COLUMNS =
-	"id, user_id, date, merchant, description, amount, category, account, needs_review, needs_subcat, created_at";
+	"id, user_id, date, merchant, description, amount, category, account_id, account, needs_review, needs_subcat, created_at";
 const CUSTOM_CATEGORY_COLUMNS =
 	"id, user_id, name, parent_name, icon_name, color_key, created_at, is_system";
 const DATABASE_BATCH_SIZE = 100;
@@ -62,7 +62,6 @@ const CATEGORY_BY_ID = new Map(
 );
 
 export interface Transaction {
-	[key: string]: string | number | boolean | string[] | undefined;
 	id: string;
 	date: string;
 	merchant: string;
@@ -70,12 +69,20 @@ export interface Transaction {
 	amount: number;
 	category: string;
 	account: string;
+	account_id?: string | null;
 	needs_review: boolean;
 	needs_subcat: boolean;
 	user_id?: string;
 	created_at?: string;
 	tags?: string[];
 	note?: string;
+}
+
+export interface Account {
+	id: string;
+	user_id: string;
+	name: string;
+	created_at: string;
 }
 
 export type TransactionUpdate = Partial<
@@ -87,10 +94,32 @@ export type TransactionUpdate = Partial<
 		| "amount"
 		| "category"
 		| "account"
+		| "account_id"
 		| "needs_review"
 		| "needs_subcat"
 	>
 >;
+
+interface TransactionFingerprintInput {
+	date: string;
+	merchant: string;
+	amount: number;
+	description?: string | null;
+	account?: string | null;
+	account_id?: string | null;
+}
+
+const getTransactionFingerprint = (
+	transaction: TransactionFingerprintInput,
+): string => {
+	return [
+		transaction.account_id ?? normalize(transaction.account),
+		transaction.date,
+		normalize(transaction.merchant),
+		Number(transaction.amount).toFixed(2),
+		normalize(transaction.description),
+	].join("\u001f");
+};
 
 export interface Rule {
 	keyword: string;
@@ -134,6 +163,7 @@ interface BudgetState {
 	customRates: Record<string, Record<string, number>>;
 	preferredCards: Record<string, string>;
 	activeCategoryIds: CategoryId[];
+	accounts: Account[];
 
 	addActiveCategory: (id: CategoryId) => Promise<void>;
 	removeActiveCategory: (id: CategoryId) => Promise<void>;
@@ -183,6 +213,8 @@ interface BudgetState {
 	getVisibleCategories: () => (typeof CATEGORY_DICTIONARY)[number][];
 	setWalletIds: (ids: string[]) => void;
 	setCustomRates: (rates: Record<string, Record<string, number>>) => void;
+
+	fetchAccounts: (force?: boolean) => Promise<void>;
 }
 
 interface PreparedRule extends Rule {
@@ -218,6 +250,47 @@ const getUserId = async (): Promise<string | null> => {
 	}
 
 	return session?.user.id ?? null;
+};
+
+const getOrCreateAccountId = async (
+	userId: string,
+	accountName: string,
+): Promise<string> => {
+	const name = accountName.trim();
+
+	if (!name) {
+		throw new Error("Account name is required.");
+	}
+
+	const { data: existingAccount, error: selectError } = await supabase
+		.from("accounts")
+		.select("id")
+		.eq("user_id", userId)
+		.eq("name", name)
+		.maybeSingle();
+
+	if (selectError) {
+		throw selectError;
+	}
+
+	if (existingAccount) {
+		return existingAccount.id;
+	}
+
+	const { data: createdAccount, error: insertError } = await supabase
+		.from("accounts")
+		.insert({
+			user_id: userId,
+			name,
+		})
+		.select("id")
+		.single();
+
+	if (insertError) {
+		throw insertError;
+	}
+
+	return createdAccount.id;
 };
 
 const savePreferences = async (
@@ -298,6 +371,25 @@ const splitIntoBatches = <T>(values: T[]): T[][] => {
 	return batches;
 };
 
+const mergeTransactionsById = (
+	incoming: Transaction[],
+	current: Transaction[],
+): Transaction[] => {
+	const result: Transaction[] = [];
+	const seen = new Set<string>();
+
+	for (const transaction of [...incoming, ...current]) {
+		if (!transaction.id || seen.has(transaction.id)) {
+			continue;
+		}
+
+		seen.add(transaction.id);
+		result.push(transaction);
+	}
+
+	return result;
+};
+
 function uniqueCategoryIds(ids: readonly CategoryId[]): CategoryId[] {
 	return Array.from(new Set(ids));
 }
@@ -346,6 +438,7 @@ export const useBudgetStore = create<BudgetState>()(
 			customRates: {},
 			preferredCards: {},
 			activeCategoryIds: [...DEFAULT_CATEGORIES],
+			accounts: [],
 
 			reorderActiveCategories: async (newOrder: CategoryId[]) => {
 				const previous = get().activeCategoryIds;
@@ -544,8 +637,55 @@ export const useBudgetStore = create<BudgetState>()(
 				}
 
 				const rules = prepareRules(get().rules);
-				const rows = newTransactions.map((transaction) => {
+
+				const preparedTransactions = newTransactions.map((transaction) => {
 					const processed = applyRules(transaction, rules);
+
+					const accountName = processed.account?.trim();
+
+					if (!accountName) {
+						throw new Error(
+							"An account must be selected for every transaction.",
+						);
+					}
+
+					return {
+						processed,
+						accountName,
+					};
+				});
+
+				const unresolvedAccountNames = Array.from(
+					new Set(
+						preparedTransactions
+							.filter(({ processed }) => {
+								return !processed.account_id;
+							})
+							.map(({ accountName }) => {
+								return accountName;
+							}),
+					),
+				);
+
+				const accountEntries = await Promise.all(
+					unresolvedAccountNames.map(async (accountName) => {
+						const accountId = await getOrCreateAccountId(userId, accountName);
+
+						return [normalize(accountName), accountId] as const;
+					}),
+				);
+
+				const accountIdByName = new Map(accountEntries);
+
+				const rows = preparedTransactions.map(({ processed, accountName }) => {
+					const accountId =
+						processed.account_id ?? accountIdByName.get(normalize(accountName));
+
+					if (!accountId) {
+						throw new Error(
+							`Could not resolve account ID for "${accountName}".`,
+						);
+					}
 
 					return {
 						user_id: userId,
@@ -554,27 +694,84 @@ export const useBudgetStore = create<BudgetState>()(
 						description: processed.description ?? "",
 						amount: processed.amount,
 						category: processed.category || "Uncategorized",
-						account: processed.account,
+						account: accountName,
+						account_id: accountId,
 						needs_review: processed.needs_review ?? true,
 						needs_subcat: processed.needs_subcat ?? true,
 					};
 				});
 
+				const dates = rows.map((row) => row.date).sort();
+
+				const minDate = dates[0];
+				const maxDate = dates[dates.length - 1];
+
+				const accountIds = Array.from(
+					new Set(rows.map((row) => row.account_id)),
+				);
+
+				const { data: existingRows, error: existingRowsError } = await supabase
+					.from("transactions")
+					.select("date, merchant, description, amount, account, account_id")
+					.eq("user_id", userId)
+					.in("account_id", accountIds)
+					.gte("date", minDate)
+					.lte("date", maxDate);
+
+				if (existingRowsError) {
+					throw existingRowsError;
+				}
+
+				const existingCounts = new Map<string, number>();
+
+				for (const transaction of existingRows ?? []) {
+					const fingerprint = getTransactionFingerprint(transaction);
+
+					existingCounts.set(
+						fingerprint,
+						(existingCounts.get(fingerprint) ?? 0) + 1,
+					);
+				}
+
+				const incomingCounts = new Map<string, number>();
+
+				const rowsToInsert = rows.filter((row) => {
+					const fingerprint = getTransactionFingerprint(row);
+
+					const occurrence = (incomingCounts.get(fingerprint) ?? 0) + 1;
+
+					incomingCounts.set(fingerprint, occurrence);
+
+					const existingOccurrences = existingCounts.get(fingerprint) ?? 0;
+
+					return occurrence > existingOccurrences;
+				});
+
+				if (rowsToInsert.length === 0) {
+					console.info("No new transactions to import.");
+
+					return;
+				}
+
 				const { data, error } = await supabase
 					.from("transactions")
-					.insert(rows)
+					.insert(rowsToInsert)
 					.select(TRANSACTION_COLUMNS);
 
 				if (error) {
 					throw error;
 				}
 
+				const insertedTransactions = (data ?? []) as Transaction[];
+
 				set((state) => ({
-					transactions: [
-						...((data ?? []) as Transaction[]),
-						...state.transactions,
-					],
+					transactions: mergeTransactionsById(
+						insertedTransactions,
+						state.transactions,
+					),
 				}));
+
+				await get().fetchAccounts(true);
 			},
 
 			fetchTransactions: async (force = false) => {
@@ -612,7 +809,10 @@ export const useBudgetStore = create<BudgetState>()(
 					}
 
 					set({
-						transactions: (transactionResponse.data ?? []) as Transaction[],
+						transactions: mergeTransactionsById(
+							(transactionResponse.data ?? []) as Transaction[],
+							[],
+						),
 						rules: (ruleResponse.data ?? []).map((rule) => ({
 							keyword: rule.keyword,
 							category: rule.category,
@@ -1169,6 +1369,40 @@ export const useBudgetStore = create<BudgetState>()(
 			setCustomRates: (customRates) => {
 				set({ customRates: { ...customRates } });
 			},
+
+			fetchAccounts: async (force = false) => {
+				if (!force && get().accounts.length > 0) {
+					return;
+				}
+
+				const userId = await getUserId();
+
+				if (!userId) {
+					set({
+						accounts: [],
+					});
+
+					return;
+				}
+
+				const { data, error } = await supabase
+					.from("accounts")
+					.select("id, user_id, name, created_at")
+					.eq("user_id", userId)
+					.order("name", {
+						ascending: true,
+					});
+
+				if (error) {
+					console.error("Failed to fetch accounts:", error.message);
+
+					return;
+				}
+
+				set({
+					accounts: (data ?? []) as Account[],
+				});
+			},
 		}),
 		{
 			name: "budget-storage",
@@ -1197,6 +1431,7 @@ export const useBudgetStore = create<BudgetState>()(
 					state?.setHasHydrated(true);
 
 					void state?.fetchTransactions(true);
+					void state?.fetchAccounts(true);
 					void state?.fetchActiveCategories();
 					void state?.fetchPreferredCards();
 					void state?.fetchCustomCategories();

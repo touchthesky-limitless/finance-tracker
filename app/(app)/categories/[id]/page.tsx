@@ -62,7 +62,7 @@ export default function CategoryBreakdownPage() {
 
 	const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
 	const [selectedIds, setSelectedIds] = useState<string[]>([]);
-	const [sorting, setSorting] = useState<SortingState>([{ id: "date", desc: true }]);
+	const [sorting] = useState<SortingState>([{ id: "date", desc: true }]);
 
 	// 2. Fetch all categories from your master hook
 	const { allUnifiedCategories } = useUnifiedCategories("Expense", "All");
@@ -143,7 +143,7 @@ return (
                             currentCategory={categoryDetails.name}
                             displayIcon={categoryDetails.icon}
                             displayColorClass={categoryDetails.colorClass}
-                            className="pointer-events-none !p-0 scale-110 origin-left"
+                            className="pointer-events-none p-0! scale-110 origin-left"
                         />
                     </div>
                 </div>
@@ -188,7 +188,7 @@ return (
             */}
             <div className="flex-1 w-full p-6 flex flex-col gap-6 overflow-y-auto min-h-0">
                 {/* --- CHART SECTION --- */}
-                <div className="bg-white dark:bg-[#1C1C1C] rounded-2xl border border-gray-200 dark:border-white/5 p-8 h-[360px] flex flex-col w-full shadow-sm dark:shadow-lg transition-colors shrink-0">
+                <div className="bg-white dark:bg-[#1C1C1C] rounded-2xl border border-gray-200 dark:border-white/5 p-8 h-90 flex flex-col w-full shadow-sm dark:shadow-lg transition-colors shrink-0">
                     <ResponsiveContainer width="100%" height="100%">
                         <BarChart
                             data={chartData}
@@ -257,7 +257,7 @@ return (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start shrink-0">
                     
                     {/* LEFT: Transactions List */}
-                    <div className="lg:col-span-2 bg-white dark:bg-[#1C1C1C] rounded-2xl border border-gray-200 dark:border-white/5 shadow-sm dark:shadow-lg overflow-hidden transition-colors flex flex-col h-[600px]">
+                    <div className="lg:col-span-2 bg-white dark:bg-[#1C1C1C] rounded-2xl border border-gray-200 dark:border-white/5 shadow-sm dark:shadow-lg overflow-hidden transition-colors flex flex-col h-150">
                         <div className="px-6 py-5 border-b border-gray-200 dark:border-white/5 bg-gray-50 dark:bg-[#232323] transition-colors shrink-0">
                             <h3 className="text-lg font-bold text-gray-900 dark:text-white">Transactions</h3>
                         </div>
@@ -355,7 +355,8 @@ return (
                         setSelectedTransaction(null);
                     }}
                     onUpdate={updateTransaction}
-                    onRuleSaved={(count, snapshot) => {
+                    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                    onRuleSaved={(_count, _snapshot) => {
                         // Optional: If you want to add the UndoToast here later, you can wire it up.
                         // For now, just close the modal.
                         setSelectedTransaction(null);

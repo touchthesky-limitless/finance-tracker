@@ -59,12 +59,32 @@ export default function EditTransactionModal({
 	const [searchTerm, setSearchTerm] = useState("");
 
 	const [ruleToEdit, setRuleToEdit] = useState<Rule | null>(null);
-
+const [
+	saveError,
+	setSaveError,
+] = useState<string | null>(
+	null,
+);
 	const transactions = useBudgetStore((state) => state.transactions);
 	const rules = useBudgetStore((state) => state.rules);
 	const deleteRule = useBudgetStore((state) => state.deleteRule);
 	const addTransactions = useBudgetStore((state) => state.addTransactions);
 	const updateTransaction = useBudgetStore((state) => state.updateTransaction);
+	const accounts = useBudgetStore(
+	(state) => state.accounts,
+);
+
+const fetchAccounts = useBudgetStore(
+	(state) => state.fetchAccounts,
+);
+
+useEffect(() => {
+	if (!isOpen) {
+		return;
+	}
+
+	void fetchAccounts();
+}, [isOpen, fetchAccounts]);
 
 	// This state holds the raw string (like "22.") so the decimal doesn't disappear
 	const [displayAmount, setDisplayAmount] = useState(() =>
@@ -87,21 +107,67 @@ export default function EditTransactionModal({
 
 	if (!isOpen || !transaction) return null;
 
-	const handleSave = () => {
-		const isExisting = transactions.some((t) => t.id === editedData.id);
-		const snapshot = [...transactions];
+const handleSave = async () => {
+	setSaveError(null);
 
+	if (!editedData.account_id) {
+		setSaveError(
+			"Please select an account.",
+		);
+
+		return;
+	}
+
+	if (!editedData.merchant.trim()) {
+		setSaveError(
+			"Please enter a merchant name.",
+		);
+
+		return;
+	}
+
+	const isExisting =
+		transactions.some((item) => {
+			return (
+				item.id === editedData.id
+			);
+		});
+
+	const snapshot = [
+		...transactions,
+	];
+
+	try {
 		if (isExisting) {
-			updateTransaction(editedData.id, editedData);
+			await updateTransaction(
+				editedData.id,
+				editedData,
+			);
 		} else {
-			addTransactions([editedData]);
+			await addTransactions([
+				editedData,
+			]);
 		}
 
 		onClose();
-		if (onRuleSaved) {
-			onRuleSaved(1, snapshot);
-		}
-	};
+
+		onRuleSaved?.(
+			1,
+			snapshot,
+		);
+	} catch (error) {
+		console.error(
+			"Failed to save transaction:",
+			error,
+		);
+
+		setSaveError(
+			error instanceof Error
+				? error.message
+				: "Failed to save transaction.",
+		);
+	}
+};
 
 	return createPortal(
 		<div className="fixed inset-0 z-100 flex items-center justify-center p-4 bg-[#F8F9FB] dark:bg-black/90 backdrop-blur-sm transform-gpu animate-in fade-in duration-200">
@@ -463,22 +529,54 @@ export default function EditTransactionModal({
 												className="absolute left-3 md:left-4 top-1/2 -translate-y-1/2 text-gray-500"
 											/>
 											<select
-												className="w-full bg-[#F8F9FB] dark:bg-[#0d0d0d] border border-gray-200 dark:border-gray-800 rounded-xl py-2.5 md:py-3 pl-10 md:pl-12 pr-4 text-sm text-gray-900 dark:text-gray-300 outline-none focus:border-orange-500/50 appearance-none transition-all"
-												value={editedData.account}
-												onChange={(e) =>
-													setEditedData({
-														...editedData,
-														account: e.target.value,
-													})
-												}
-											>
-												<option value="" disabled>
-													Select Account
-												</option>
-												<option value="Chase Checking">Chase Checking</option>
-												<option value="Amex Gold">Amex Gold</option>
-												<option value="Apple Card">Apple Card</option>
-											</select>
+	className="w-full bg-[#F8F9FB] dark:bg-[#0d0d0d] border border-gray-200 dark:border-gray-800 rounded-xl py-2.5 md:py-3 pl-10 md:pl-12 pr-4 text-sm text-gray-900 dark:text-gray-300 outline-none focus:border-orange-500/50 appearance-none transition-all"
+	value={
+		editedData.account_id ??
+		""
+	}
+	onChange={(event) => {
+		const selectedAccount =
+			accounts.find((account) => {
+				return (
+					account.id ===
+					event.target.value
+				);
+			});
+
+		if (!selectedAccount) {
+			setEditedData({
+				...editedData,
+				account_id: null,
+				account: "",
+			});
+
+			return;
+		}
+
+		setEditedData({
+			...editedData,
+			account_id:
+				selectedAccount.id,
+			account:
+				selectedAccount.name,
+		});
+	}}
+>
+	<option value="" disabled>
+		Select Account
+	</option>
+
+	{accounts.map((account) => {
+		return (
+			<option
+				key={account.id}
+				value={account.id}
+			>
+				{account.name}
+			</option>
+		);
+	})}
+</select>
 										</div>
 									</div>
 								</div>
@@ -515,6 +613,15 @@ export default function EditTransactionModal({
 						</div>
 					)}
 
+					{saveError && (
+	<p
+		role="alert"
+		className="mr-auto text-sm text-red-500"
+	>
+		{saveError}
+	</p>
+)}
+
 					{/* --- FOOTER --- */}
 					<div className="p-4 md:p-6 border-t border-gray-100 dark:border-gray-800 bg-[#F8F9FB] dark:bg-[#0d0d0d] flex justify-end gap-2 md:gap-3 shrink-0">
 						<button
@@ -524,12 +631,15 @@ export default function EditTransactionModal({
 							Cancel
 						</button>
 						<button
-							type="button"
-							onClick={handleSave}
-							className="px-6 md:px-10 py-2 md:py-2.5 bg-orange-600 hover:bg-orange-500 text-white text-xs md:text-sm font-black rounded-xl transition-all shadow-lg shadow-orange-600/20 active:scale-95"
-						>
-							{isNew ? "Add" : "Save"}
-						</button>
+	type="button"
+	onClick={() => {
+		void handleSave();
+	}}
+	disabled={!editedData.account_id}
+	className="px-6 md:px-10 py-2 md:py-2.5 bg-orange-600 hover:bg-orange-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs md:text-sm font-black rounded-xl transition-all shadow-lg shadow-orange-600/20 active:scale-95"
+>
+	{isNew ? "Add" : "Save"}
+</button>
 					</div>
 				</div>
 

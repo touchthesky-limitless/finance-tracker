@@ -73,7 +73,7 @@ export default function WalletRewardsPage() {
 
 	// Modal Data States
 	const [editingCategory, setEditingCategory] = useState<string | null>(null);
-	const [deletingCategory, setDeletingCategory] = useState<string | null>(null);
+	const [deletingCategory, setDeletingCategory] = useState<CategoryId | null>(null);
 	const [activeStackId, setActiveStackId] = useState<string | null>(null);
 
 	// Derived Data
@@ -205,8 +205,8 @@ export default function WalletRewardsPage() {
 		const { active, over } = event;
 
 		if (over && active.id !== over.id) {
-			const oldIndex = activeCategoryIds.indexOf(active.id as string);
-			const newIndex = activeCategoryIds.indexOf(over.id as string);
+			const oldIndex = activeCategoryIds.indexOf(active.id as CategoryId);
+			const newIndex = activeCategoryIds.indexOf(over.id as CategoryId);
 
 			// This MUST update the store, which the persist middleware then saves
 			const newOrder = arrayMove(activeCategoryIds, oldIndex, newIndex);
