@@ -54,7 +54,7 @@ interface DataTableProps {
 
 	sorting: SortingState;
 
-	onCategoryChange?: (id: string, newCategory: string) => void;
+	onCategoryChange?: (id: string, newCategory: string) => Promise<void> | void;
 
 	isCategoryView?: boolean;
 
@@ -325,7 +325,7 @@ export function DataTable({
 											return;
 										}
 
-										onCategoryChange?.(info.row.original.id, newCategory);
+										void onCategoryChange?.(info.row.original.id, newCategory);
 									}}
 								/>
 							</div>

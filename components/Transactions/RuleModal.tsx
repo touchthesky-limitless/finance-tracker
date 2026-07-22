@@ -29,6 +29,7 @@ import {
 export interface RuleModalSeed {
 	sourceTransaction?: Transaction | null;
 	renameMerchant?: Pick<Merchant, "id" | "name"> | null;
+	updateCategory?: string | null;
 }
 
 interface RuleModalSaveOptions {
@@ -212,57 +213,84 @@ function createDraft(
 
 	const source = seed?.sourceTransaction ?? null;
 	const renamedMerchant = seed?.renameMerchant ?? null;
+	const requestedCategory = seed?.updateCategory?.trim() ?? "";
+
 	const originalStatement = source ? getOriginalStatement(source) : "";
+
 	const sourceMerchant = source?.merchant?.trim() ?? "";
+
 	const sourceCategory = source?.category?.trim() ?? "";
+
+	const isMerchantRename = Boolean(renamedMerchant);
+	const isCategoryUpdate = Boolean(requestedCategory);
 
 	return {
 		id: createId(),
-		name: renamedMerchant
+
+		name: isMerchantRename
 			? `Rename ${originalStatement || sourceMerchant}`
-			: sourceMerchant
-				? `${sourceMerchant} rule`
-				: "New transaction rule",
+			: isCategoryUpdate
+				? `Categorize ${sourceMerchant} as ${requestedCategory}`
+				: sourceMerchant
+					? `${sourceMerchant} rule`
+					: "New transaction rule",
+
 		originalStatement: {
-			enabled: Boolean(renamedMerchant && originalStatement),
+			enabled: Boolean(isMerchantRename && originalStatement),
 			operator: "contains",
-			value: renamedMerchant ? originalStatement : "",
+			value: isMerchantRename ? originalStatement : "",
 		},
+
 		merchantName: {
-			enabled: !renamedMerchant,
+			enabled: Boolean(!isMerchantRename && sourceMerchant),
 			operator: "contains",
-			value: renamedMerchant ? "" : sourceMerchant,
+			value: !isMerchantRename ? sourceMerchant : "",
 		},
+
 		amount: {
 			enabled: false,
-			direction: source?.amount && source.amount >= 0 ? "credit" : "debit",
+			direction:
+				source?.amount !== undefined && source.amount >= 0 ? "credit" : "debit",
 			operator: "greater_than",
 			value: "",
 		},
+
 		categories: {
 			enabled: false,
 			values: [],
 		},
+
 		accounts: {
 			enabled: false,
 			values: [],
 		},
+
 		renameMerchant: {
-			enabled: Boolean(renamedMerchant),
+			enabled: isMerchantRename,
 			merchantId: renamedMerchant?.id ?? "",
 			name: renamedMerchant?.name ?? "",
 		},
+
 		updateCategory: {
-			enabled: !renamedMerchant && Boolean(sourceCategory),
-			value: renamedMerchant ? "" : sourceCategory,
+			enabled: Boolean(
+				!isMerchantRename && (requestedCategory || sourceCategory),
+			),
+			value: isCategoryUpdate
+				? requestedCategory
+				: !isMerchantRename
+					? sourceCategory
+					: "",
 		},
+
 		addTags: {
 			enabled: false,
 			values: [],
 		},
+
 		hideTransaction: {
 			enabled: false,
 		},
+
 		reviewStatus: {
 			enabled: false,
 			value: "needs_review",
@@ -336,7 +364,10 @@ function validateDraft(draft: RuleDraft): ValidationErrors {
 		errors.actions = "Turn on at least one update.";
 	}
 
-	if (draft.originalStatement.enabled && !draft.originalStatement.value.trim()) {
+	if (
+		draft.originalStatement.enabled &&
+		!draft.originalStatement.value.trim()
+	) {
 		errors.originalStatement = "Original statement value is required.";
 	}
 
@@ -392,31 +423,16 @@ export function RuleModal({
 	onSave,
 	onDelete,
 }: RuleModalProps) {
-	const [tab, setTab] = useState<RuleModalTab>("settings");
-	const [draft, setDraft] = useState<RuleDraft>(() => {
+	const [draft, setDraft] = useState(() => {
 		return createDraft(initialRule, seed);
 	});
+	const [tab, setTab] = useState<RuleModalTab>("settings");
 	const [applyToExisting, setApplyToExisting] = useState(false);
 	const [attemptedSave, setAttemptedSave] = useState(false);
 	const [isSaving, setIsSaving] = useState(false);
 	const [isDeleting, setIsDeleting] = useState(false);
 	const [deleteArmed, setDeleteArmed] = useState(false);
 	const [saveError, setSaveError] = useState<string | null>(null);
-
-	useEffect(() => {
-		if (!isOpen) {
-			return;
-		}
-
-		setDraft(createDraft(initialRule, seed));
-		setTab("settings");
-		setApplyToExisting(false);
-		setAttemptedSave(false);
-		setIsSaving(false);
-		setIsDeleting(false);
-		setDeleteArmed(false);
-		setSaveError(null);
-	}, [isOpen, initialRule, seed]);
 
 	useEffect(() => {
 		if (!isOpen) {
@@ -660,7 +676,9 @@ export function RuleModal({
 												},
 											}));
 										}}
-										error={attemptedSave ? validation.originalStatement : undefined}
+										error={
+											attemptedSave ? validation.originalStatement : undefined
+										}
 									>
 										<div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(150px,0.9fr)_minmax(0,1.6fr)]">
 											<TextOperatorSelect
@@ -688,7 +706,11 @@ export function RuleModal({
 													}));
 												}}
 												placeholder="Original statement…"
-												className={fieldClass(Boolean(attemptedSave && validation.originalStatement))}
+												className={fieldClass(
+													Boolean(
+														attemptedSave && validation.originalStatement,
+													),
+												)}
 											/>
 										</div>
 									</RuleCard>
@@ -733,7 +755,9 @@ export function RuleModal({
 													}));
 												}}
 												placeholder="Merchant name…"
-												className={fieldClass(Boolean(attemptedSave && validation.merchantName))}
+												className={fieldClass(
+													Boolean(attemptedSave && validation.merchantName),
+												)}
 											/>
 										</div>
 									</RuleCard>
@@ -802,7 +826,10 @@ export function RuleModal({
 												inputMode="decimal"
 												value={draft.amount.value}
 												onChange={(event) => {
-													const value = event.target.value.replace(/[^0-9.]/g, "");
+													const value = event.target.value.replace(
+														/[^0-9.]/g,
+														"",
+													);
 													setDraft((current) => ({
 														...current,
 														amount: { ...current.amount, value },
@@ -886,7 +913,9 @@ export function RuleModal({
 												},
 											}));
 										}}
-										error={attemptedSave ? validation.renameMerchant : undefined}
+										error={
+											attemptedSave ? validation.renameMerchant : undefined
+										}
 									>
 										<SelectField
 											value={draft.renameMerchant.merchantId}
@@ -905,7 +934,9 @@ export function RuleModal({
 											}}
 											options={merchantOptions}
 											placeholder="Rename to…"
-											error={Boolean(attemptedSave && validation.renameMerchant)}
+											error={Boolean(
+												attemptedSave && validation.renameMerchant,
+											)}
 										/>
 									</RuleCard>
 
@@ -921,7 +952,9 @@ export function RuleModal({
 												},
 											}));
 										}}
-										error={attemptedSave ? validation.updateCategory : undefined}
+										error={
+											attemptedSave ? validation.updateCategory : undefined
+										}
 									>
 										<SelectField
 											value={draft.updateCategory.value}
@@ -936,7 +969,9 @@ export function RuleModal({
 											}}
 											options={categoryOptions}
 											placeholder="Change category to…"
-											error={Boolean(attemptedSave && validation.updateCategory)}
+											error={Boolean(
+												attemptedSave && validation.updateCategory,
+											)}
 										/>
 									</RuleCard>
 
@@ -1018,7 +1053,9 @@ export function RuleModal({
 					<PreviewPanel
 						transactions={matchingTransactions}
 						rule={rule}
-						accountNameById={new Map(accounts.map((account) => [account.id, account.name]))}
+						accountNameById={
+							new Map(accounts.map((account) => [account.id, account.name]))
+						}
 					/>
 				)}
 
@@ -1290,7 +1327,9 @@ function MultiSelectField({
 }: MultiSelectFieldProps) {
 	const selectedSet = new Set(values);
 	const available = options.filter((option) => !selectedSet.has(option.value));
-	const labelByValue = new Map(options.map((option) => [option.value, option.label]));
+	const labelByValue = new Map(
+		options.map((option) => [option.value, option.label]),
+	);
 
 	return (
 		<div className="rounded-xl border border-gray-200 bg-white p-2 dark:border-white/10 dark:bg-[#1f1f1e]">
@@ -1333,7 +1372,9 @@ function MultiSelectField({
 					}}
 					className="h-9 w-full appearance-none rounded-lg bg-transparent pl-8 pr-8 text-sm text-gray-600 outline-none dark:text-gray-300"
 				>
-					<option value="">{available.length ? placeholder : "No more options"}</option>
+					<option value="">
+						{available.length ? placeholder : "No more options"}
+					</option>
 					{available.map((option) => (
 						<option key={option.value} value={option.value}>
 							{option.label}
@@ -1387,7 +1428,8 @@ function PreviewPanel({
 						</div>
 						<h3 className="mt-4 font-semibold">No matching transactions yet</h3>
 						<p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-							Adjust the criteria to preview which transactions this rule will update.
+							Adjust the criteria to preview which transactions this rule will
+							update.
 						</p>
 					</div>
 				</div>
@@ -1407,13 +1449,17 @@ function PreviewPanel({
 							>
 								<div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
 									<div className="min-w-0">
-										<p className="truncate font-semibold">{transaction.merchant}</p>
+										<p className="truncate font-semibold">
+											{transaction.merchant}
+										</p>
 										<p className="mt-0.5 truncate text-xs text-gray-500 dark:text-gray-400">
-											{transaction.date} · {accountName || "No account"} · {transaction.category || "Uncategorized"}
+											{transaction.date} · {accountName || "No account"} ·{" "}
+											{transaction.category || "Uncategorized"}
 										</p>
 									</div>
 									<p className="shrink-0 font-semibold tabular-nums">
-										{transaction.amount < 0 ? "−" : "+"}${Math.abs(transaction.amount).toFixed(2)}
+										{transaction.amount < 0 ? "−" : "+"}$
+										{Math.abs(transaction.amount).toFixed(2)}
 									</p>
 								</div>
 

@@ -116,15 +116,15 @@ export default function TransactionsPage() {
 	const customTags = useBudgetStore((state) => state.customTags);
 
 	const saveRule = useBudgetStore((state) => state.saveRule);
-const deleteRule = useBudgetStore((state) => state.deleteRule);
+	const deleteRule = useBudgetStore((state) => state.deleteRule);
 
 	const confirmedRecurringMerchants = useBudgetStore(
 		(state) => state.confirmedRecurringMerchants,
 	);
 
 	const merchants = useBudgetStore((state) => {
-	return state.merchants;
-});
+		return state.merchants;
+	});
 
 	// Page state
 	const [searchQuery, setSearchQuery] = useState("");
@@ -160,15 +160,25 @@ const deleteRule = useBudgetStore((state) => state.deleteRule);
 		},
 	);
 
-	const [merchantRuleSuggestion, setMerchantRuleSuggestion] = useState<{
-	transaction: Transaction;
-	merchant: Pick<Merchant, "id" | "name">;
-} | null>(null);
+	type TransactionRuleSuggestion =
+		| {
+				type: "merchant";
+				transaction: Transaction;
+				merchant: Pick<Merchant, "id" | "name">;
+		  }
+		| {
+				type: "category";
+				transaction: Transaction;
+				category: string;
+		  };
 
-const [ruleModalState, setRuleModalState] = useState<{
-	rule?: TransactionRule | null;
-	seed?: RuleModalSeed | null;
-} | null>(null);
+	const [transactionRuleSuggestion, setTransactionRuleSuggestion] =
+		useState<TransactionRuleSuggestion | null>(null);
+
+	const [ruleModalState, setRuleModalState] = useState<{
+		rule?: TransactionRule | null;
+		seed?: RuleModalSeed | null;
+	} | null>(null);
 
 	const [sorting, setSorting] = useState<SortingState>(() => {
 		return readLocalStorage<SortingState>("custom_sort", DEFAULT_SORTING);
@@ -480,10 +490,10 @@ const [ruleModalState, setRuleModalState] = useState<{
 	]);
 
 	const ruleCategoryNames = useMemo(() => {
-	return filterData.categories
-		.filter((option) => !option.isParent)
-		.map((option) => option.value);
-}, [filterData.categories]);
+		return filterData.categories
+			.filter((option) => !option.isParent)
+			.map((option) => option.value);
+	}, [filterData.categories]);
 
 	const normalizedRecurringMerchants = useMemo(() => {
 		return new Set(
@@ -656,41 +666,55 @@ const [ruleModalState, setRuleModalState] = useState<{
 	}, []);
 
 	const handleMerchantChange = useCallback(
-	async (
-		transactionId: string,
-		merchant: Pick<Merchant, "id" | "name">,
-	) => {
-		const originalTransaction = transactions.find((transaction) => {
-			return transaction.id === transactionId;
-		});
+		async (transactionId: string, merchant: Pick<Merchant, "id" | "name">) => {
+			const originalTransaction = transactions.find((transaction) => {
+				return transaction.id === transactionId;
+			});
 
-		await updateTransaction(transactionId, {
-			merchant: merchant.name,
-			merchant_id: merchant.id,
-		});
+			await updateTransaction(transactionId, {
+				merchant: merchant.name,
+				merchant_id: merchant.id,
+			});
 
-		if (!originalTransaction) {
-			return;
-		}
+			if (!originalTransaction) {
+				return;
+			}
 
-		setMerchantRuleSuggestion({
-			// Keep the pre-update transaction so the rule criterion uses the
-			// bank's original statement/old merchant, not the new merchant.
-			transaction: originalTransaction,
-			merchant,
-		});
-	},
-	[transactions, updateTransaction],
-);
+			setTransactionRuleSuggestion({
+				type: "merchant",
+				transaction: originalTransaction,
+				merchant,
+			});
+		},
+		[transactions, updateTransaction],
+	);
 
 	// Update only the category field
 	const handleCategoryChange = useCallback(
-		(id: string, newCategory: string) => {
-			void updateTransaction(id, {
+		async (transactionId: string, newCategory: string) => {
+			const originalTransaction = transactions.find((transaction) => {
+				return transaction.id === transactionId;
+			});
+
+			if (!originalTransaction) {
+				return;
+			}
+
+			if (originalTransaction.category.trim() === newCategory.trim()) {
+				return;
+			}
+
+			await updateTransaction(transactionId, {
+				category: newCategory,
+			});
+
+			setTransactionRuleSuggestion({
+				type: "category",
+				transaction: originalTransaction,
 				category: newCategory,
 			});
 		},
-		[updateTransaction],
+		[transactions, updateTransaction],
 	);
 
 	// Create a blank transaction for the editor
@@ -863,53 +887,82 @@ const [ruleModalState, setRuleModalState] = useState<{
 				/>
 			)}
 
-			<MerchantRuleToast
-	show={Boolean(merchantRuleSuggestion)}
-	merchantName={merchantRuleSuggestion?.merchant.name ?? ""}
-	onDismiss={() => {
-		setMerchantRuleSuggestion(null);
-	}}
-	onCreateRule={() => {
-		if (!merchantRuleSuggestion) {
-			return;
-		}
+			{transactionRuleSuggestion && (
+				<MerchantRuleToast
+					key={[
+						transactionRuleSuggestion.type,
+						transactionRuleSuggestion.transaction.id,
+						transactionRuleSuggestion.type === "merchant"
+							? transactionRuleSuggestion.merchant.id
+							: transactionRuleSuggestion.category,
+					].join(":")}
+					show
+					updatedValue={
+						transactionRuleSuggestion.type === "merchant"
+							? transactionRuleSuggestion.merchant.name
+							: transactionRuleSuggestion.category
+					}
+					onDismiss={() => {
+						setTransactionRuleSuggestion(null);
+					}}
+					onCreateRule={() => {
+						if (transactionRuleSuggestion.type === "merchant") {
+							setRuleModalState({
+								seed: {
+									sourceTransaction: transactionRuleSuggestion.transaction,
+									renameMerchant: transactionRuleSuggestion.merchant,
+								},
+							});
+						} else {
+							setRuleModalState({
+								seed: {
+									sourceTransaction: transactionRuleSuggestion.transaction,
+									updateCategory: transactionRuleSuggestion.category,
+								},
+							});
+						}
 
-		setRuleModalState({
-			seed: {
-				sourceTransaction: merchantRuleSuggestion.transaction,
-				renameMerchant: merchantRuleSuggestion.merchant,
-			},
-		});
-		setMerchantRuleSuggestion(null);
-	}}
-/>
+						setTransactionRuleSuggestion(null);
+					}}
+				/>
+			)}
+			{ruleModalState && (
+				<RuleModal
+					key={
+						ruleModalState.rule?.id ??
+						[
+							"new",
+							ruleModalState.seed?.sourceTransaction?.id ?? "",
+							ruleModalState.seed?.renameMerchant?.id ?? "",
+							ruleModalState.seed?.updateCategory ?? "",
+						].join(":")
+					}
+					isOpen
+					initialRule={ruleModalState.rule ?? null}
+					seed={ruleModalState.seed ?? null}
+					transactions={transactions}
+					accounts={accounts}
+					merchants={merchants}
+					categories={ruleCategoryNames}
+					tags={customTags}
+					onClose={() => {
+						setRuleModalState(null);
+					}}
+					onSave={async (rule, options) => {
+						const result = await saveRule(rule, options.applyToExisting);
 
-<RuleModal
-	isOpen={Boolean(ruleModalState)}
-	initialRule={ruleModalState?.rule ?? null}
-	seed={ruleModalState?.seed ?? null}
-	transactions={transactions}
-	accounts={accounts}
-	merchants={merchants}
-	categories={ruleCategoryNames}
-	tags={customTags}
-	onClose={() => {
-		setRuleModalState(null);
-	}}
-	onSave={async (rule, options) => {
-		const result = await saveRule(rule, options.applyToExisting);
-
-		if (result.count > 0) {
-			setToast({
-				count: result.count,
-				snapshot: result.snapshot,
-			});
-		}
-	}}
-	onDelete={async (rule) => {
-		await deleteRule(rule.id);
-	}}
-/>
+						if (result.count > 0) {
+							setToast({
+								count: result.count,
+								snapshot: result.snapshot,
+							});
+						}
+					}}
+					onDelete={async (rule) => {
+						await deleteRule(rule.id);
+					}}
+				/>
+			)}
 
 			{toast && (
 				<UndoToast
