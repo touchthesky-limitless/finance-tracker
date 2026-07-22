@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { PlusCircle } from "lucide-react";
+import { Plus } from "lucide-react";
+import * as Tooltip from "@radix-ui/react-tooltip";
 import { SidebarItemType } from "@/config/navigation";
 import { FeatureGuard } from "@/components/ui/FeatureGuard";
 
@@ -16,56 +17,72 @@ export default function SidebarNavItem({
 	isActive,
 	isCollapsed,
 }: SidebarNavItemProps) {
-	return (
-		<FeatureGuard isLocked={item.isLocked}>
+	const navItem = (
+		<div
+			className={`group relative ${isCollapsed ? "mx-auto w-10" : "mx-1.5"}`}
+		>
 			<Link
 				href={item.href}
+				aria-current={isActive ? "page" : undefined}
 				className={`
-                    flex items-center my-0.5 transition-all duration-200 group relative
-                    ${
-											isCollapsed
-												? "justify-center py-3 w-12 mx-auto rounded-xl"
-												: "justify-between py-2.5 pl-4 pr-3 rounded-r-2xl border-r"
-										}
-                    ${
-											isActive
-												? isCollapsed
-													? "text-gray-900 dark:text-white bg-[#00d2d3]/15 dark:bg-[#00d2d3]/10 border border-[#00d2d3]/30"
-													: "text-gray-900 dark:text-white border-y border-r border-[#00d2d3] bg-[#00d2d3]/10 dark:bg-[#00d2d3]/5"
-												: isCollapsed
-													? "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/5 border border-transparent"
-													: "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/5 border-y border-r border-transparent"
-										}
-                `}
+					flex h-9 min-w-0 items-center rounded-lg text-sm
+					transition-colors duration-100
+					focus-visible:outline-none focus-visible:ring-2
+					focus-visible:ring-black/20 dark:focus-visible:ring-white/20
+					${isCollapsed ? "w-10 justify-center" : "w-full gap-3 px-2.5 pr-9"}
+					${
+						isActive
+							? "bg-[#ececec] text-[#0d0d0d] dark:bg-[#2a2a2a] dark:text-[#ececec]"
+							: "text-[#0d0d0d] hover:bg-[#ececec] dark:text-[#ececec] dark:hover:bg-[#2a2a2a]"
+					}
+				`}
 			>
-				<div className={`flex items-center ${isCollapsed ? "" : "gap-4"}`}>
-					<item.icon
-						size={18}
-						className={
-							isActive
-								? "text-gray-900 dark:text-white"
-								: "text-gray-500 dark:text-gray-400 group-hover:text-gray-900 dark:group-hover:text-gray-200"
-						}
-						strokeWidth={isActive ? 2.5 : 2}
-					/>
-					{!isCollapsed && (
-						<span className="text-[14px] tracking-wide font-medium whitespace-nowrap">
-							{item.name}
-						</span>
-					)}
-				</div>
+				<item.icon size={18} strokeWidth={1.8} className="shrink-0" />
 
-				{!isCollapsed && item.hasAdd && (
-					<button
-						type="button"
-						aria-label={`Add ${item.name}`}
-						className="text-gray-400 dark:text-gray-500 hover:text-[#00d2d3] dark:hover:text-[#00d2d3] transition-colors opacity-0 group-hover:opacity-100"
-						onClick={(e) => e.preventDefault()} // Prevents the link from firing if the button is clicked
-					>
-						<PlusCircle size={15} />
-					</button>
+				{!isCollapsed && (
+					<span className="min-w-0 flex-1 truncate font-normal">
+						{item.name}
+					</span>
 				)}
 			</Link>
+
+			{!isCollapsed && item.hasAdd && (
+				<button
+					type="button"
+					aria-label={`Add ${item.name}`}
+					onClick={(event) => {
+						event.preventDefault();
+						event.stopPropagation();
+					}}
+					className="absolute right-1 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-[#676767] opacity-0 transition-all hover:bg-black/5 hover:text-[#0d0d0d] focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/20 group-hover:opacity-100 dark:text-[#a6a6a6] dark:hover:bg-white/10 dark:hover:text-[#ececec] dark:focus-visible:ring-white/20"
+				>
+					<Plus size={17} strokeWidth={1.8} />
+				</button>
+			)}
+		</div>
+	);
+
+	return (
+		<FeatureGuard isLocked={item.isLocked}>
+			{isCollapsed ? (
+				<Tooltip.Provider delayDuration={250}>
+					<Tooltip.Root>
+						<Tooltip.Trigger asChild>{navItem}</Tooltip.Trigger>
+						<Tooltip.Portal>
+							<Tooltip.Content
+								side="right"
+								sideOffset={8}
+								className="z-[200] rounded-lg bg-[#212121] px-3 py-2 text-xs font-medium text-white shadow-lg dark:bg-[#f2f2f2] dark:text-[#171717]"
+							>
+								{item.name}
+								<Tooltip.Arrow className="fill-[#212121] dark:fill-[#f2f2f2]" />
+							</Tooltip.Content>
+						</Tooltip.Portal>
+					</Tooltip.Root>
+				</Tooltip.Provider>
+			) : (
+				navItem
+			)}
 		</FeatureGuard>
 	);
 }

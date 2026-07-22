@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { usePathname } from "next/navigation";
-import { motion } from "framer-motion";
 import { NAV_GROUPS } from "@/config/navigation";
 import SidebarHeader from "@/components/Sidebar/SidebarHeader";
 import SidebarNavItem from "@/components/Sidebar/SidebarNavItem";
@@ -10,60 +9,50 @@ import ProfileDropdown from "@/components/navigation/ProfileDropdown";
 
 export default function Sidebar() {
 	const pathname = usePathname();
-
 	const [isCollapsed, setIsCollapsed] = useState(false);
-	const [isHovered, setIsHovered] = useState(false);
-
-	const showCollapsedUI = isCollapsed && !isHovered;
-
-	const renderNavItems = () => {
-		const itemElements = [];
-		for (let i = 0; i < NAV_GROUPS.length; i++) {
-			const item = NAV_GROUPS[i];
-			itemElements.push(
-				<SidebarNavItem
-					key={item.name}
-					item={item}
-					isActive={pathname === item.href}
-					isCollapsed={showCollapsedUI}
-				/>,
-			);
-		}
-		return itemElements;
-	};
 
 	return (
-		<motion.aside
-			onMouseEnter={() => setIsHovered(true)}
-			onMouseLeave={() => setIsHovered(false)}
-			// Framer Motion handles the width animation here seamlessly
-			animate={{
-				width: showCollapsedUI ? 80 : 200,
-			}}
-			transition={{
-				type: "spring",
-				bounce: 0, // Removes the "wobble" effect for a clean snap
-				duration: 0.4,
-			}}
-			// Added light mode colors, dark: modifiers, and updated z-index
-			className="h-screen bg-white dark:bg-[#1c1c1c] text-gray-900 dark:text-[#e0e0e0] flex flex-col z-100 shrink-0 overflow-x-hidden transition-colors"
+		<aside
+			className={`
+				relative z-[100] flex h-dvh shrink-0 flex-col overflow-hidden
+				border-r border-black/5 bg-[#f9f9f9] text-[#0d0d0d]
+				transition-[width] duration-200 ease-out
+				dark:border-white/5 dark:bg-[#171717] dark:text-[#ececec]
+				${isCollapsed ? "w-[56px]" : "w-[220px]"}
+			`}
 		>
 			<SidebarHeader
-				isCollapsed={showCollapsedUI}
-				onToggle={() => setIsCollapsed(!isCollapsed)}
+				isCollapsed={isCollapsed}
+				onToggle={() => setIsCollapsed((current) => !current)}
 			/>
 
-			<nav className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-hide flex flex-col">
-				{" "}
-				{renderNavItems()}
+			<nav
+				aria-label="Primary navigation"
+				className="scrollbar-hide flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto px-0.5 py-1"
+			>
+				{NAV_GROUPS.map((item) => {
+					const isActive =
+						pathname === item.href ||
+						pathname.startsWith(`${item.href}/`);
+
+					return (
+						<SidebarNavItem
+							key={item.name}
+							item={item}
+							isActive={isActive}
+							isCollapsed={isCollapsed}
+						/>
+					);
+				})}
 			</nav>
 
 			<div
-				// Added light mode border color and dark: modifier
-				className={`transition-colors ${showCollapsedUI ? "flex justify-center" : ""}`}
+				className={`shrink-0 p-2 ${
+					isCollapsed ? "flex justify-center" : ""
+				}`}
 			>
-				<ProfileDropdown isCollapsed={showCollapsedUI} />
+				<ProfileDropdown isCollapsed={isCollapsed} />
 			</div>
-		</motion.aside>
+		</aside>
 	);
 }
