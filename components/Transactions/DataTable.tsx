@@ -283,12 +283,11 @@ export function DataTable({
 						>
 							<div className="min-w-0 flex-1">
 								<button
-									type="button"
-									disabled={!canNavigate}
-									onClick={(event) => {
-										event.stopPropagation();
-										handleMerchantClick();
-									}}
+	type="button"
+	onClick={(event) => {
+		event.stopPropagation();
+		onRowClick(info.row.original);
+	}}
 									aria-label={`Open ${merchantName} merchant`}
 									className={`
 							flex h-10 w-full min-w-0 items-center
@@ -306,7 +305,7 @@ export function DataTable({
 							focus-visible:ring-2
 							focus-visible:ring-orange-500/30
 
-							disabled:cursor-not-allowed
+						
 						`}
 								>
 									<div

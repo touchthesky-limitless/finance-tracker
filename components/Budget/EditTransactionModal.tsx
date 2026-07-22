@@ -57,6 +57,7 @@ const getComparableTransaction = (transaction: Transaction) => {
 	return {
 		date: transaction.date,
 		merchant: transaction.merchant.trim(),
+		merchant_id: transaction.merchant_id ?? null,
 		description: transaction.description ?? "",
 		amount: Number(transaction.amount),
 		category: transaction.category,
@@ -83,6 +84,7 @@ export default function EditTransactionModal({
 	const addTransactions = useBudgetStore((state) => state.addTransactions);
 	const fetchAccounts = useBudgetStore((state) => state.fetchAccounts);
 	const fetchMerchants = useBudgetStore((state) => state.fetchMerchants);
+	const addCustomMerchant = useBudgetStore((state) => state.addCustomMerchant);
 	const addCustomTag = useBudgetStore((state) => state.addCustomTag);
 	const deleteRule = useBudgetStore((state) => state.deleteRule);
 
@@ -194,6 +196,20 @@ export default function EditTransactionModal({
 			return first.localeCompare(second);
 		});
 	}, [merchants, transactions]);
+
+	const merchantIdByName = useMemo(() => {
+		const result = new Map<string, string>();
+
+		for (const merchant of merchants) {
+			const normalizedName = normalize(merchant.name);
+
+			if (normalizedName && merchant.id) {
+				result.set(normalizedName, merchant.id);
+			}
+		}
+
+		return result;
+	}, [merchants]);
 
 	const filteredMerchants = useMemo(() => {
 		const query = normalize(merchantQuery);
@@ -333,18 +349,25 @@ export default function EditTransactionModal({
 
 	const selectMerchant = useCallback(
 		(name: string) => {
-			setMerchantQuery(name);
+			const cleanName = name.trim();
+
+			const merchantId = merchantIdByName.get(normalize(cleanName)) ?? null;
+
+			setMerchantQuery(cleanName);
+
 			setEditedData((current) => {
 				return {
 					...current,
-					merchant: name,
+					merchant: cleanName,
+					merchant_id: merchantId,
 				};
 			});
+
 			setMerchantOpen(false);
 			setActiveMerchantIndex(0);
-			applyRuleSuggestion(name);
+			applyRuleSuggestion(cleanName);
 		},
-		[applyRuleSuggestion],
+		[applyRuleSuggestion, merchantIdByName],
 	);
 
 	const toggleTag = useCallback((tagName: string) => {
@@ -412,20 +435,33 @@ export default function EditTransactionModal({
 		const cleanTags = (editedData.tags ?? [])
 			.map((tagName) => tagName.trim())
 			.filter(Boolean);
+
 		const accountName = selectedAccount?.name ?? editedData.account.trim();
+
 		const absoluteAmount = Math.abs(Number(editedData.amount));
-		const preparedTransaction: Transaction = {
-			...editedData,
-			merchant: cleanMerchant,
-			description: cleanDescription,
-			tags: cleanTags,
-			account: accountName,
-			amount: direction === "debit" ? -absoluteAmount : absoluteAmount,
-			category: editedData.category || "Uncategorized",
-		};
 		const snapshot = [...transactions];
 
 		try {
+			let merchantId =
+				editedData.merchant_id?.trim() ||
+				merchantIdByName.get(normalize(cleanMerchant));
+
+			if (!merchantId) {
+				const createdMerchant = await addCustomMerchant(cleanMerchant);
+				merchantId = createdMerchant.id;
+			}
+
+			const preparedTransaction: Transaction = {
+				...editedData,
+				merchant: cleanMerchant,
+				merchant_id: merchantId,
+				description: cleanDescription,
+				tags: cleanTags,
+				account: accountName,
+				amount: direction === "debit" ? -absoluteAmount : absoluteAmount,
+				category: editedData.category || "Uncategorized",
+			};
+
 			if (isNew) {
 				await addTransactions([preparedTransaction]);
 			} else {
@@ -456,6 +492,8 @@ export default function EditTransactionModal({
 		onUpdate,
 		selectedAccount?.name,
 		transactions,
+		addCustomMerchant,
+		merchantIdByName,
 	]);
 
 	useEffect(() => {
@@ -681,15 +719,19 @@ export default function EditTransactionModal({
 											}}
 											onChange={(event) => {
 												const name = event.target.value;
+
 												setMerchantQuery(name);
 												setMerchantOpen(true);
 												setActiveMerchantIndex(0);
+
 												setEditedData((current) => {
 													return {
 														...current,
 														merchant: name,
+														merchant_id: null,
 													};
 												});
+
 												applyRuleSuggestion(name);
 											}}
 											onKeyDown={(event) => {

@@ -310,6 +310,95 @@ const getOrCreateAccountId = async (
 	return createdAccount.id;
 };
 
+const getOrCreateMerchantIds = async (
+	userId: string,
+	merchantNames: string[],
+): Promise<Map<string, string>> => {
+	const nameByNormalizedName = new Map<string, string>();
+
+	for (const merchantName of merchantNames) {
+		const name = merchantName.trim();
+		const normalizedName = normalize(name);
+
+		if (normalizedName && !nameByNormalizedName.has(normalizedName)) {
+			nameByNormalizedName.set(normalizedName, name);
+		}
+	}
+
+	if (nameByNormalizedName.size === 0) {
+		return new Map();
+	}
+
+	const { data: existingData, error: existingError } = await supabase
+		.from("merchants")
+		.select("id, user_id, name, is_system, created_at")
+		.or(`is_system.eq.true,user_id.eq.${userId}`);
+
+	if (existingError) {
+		throw existingError;
+	}
+
+	const existingMerchants = (existingData ?? []) as Merchant[];
+	const merchantIdByName = new Map<string, string>();
+
+	/*
+	 * Add system merchants first.
+	 * A matching user-created merchant is added afterward and wins.
+	 */
+	for (const merchant of existingMerchants) {
+		if (!merchant.is_system) {
+			continue;
+		}
+
+		merchantIdByName.set(normalize(merchant.name), merchant.id);
+	}
+
+	for (const merchant of existingMerchants) {
+		if (merchant.is_system || merchant.user_id !== userId) {
+			continue;
+		}
+
+		merchantIdByName.set(normalize(merchant.name), merchant.id);
+	}
+
+	const merchantsToCreate: Array<{
+		user_id: string;
+		name: string;
+		is_system: false;
+	}> = [];
+
+	for (const [normalizedName, name] of nameByNormalizedName) {
+		if (merchantIdByName.has(normalizedName)) {
+			continue;
+		}
+
+		merchantsToCreate.push({
+			user_id: userId,
+			name,
+			is_system: false,
+		});
+	}
+
+	if (merchantsToCreate.length > 0) {
+		const { data: createdData, error: createError } = await supabase
+			.from("merchants")
+			.insert(merchantsToCreate)
+			.select("id, user_id, name, is_system, created_at");
+
+		if (createError) {
+			throw createError;
+		}
+
+		const createdMerchants = (createdData ?? []) as Merchant[];
+
+		for (const merchant of createdMerchants) {
+			merchantIdByName.set(normalize(merchant.name), merchant.id);
+		}
+	}
+
+	return merchantIdByName;
+};
+
 const savePreferences = async (
 	userId: string,
 	updates: {
@@ -708,7 +797,8 @@ export const useBudgetStore = create<BudgetState>()(
 					return {
 						user_id: userId,
 						date: processed.date,
-						merchant: processed.merchant,
+						merchant: processed.merchant.trim(),
+						merchant_id: processed.merchant_id ?? null,
 						description: processed.description ?? "",
 						amount: processed.amount,
 						category: processed.category || "Uncategorized",
@@ -772,9 +862,38 @@ export const useBudgetStore = create<BudgetState>()(
 					return;
 				}
 
+				const unresolvedMerchantNames = rowsToInsert
+					.filter((row) => {
+						return !row.merchant_id;
+					})
+					.map((row) => {
+						return row.merchant;
+					});
+
+				const merchantIdByName = await getOrCreateMerchantIds(
+					userId,
+					unresolvedMerchantNames,
+				);
+
+				const linkedRowsToInsert = rowsToInsert.map((row) => {
+					const merchantId =
+						row.merchant_id ?? merchantIdByName.get(normalize(row.merchant));
+
+					if (!merchantId) {
+						throw new Error(
+							`Could not resolve merchant ID for "${row.merchant}".`,
+						);
+					}
+
+					return {
+						...row,
+						merchant_id: merchantId,
+					};
+				});
+
 				const { data, error } = await supabase
 					.from("transactions")
-					.insert(rowsToInsert)
+					.insert(linkedRowsToInsert)
 					.select(TRANSACTION_COLUMNS);
 
 				if (error) {
@@ -790,7 +909,7 @@ export const useBudgetStore = create<BudgetState>()(
 					),
 				}));
 
-				await get().fetchAccounts(true);
+				await Promise.all([get().fetchAccounts(true), get().fetchMerchants()]);
 			},
 
 			fetchTransactions: async (force = false) => {
