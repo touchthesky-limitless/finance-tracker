@@ -17,9 +17,9 @@ import { SortingState } from "@tanstack/react-table";
 import { useBudgetStore } from "@/store/useBudgetStore";
 import { formatCurrency } from "@/utils/formatters";
 
-// 1. Import your components and the unified categories hook
 import { CategoryTrigger } from "@/components/CategoryTrigger";
 import { DataTable } from "@/components/Transactions/DataTable";
+import { useMerchantOptions } from "@/hooks/useMerchantOptions";
 import { useUnifiedCategories } from "@/hooks/useUnifiedCategories";
 import dynamic from "next/dynamic";
 import { Transaction } from "@/store/useBudgetStore";
@@ -48,7 +48,7 @@ export default function CategoryBreakdownPage() {
 	const categoryId = rawId ? decodeURIComponent(rawId) : "";
 
 	// Extract URL state
-	const activeTimeframe = searchParams.get("timeframe") || "year";
+	const activeTimeframe = searchParams.get("timeframe") || "yearly";
 	const activeDateString =
 		searchParams.get("date") || `${new Date().getFullYear()}-01-01`;
 	const activeYear = parseInt(activeDateString.substring(0, 4), 10);
@@ -60,6 +60,8 @@ export default function CategoryBreakdownPage() {
 	const updateTransaction = useBudgetStore((state) => {
 		return state.updateTransaction;
 	});
+
+	const merchantItems = useMerchantOptions();
 
 	const [selectedTransaction, setSelectedTransaction] =
 		useState<Transaction | null>(null);
@@ -272,32 +274,31 @@ export default function CategoryBreakdownPage() {
 								<DataTable
 									transactions={categoryTransactions}
 									selectedIds={selectedIds}
-									onSelectRow={(id, e) => {
-										e.stopPropagation();
-										setSelectedIds((prev) => {
-											return prev.includes(id)
-												? prev.filter((i) => {
-														return i !== id;
+									merchantItems={merchantItems}
+									onSelectRow={(id, event) => {
+										event.stopPropagation();
+
+										setSelectedIds((previous) => {
+											return previous.includes(id)
+												? previous.filter((currentId) => {
+														return currentId !== id;
 													})
-												: [...prev, id];
+												: [...previous, id];
 										});
 									}}
 									onRowClick={setSelectedTransaction}
-									columnVisibility={{ select: false, amount: true }}
+									columnVisibility={{
+										select: false,
+										amount: true,
+									}}
 									isEditMode={false}
 									currentView="all"
 									sorting={sorting}
 									isCategoryView={false}
 									onCategoryChange={(id, newCategory) => {
-										const target = categoryTransactions.find((t) => {
-											return t.id === id;
+										void updateTransaction(id, {
+											category: newCategory,
 										});
-										if (target) {
-											updateTransaction(id, {
-												...target,
-												category: newCategory,
-											});
-										}
 									}}
 								/>
 							) : (

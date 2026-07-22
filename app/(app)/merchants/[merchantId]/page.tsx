@@ -25,6 +25,7 @@ import {
 } from "@/hooks/useUnifiedMerchants";
 import { useBudgetStore, type Transaction } from "@/store/useBudgetStore";
 import { formatCurrency } from "@/utils/formatters";
+import { useMerchantOptions } from "@/hooks/useMerchantOptions";
 
 interface ChartData {
 	period: string;
@@ -252,6 +253,7 @@ export default function MerchantBreakdownPage() {
 	const { getMerchantById, getMerchantId } = useUnifiedMerchants();
 	const merchant = getMerchantById(merchantId);
 	const merchantName = merchant?.name || "Unknown Merchant";
+	const merchantItems = useMerchantOptions();
 
 	const merchantTransactions = getMerchantTransactions(
 		transactions,
@@ -445,6 +447,7 @@ export default function MerchantBreakdownPage() {
 								<DataTable
 									transactions={visibleTransactions}
 									selectedIds={selectedIds}
+									merchantItems={merchantItems}
 									onSelectRow={(id, event) => {
 										event.stopPropagation();
 

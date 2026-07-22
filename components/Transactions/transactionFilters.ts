@@ -1,4 +1,5 @@
 import type { Transaction } from "@/store/useBudgetStore";
+import type { MerchantListItem } from "@/components/Merchants/types";
 
 export type AmountFilterMode =
 	| "none"
@@ -36,6 +37,8 @@ export interface TransactionFilterOption {
 	isParent?: boolean;
 	iconName?: string;
 	colorKey?: string;
+
+	merchant?: MerchantListItem;
 }
 
 export interface TransactionFilterData {

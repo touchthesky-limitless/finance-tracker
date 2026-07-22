@@ -19,10 +19,12 @@ import {
 	type VisibilityState,
 } from "@tanstack/react-table";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { ArrowRight, Check, ChevronDown, ChevronRight } from "lucide-react";
+import { ArrowRight, Check, ChevronRight } from "lucide-react";
 
 import { CategorySelector } from "@/components/CategorySelector";
-import { Transaction } from "@/store/useBudgetStore";
+import { MerchantCell } from "@/components/Transactions/MerchantCell";
+import type { MerchantListItem } from "@/components/Merchants/types";
+import type { Merchant, Transaction } from "@/store/useBudgetStore";
 import { formatCurrency } from "@/utils/formatters";
 import {
 	getTransactionMerchantId,
@@ -36,6 +38,13 @@ interface DataTableProps {
 	onSelectRow: (id: string, event: ReactMouseEvent) => void;
 
 	onRowClick: (transaction: Transaction) => void;
+
+	merchantItems?: MerchantListItem[];
+
+	onMerchantChange?: (
+		transactionId: string,
+		merchant: Pick<Merchant, "id" | "name">,
+	) => Promise<void> | void;
 
 	columnVisibility: VisibilityState;
 	isEditMode: boolean;
@@ -128,6 +137,8 @@ export function DataTable({
 	selectedIds,
 	onSelectRow,
 	onRowClick,
+	onMerchantChange,
+	merchantItems = [],
 	columnVisibility,
 	isEditMode,
 	currentView,
@@ -256,17 +267,15 @@ export function DataTable({
 				size: 360,
 
 				cell: (info) => {
+					const transaction = info.row.original;
+
 					const merchantName = String(info.getValue() || "Unknown merchant");
 
 					const merchantId =
-						getTransactionMerchantId(info.row.original) ??
+						getTransactionMerchantId(transaction) ??
 						resolveMerchantId(merchantName);
 
-					const canNavigate = Boolean(merchantId);
-
-					const initial = merchantName.charAt(0).toUpperCase() || "?";
-
-					const handleMerchantClick = () => {
+					const handleMerchantNavigation = () => {
 						if (!merchantId) {
 							return;
 						}
@@ -275,126 +284,17 @@ export function DataTable({
 					};
 
 					return (
-						<div
-							onClick={(event) => {
-								event.stopPropagation();
+						<MerchantCell
+							transaction={transaction}
+							merchantId={merchantId}
+							merchantItems={merchantItems}
+							showNavigation={isMerchantNavigationEnabled}
+							onNavigate={handleMerchantNavigation}
+							onOpenEditor={() => {
+								onRowClick(transaction);
 							}}
-							className="group flex h-full w-full items-center gap-1.5 pr-2"
-						>
-							<div className="min-w-0 flex-1">
-								<button
-	type="button"
-	onClick={(event) => {
-		event.stopPropagation();
-		onRowClick(info.row.original);
-	}}
-									aria-label={`Open ${merchantName} merchant`}
-									className={`
-							flex h-10 w-full min-w-0 items-center
-							gap-3 rounded-xl border border-transparent
-							px-3 text-left transition-all
-
-							group-hover:border-gray-300
-							group-hover:bg-gray-50
-
-							dark:group-hover:border-white/20
-							dark:group-hover:bg-white/5
-
-							focus-visible:border-gray-300
-							focus-visible:outline-none
-							focus-visible:ring-2
-							focus-visible:ring-orange-500/30
-
-						
-						`}
-								>
-									<div
-										aria-hidden="true"
-										className="
-								flex h-7 w-7 shrink-0 items-center
-								justify-center rounded-full
-								bg-gray-100 text-sm font-black
-								text-[#FF5A35]
-								dark:bg-white
-							"
-									>
-										{initial}
-									</div>
-
-									<span
-										title={merchantName}
-										className="
-								min-w-0 flex-1 truncate
-								text-[15px] font-medium
-								text-gray-900 dark:text-white
-							"
-									>
-										{merchantName}
-									</span>
-
-									<ChevronDown
-										size={16}
-										strokeWidth={2}
-										aria-hidden="true"
-										className="
-		shrink-0
-		text-gray-500
-		opacity-0
-		transition-all
-		group-hover:opacity-100
-		group-focus-within:opacity-100
-		dark:text-gray-400
-	"
-									/>
-								</button>
-							</div>
-
-							{isMerchantNavigationEnabled && (
-								<button
-									type="button"
-									disabled={!canNavigate}
-									onClick={(event) => {
-										event.stopPropagation();
-										handleMerchantClick();
-									}}
-									aria-label={`View ${merchantName} merchant`}
-									title={
-										canNavigate
-											? "View merchant"
-											: `Merchant ID unavailable for ${merchantName}`
-									}
-									className={`
-							flex h-8 w-8 shrink-0 items-center
-							justify-center rounded-lg
-							border border-transparent
-							opacity-0 transition-all
-
-							group-hover:opacity-100
-							group-focus-within:opacity-100
-							focus-visible:opacity-100
-
-							group-hover:border-gray-300
-							dark:group-hover:border-white/20
-
-							hover:bg-gray-100
-							dark:hover:bg-white/5
-
-							${canNavigate ? "cursor-pointer" : "cursor-not-allowed"}
-						`}
-								>
-									<ArrowRight
-										size={16}
-										strokeWidth={2}
-										aria-hidden="true"
-										className={
-											canNavigate
-												? "text-gray-600 dark:text-gray-400"
-												: "text-gray-300 dark:text-gray-600"
-										}
-									/>
-								</button>
-							)}
-						</div>
+							onMerchantChange={onMerchantChange}
+						/>
 					);
 				},
 			}),
@@ -637,6 +537,8 @@ export function DataTable({
 		isMerchantNavigationEnabled,
 		router,
 		onRowClick,
+		onMerchantChange,
+		merchantItems,
 	]);
 
 	const uniqueTransactions = useMemo(() => {

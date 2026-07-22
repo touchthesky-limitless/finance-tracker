@@ -6,7 +6,11 @@ import { SortingState, VisibilityState } from "@tanstack/react-table";
 import { X } from "lucide-react";
 
 import { CATEGORY_HIERARCHY, findParentCategory } from "@/constants";
-import { Transaction, useBudgetStore } from "@/store/useBudgetStore";
+import {
+	type Merchant,
+	type Transaction,
+	useBudgetStore,
+} from "@/store/useBudgetStore";
 import { DataTable } from "@/components/Transactions/DataTable";
 import { UndoToast } from "@/components/ui/UndoToast";
 import CsvUploader from "@/components/CsvUploader";
@@ -24,6 +28,7 @@ import {
 	type TransactionFilterOption,
 	type TransactionFilters,
 } from "@/components/Transactions/transactionFilters";
+import { useMerchantOptions } from "@/hooks/useMerchantOptions";
 
 const DEFAULT_SORTING: SortingState = [
 	{
@@ -95,8 +100,6 @@ export default function TransactionsPage() {
 
 	const fetchAccounts = useBudgetStore((state) => state.fetchAccounts);
 
-	const merchants = useBudgetStore((state) => state.merchants);
-
 	const fetchMerchants = useBudgetStore((state) => state.fetchMerchants);
 
 	const customTags = useBudgetStore((state) => state.customTags);
@@ -112,6 +115,8 @@ export default function TransactionsPage() {
 		startDate: "",
 		endDate: "",
 	});
+
+	const merchantItems = useMerchantOptions();
 
 	const [transactionFilters, setTransactionFilters] =
 		useState<TransactionFilters>(EMPTY_TRANSACTION_FILTERS);
@@ -140,6 +145,17 @@ export default function TransactionsPage() {
 	const [sorting, setSorting] = useState<SortingState>(() => {
 		return readLocalStorage<SortingState>("custom_sort", DEFAULT_SORTING);
 	});
+
+	const merchantFilterOptions = useMemo<TransactionFilterOption[]>(() => {
+		return merchantItems.map((merchant) => {
+			return {
+				value: merchant.name,
+				label: merchant.name,
+				count: merchant.transactionCount,
+				merchant,
+			};
+		});
+	}, [merchantItems]);
 
 	// Mount guard
 	useEffect(() => {
@@ -357,45 +373,6 @@ export default function TransactionsPage() {
 			addLeafOption(categoryName, parentName);
 		}
 
-		const merchantCounts = new Map<string, number>();
-		const merchantNameByKey = new Map<string, string>();
-
-		for (const merchant of merchants) {
-			const merchantName = merchant.name.trim();
-			const key = merchantName.toLowerCase();
-
-			if (merchantName && !merchantNameByKey.has(key)) {
-				merchantNameByKey.set(key, merchantName);
-			}
-		}
-
-		for (const transaction of transactions) {
-			const merchantName = transaction.merchant?.trim();
-
-			if (!merchantName) {
-				continue;
-			}
-
-			const key = merchantName.toLowerCase();
-			merchantNameByKey.set(key, merchantNameByKey.get(key) ?? merchantName);
-			merchantCounts.set(key, (merchantCounts.get(key) ?? 0) + 1);
-		}
-
-		const merchantOptions = [...merchantNameByKey.entries()]
-			.map(([key, merchantName]) => {
-				return {
-					value: merchantName,
-					label: merchantName,
-					count: merchantCounts.get(key) ?? 0,
-				};
-			})
-			.sort((first, second) => {
-				return (
-					(second.count ?? 0) - (first.count ?? 0) ||
-					first.label.localeCompare(second.label)
-				);
-			});
-
 		const accountNameByKey = new Map<string, string>();
 
 		for (const account of accounts) {
@@ -461,12 +438,18 @@ export default function TransactionsPage() {
 
 		return {
 			categories: categoryOptions,
-			merchants: merchantOptions,
+			merchants: merchantFilterOptions,
 			accounts: accountOptions,
 			tags: tagOptions,
 			goals: [],
 		};
-	}, [accounts, customCategories, customTags, merchants, transactions]);
+	}, [
+		accounts,
+		customCategories,
+		customTags,
+		merchantFilterOptions,
+		transactions,
+	]);
 
 	const normalizedRecurringMerchants = useMemo(() => {
 		return new Set(
@@ -638,6 +621,16 @@ export default function TransactionsPage() {
 		});
 	}, []);
 
+	const handleMerchantChange = useCallback(
+		async (transactionId: string, merchant: Pick<Merchant, "id" | "name">) => {
+			await updateTransaction(transactionId, {
+				merchant: merchant.name,
+				merchant_id: merchant.id,
+			});
+		},
+		[updateTransaction],
+	);
+
 	// Update only the category field
 	const handleCategoryChange = useCallback(
 		(id: string, newCategory: string) => {
@@ -741,8 +734,10 @@ export default function TransactionsPage() {
 						<DataTable
 							transactions={filteredTransactions}
 							selectedIds={selectedIds}
+							merchantItems={merchantItems}
 							onSelectRow={handleSelectRow}
 							onRowClick={setSelectedTransaction}
+							onMerchantChange={handleMerchantChange}
 							columnVisibility={columnVisibility}
 							isEditMode={isEditMode}
 							currentView={currentView}

@@ -9,7 +9,7 @@ import {
 	type SetStateAction,
 	type ReactNode,
 } from "react";
-import { CircleX, CreditCard, Search, Tag, X } from "lucide-react";
+import { CircleX, Search, Tag, X } from "lucide-react";
 
 import { CATEGORY_HIERARCHY, getCategoryTheme } from "@/constants";
 import { CUSTOM_ICON_MAP, SYSTEM_ICON_MAP } from "@/constants/icons";
@@ -22,6 +22,7 @@ import {
 	type TransactionTypeFilter,
 	type TriStateFilter,
 } from "@/components/Transactions/transactionFilters";
+import { MerchantOptionContent } from "@/components/Merchants/MerchantOptionContent";
 
 type FilterSection =
 	| "categories"
@@ -312,6 +313,10 @@ export function TransactionFilterPanel({
 				return selectedValues.includes(child.value);
 			});
 
+		const someVisibleSelected = visibleChildren.some((child) => {
+			return selectedValues.includes(child.value);
+		});
+
 		const updateChildren = (
 			children: TransactionFilterOption[],
 			shouldSelect: boolean,
@@ -353,12 +358,7 @@ export function TransactionFilterPanel({
 			<div className="px-3 py-2">
 				<CheckboxRow
 					checked={allVisibleSelected}
-					indeterminate={
-						!allVisibleSelected &&
-						visibleChildren.some((child) => {
-							return selectedValues.includes(child.value);
-						})
-					}
+					indeterminate={!allVisibleSelected && someVisibleSelected}
 					label="Select all"
 					emphasized
 					onChange={() => {
@@ -519,13 +519,23 @@ export function TransactionFilterPanel({
 											disabled={option.disabled}
 											label={option.label}
 											secondaryLabel={option.secondaryLabel}
-											count={showCounts ? option.count : undefined}
+											content={
+												key === "merchantNames" && option.merchant ? (
+													<MerchantOptionContent
+														merchant={option.merchant}
+														size="sm"
+													/>
+												) : undefined
+											}
 											icon={
-												key === "merchantNames" ? (
-													<CreditCard size={15} strokeWidth={1.8} />
-												) : key === "tags" ? (
+												key === "tags" ? (
 													<Tag size={15} strokeWidth={1.8} />
 												) : undefined
+											}
+											count={
+												key !== "merchantNames" && showCounts
+													? option.count
+													: undefined
 											}
 											onChange={() => {
 												toggleValue(key, option.value);
@@ -1087,9 +1097,10 @@ function CheckboxRow({
 	secondaryLabel,
 	count,
 	icon,
+	content,
 	disabled = false,
-	indeterminate = false,
 	indent = false,
+	indeterminate = false,
 	emphasized = false,
 }: {
 	checked: boolean;
@@ -1098,17 +1109,20 @@ function CheckboxRow({
 	secondaryLabel?: string;
 	count?: number;
 	icon?: ReactNode;
+	content?: ReactNode;
 	disabled?: boolean;
-	indeterminate?: boolean;
 	indent?: boolean;
+	indeterminate?: boolean;
 	emphasized?: boolean;
 }) {
 	const checkboxRef = useRef<HTMLInputElement>(null);
 
 	useEffect(() => {
-		if (checkboxRef.current) {
-			checkboxRef.current.indeterminate = indeterminate;
+		if (!checkboxRef.current) {
+			return;
 		}
+
+		checkboxRef.current.indeterminate = indeterminate;
 	}, [indeterminate]);
 
 	return (
@@ -1126,31 +1140,37 @@ function CheckboxRow({
 				type="checkbox"
 				checked={checked}
 				disabled={disabled}
+				aria-checked={indeterminate ? "mixed" : checked}
 				onChange={onChange}
 				className="h-4 w-4 shrink-0 rounded border-gray-300 text-[#FF5A35] focus:ring-[#FF5A35]/30 dark:border-white/20 dark:bg-transparent"
 			/>
 
-			{icon && <span className="shrink-0">{icon}</span>}
+			{content ? (
+				<div className="min-w-0 flex-1">{content}</div>
+			) : (
+				<>
+					{icon && <span className="shrink-0 text-gray-500">{icon}</span>}
 
-			<div className="min-w-0 flex-1">
-				<p
-					className={`truncate text-sm text-gray-900 dark:text-gray-100 ${
-						emphasized ? "font-semibold" : "font-normal"
-					}`}
-				>
-					{label}
-				</p>
-				{secondaryLabel && (
-					<p className="truncate text-[11px] leading-4 text-gray-400">
-						{secondaryLabel}
-					</p>
-				)}
-			</div>
+					<div className="min-w-0 flex-1">
+						<span
+							className={`block truncate text-sm ${
+								emphasized ? "font-semibold" : "font-normal"
+							}`}
+						>
+							{label}
+						</span>
 
-			{typeof count === "number" && (
-				<span className="shrink-0 text-xs text-gray-500 dark:text-gray-400">
-					{count}
-				</span>
+						{secondaryLabel && (
+							<p className="truncate text-xs text-gray-400">{secondaryLabel}</p>
+						)}
+					</div>
+
+					{typeof count === "number" && (
+						<span className="shrink-0 text-sm tabular-nums text-gray-500 dark:text-gray-400">
+							{count}
+						</span>
+					)}
+				</>
 			)}
 		</label>
 	);
