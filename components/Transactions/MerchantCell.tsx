@@ -563,6 +563,7 @@ export function MerchantCell({
 								/>
 							</div>
 
+							{/* Scrollable content */}
 							<div className="min-h-0 flex-1 overflow-y-auto">
 								<div className="border-b border-gray-100 px-4 py-4 dark:border-white/5">
 									<p className="px-2 text-sm font-semibold text-gray-500 dark:text-gray-400">
@@ -576,22 +577,23 @@ export function MerchantCell({
 											void handleOriginalStatementSelect();
 										}}
 										className="
-		mt-2 flex w-full items-center gap-3
-		rounded-xl px-3 py-3 text-left
-		transition-colors
-		hover:bg-gray-100
-		disabled:cursor-wait
-		disabled:opacity-60
-		dark:hover:bg-white/5
-	"
+				mt-2 flex w-full items-center gap-3
+				rounded-xl px-3 py-3 text-left
+				transition-colors
+				hover:bg-gray-100
+				disabled:cursor-wait
+				disabled:opacity-60
+				dark:hover:bg-white/5
+			"
 									>
-										<MerchantLogo name={originalStatement} size="sm" />
-										<span className="min-w-0 flex-1 truncate text-base font-medium text-gray-900 dark:text-white">
-											{originalStatement}
-										</span>
-
-										<MerchantTransactionCount
-											count={originalStatementTransactionCount}
+										<MerchantOptionContent
+											merchant={{
+												id: originalStatementMerchant?.id ?? "",
+												name: originalStatement,
+												logoUrl: originalStatementMerchant?.logoUrl ?? null,
+												transactionCount: originalStatementTransactionCount,
+											}}
+											size="sm"
 										/>
 
 										{originalStatementMerchant?.id === merchantId && (
@@ -617,81 +619,80 @@ export function MerchantCell({
 													void handleMerchantSelect(merchant);
 												}}
 												className={`
-				flex w-full items-center rounded-xl
-				px-3 py-3 text-left transition-colors
-
-				hover:bg-gray-100
-				dark:hover:bg-white/5
-
-				${isSelected ? "bg-cyan-500/15 text-cyan-500" : ""}
-			`}
+						flex w-full items-center
+						rounded-xl px-3 py-3
+						text-left transition-colors
+						hover:bg-gray-100
+						dark:hover:bg-white/5
+						${isSelected ? "bg-cyan-500/15" : ""}
+					`}
 											>
 												<MerchantOptionContent merchant={merchant} size="sm" />
 											</button>
 										);
 									})}
 
-									{searchQuery.trim() && !exactMerchantExists && (
-										<div
-											className="
-				shrink-0 border-t border-gray-200
-				bg-white px-4 py-3
-
-				dark:border-white/10
-				dark:bg-[#202020]
-			"
-										>
-											<button
-												type="button"
-												disabled={isSaving}
-												onClick={() => {
-													void handleCreateMerchant();
-												}}
-												className="
-					flex min-h-12 w-full
-					items-center gap-2
-					rounded-xl px-3 py-2
-					text-left text-base font-medium
-
-					text-cyan-600
-					transition-colors
-					hover:bg-cyan-50
-
-					disabled:cursor-wait
-					disabled:opacity-60
-
-					dark:text-cyan-400
-					dark:hover:bg-cyan-500/10
-				"
-											>
-												{isSaving ? (
-													<Loader2 size={18} className="animate-spin" />
-												) : (
-													<Plus size={18} />
-												)}
-
-												<span className="truncate">
-													Create new &quot;
-													{searchQuery.trim()}
-													&quot; merchant
-												</span>
-											</button>
-										</div>
-									)}
-
 									{visibleMerchants.length === 0 && !searchQuery.trim() && (
 										<p className="px-3 py-6 text-center text-sm text-gray-500">
 											No merchants found.
 										</p>
 									)}
-
-									{errorMessage && (
-										<p className="px-3 pt-3 text-sm text-red-600 dark:text-red-400">
-											{errorMessage}
-										</p>
-									)}
 								</div>
 							</div>
+
+							{/* Fixed footer — outside the scrolling div */}
+							{searchQuery.trim() && !exactMerchantExists && (
+								<div
+									className="
+			z-10 shrink-0
+			border-t border-gray-200
+			bg-white px-4 py-3
+			shadow-[0_-6px_16px_rgba(0,0,0,0.06)]
+			dark:border-white/10
+			dark:bg-[#202020]
+			dark:shadow-[0_-6px_16px_rgba(0,0,0,0.25)]
+		"
+								>
+									<button
+										type="button"
+										disabled={isSaving}
+										onClick={() => {
+											void handleCreateMerchant();
+										}}
+										className="
+				flex min-h-12 w-full
+				items-center gap-2 rounded-xl
+				px-3 py-2 text-left
+				text-base font-medium
+				text-cyan-600
+				transition-colors
+				hover:bg-cyan-50
+				disabled:cursor-wait
+				disabled:opacity-60
+				dark:text-cyan-400
+				dark:hover:bg-cyan-500/10
+			"
+									>
+										{isSaving ? (
+											<Loader2 size={18} className="shrink-0 animate-spin" />
+										) : (
+											<Plus size={18} className="shrink-0" />
+										)}
+
+										<span className="min-w-0 truncate">
+											Create new &quot;
+											{searchQuery.trim()}
+											&quot; merchant
+										</span>
+									</button>
+								</div>
+							)}
+
+							{errorMessage && (
+								<p className="shrink-0 px-5 pb-3 text-sm text-red-600 dark:text-red-400">
+									{errorMessage}
+								</p>
+							)}
 						</div>
 					</FloatingFocusManager>
 				</FloatingPortal>
