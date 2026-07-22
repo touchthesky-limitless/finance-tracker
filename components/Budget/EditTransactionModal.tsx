@@ -29,7 +29,6 @@ import {
 
 import { CategorySelector } from "@/components/CategorySelector";
 import { CategoryIcon } from "@/components/CategoryIcon";
-import { CreateRuleModal } from "@/components/Transactions/CreateRuleModal";
 import {
 	type Rule,
 	type Transaction,
@@ -37,6 +36,12 @@ import {
 } from "@/store/useBudgetStore";
 import { findParentCategory, getCategoryTheme } from "@/constants";
 import { getInitialDisplayAmount, parseAmountInput } from "@/utils/formatters";
+import { RuleModal } from "@/components/Transactions/RuleModal";
+import { CATEGORY_HIERARCHY } from "@/constants";
+import {
+	getRuleTransactionUpdates,
+	matchesTransactionRule,
+} from "@/lib/rules/ruleEngine";
 
 interface EditTransactionModalProps {
 	transaction: Transaction;
@@ -87,6 +92,8 @@ export default function EditTransactionModal({
 	const addCustomMerchant = useBudgetStore((state) => state.addCustomMerchant);
 	const addCustomTag = useBudgetStore((state) => state.addCustomTag);
 	const deleteRule = useBudgetStore((state) => state.deleteRule);
+	const saveRule = useBudgetStore((state) => state.saveRule);
+	const customCategories = useBudgetStore((state) => state.customCategories);
 
 	const isNew = !transactions.some((item) => {
 		return item.id === transaction.id;
@@ -172,6 +179,32 @@ export default function EditTransactionModal({
 			window.clearTimeout(timer);
 		};
 	}, [deletingRule]);
+
+	const ruleCategories = useMemo(() => {
+		const names = new Set<string>();
+
+		for (const children of Object.values(CATEGORY_HIERARCHY)) {
+			for (const child of children) {
+				names.add(child);
+			}
+		}
+
+		for (const category of customCategories) {
+			if (category.parent_name?.trim()) {
+				names.add(category.name.trim());
+			}
+		}
+
+		for (const item of transactions) {
+			if (item.category?.trim()) {
+				names.add(item.category.trim());
+			}
+		}
+
+		return [...names].sort((first, second) => {
+			return first.localeCompare(second);
+		});
+	}, [customCategories, transactions]);
 
 	const allMerchantNames = useMemo(() => {
 		const byNormalizedName = new Map<string, string>();
@@ -262,11 +295,13 @@ export default function EditTransactionModal({
 		}
 
 		return rules.filter((rule) => {
-			return (
-				normalize(rule.keyword).includes(query) ||
-				normalize(rule.category).includes(query) ||
-				normalize(rule.matchCategory ?? "").includes(query)
-			);
+			const searchableText = [
+				rule.name,
+				getRuleSummary(rule),
+				getRuleActionSummary(rule),
+			].join(" ");
+
+			return normalize(searchableText).includes(query);
 		});
 	}, [ruleSearch, rules]);
 
@@ -326,9 +361,16 @@ export default function EditTransactionModal({
 				return;
 			}
 
-			const normalizedMerchant = normalize(merchantName);
+			const candidateTransaction: Transaction = {
+				...editedData,
+				merchant: merchantName,
+			};
+
 			const matchingRule = rules.find((rule) => {
-				return normalizedMerchant.includes(normalize(rule.keyword));
+				return (
+					Boolean(rule.actions.updateCategory) &&
+					matchesTransactionRule(candidateTransaction, rule)
+				);
 			});
 
 			if (!matchingRule) {
@@ -336,15 +378,26 @@ export default function EditTransactionModal({
 				return;
 			}
 
+			const updates = getRuleTransactionUpdates(
+				candidateTransaction,
+				matchingRule,
+			);
+
+			if (!updates.category) {
+				setRuleSuggestion(null);
+				return;
+			}
+
 			setEditedData((current) => {
 				return {
 					...current,
-					category: matchingRule.category,
+					category: updates.category ?? current.category,
 				};
 			});
-			setRuleSuggestion(matchingRule.category);
+
+			setRuleSuggestion(updates.category);
 		},
-		[isNew, rules],
+		[editedData, isNew, rules],
 	);
 
 	const selectMerchant = useCallback(
@@ -1145,19 +1198,35 @@ export default function EditTransactionModal({
 					</div>
 				)}
 
-				<CreateRuleModal
-					key={
-						ruleToEdit ? `edit-${ruleToEdit.keyword}` : `new-${editedData.id}`
-					}
+				<RuleModal
+					key={ruleToEdit ? `edit-${ruleToEdit.id}` : `new-${editedData.id}`}
 					isOpen={isRuleModalOpen}
+					initialRule={ruleToEdit}
+					seed={
+						ruleToEdit
+							? null
+							: {
+									sourceTransaction: editedData,
+								}
+					}
+					transactions={transactions}
+					accounts={accounts}
+					merchants={merchants}
+					categories={ruleCategories}
+					tags={customTags}
 					onClose={() => {
 						setIsRuleModalOpen(false);
 						setRuleToEdit(null);
 					}}
-					initialName={ruleToEdit?.keyword ?? editedData.merchant}
-					initialCategory={ruleToEdit?.category ?? editedData.category}
-					onSaveSuccess={(count, snapshot) => {
-						onRuleSaved(count, snapshot);
+					onSave={async (rule, options) => {
+						const result = await saveRule(rule, options.applyToExisting);
+
+						onRuleSaved(result.count, result.snapshot);
+						setIsRuleModalOpen(false);
+						setRuleToEdit(null);
+					}}
+					onDelete={async (rule) => {
+						await deleteRule(rule.id);
 						setIsRuleModalOpen(false);
 						setRuleToEdit(null);
 					}}
@@ -1242,6 +1311,74 @@ interface RulesPanelProps {
 	onEditRule: (rule: Rule) => void;
 }
 
+function formatRuleOperator(operator: string): string {
+	return operator.replaceAll("_", " ");
+}
+
+function getRuleSummary(rule: Rule): string {
+	const conditions: string[] = [];
+
+	if (rule.criteria.originalStatement) {
+		conditions.push(
+			`Statement ${formatRuleOperator(
+				rule.criteria.originalStatement.operator,
+			)} “${rule.criteria.originalStatement.value}”`,
+		);
+	}
+
+	if (rule.criteria.merchantName) {
+		conditions.push(
+			`Merchant ${formatRuleOperator(
+				rule.criteria.merchantName.operator,
+			)} “${rule.criteria.merchantName.value}”`,
+		);
+	}
+
+	if (rule.criteria.amount) {
+		conditions.push(
+			`${rule.criteria.amount.direction} amount ${formatRuleOperator(
+				rule.criteria.amount.operator,
+			)} $${rule.criteria.amount.value}`,
+		);
+	}
+
+	if (rule.criteria.categories?.length) {
+		conditions.push(`Category: ${rule.criteria.categories.join(", ")}`);
+	}
+
+	return conditions.join(" · ") || "Custom criteria";
+}
+
+function getRuleActionSummary(rule: Rule): string {
+	const actions: string[] = [];
+
+	if (rule.actions.renameMerchant) {
+		actions.push(`Rename to ${rule.actions.renameMerchant.name}`);
+	}
+
+	if (rule.actions.updateCategory) {
+		actions.push(`Set category to ${rule.actions.updateCategory}`);
+	}
+
+	if (rule.actions.addTags?.length) {
+		actions.push(`Add tags: ${rule.actions.addTags.join(", ")}`);
+	}
+
+	if (rule.actions.hideTransaction) {
+		actions.push("Hide transaction");
+	}
+
+	if (rule.actions.reviewStatus) {
+		actions.push(
+			rule.actions.reviewStatus === "needs_review"
+				? "Mark as needs review"
+				: "Mark as reviewed",
+		);
+	}
+
+	return actions.join(" · ") || "Apply updates";
+}
+
 function RulesPanel({
 	rules,
 	searchQuery,
@@ -1298,12 +1435,17 @@ function RulesPanel({
 				) : (
 					<div className="space-y-2.5">
 						{rules.map((rule) => {
-							const parent = findParentCategory(rule.category);
-							const theme = getCategoryTheme(rule.category);
+							const displayCategory =
+								rule.actions.updateCategory ??
+								rule.criteria.categories?.[0] ??
+								"Uncategorized";
+
+							const parent = findParentCategory(displayCategory);
+							const theme = getCategoryTheme(displayCategory);
 
 							return (
 								<div
-									key={rule.keyword}
+									key={rule.id}
 									className="flex items-center gap-3 rounded-xl border border-gray-200 p-3.5 dark:border-white/10"
 								>
 									<div className="grid size-9 shrink-0 place-items-center rounded-lg bg-gray-100 dark:bg-white/5">
@@ -1315,17 +1457,18 @@ function RulesPanel({
 									</div>
 									<div className="min-w-0 flex-1">
 										<p className="truncate text-sm font-semibold">
-											Contains “{rule.keyword}”
+											{rule.name}
 										</p>
 										<p className="mt-0.5 truncate text-xs text-gray-500 dark:text-gray-400">
-											Set category to {rule.category}
-											{rule.matchCategory
-												? ` when current category is ${rule.matchCategory}`
-												: ""}
+											{getRuleSummary(rule)}
+										</p>
+
+										<p className="mt-0.5 truncate text-xs text-gray-500 dark:text-gray-400">
+											{getRuleActionSummary(rule)}
 										</p>
 									</div>
 
-									{deletingRule === rule.keyword ? (
+									{deletingRule === rule.id ? (
 										<div className="flex shrink-0 items-center gap-1">
 											<button
 												type="button"
@@ -1337,7 +1480,7 @@ function RulesPanel({
 											<button
 												type="button"
 												onClick={() => {
-													onConfirmDelete(rule.keyword);
+													onConfirmDelete(rule.id);
 												}}
 												className="rounded-lg bg-red-600 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-red-500"
 											>
@@ -1352,17 +1495,17 @@ function RulesPanel({
 													onEditRule(rule);
 												}}
 												className="grid size-9 place-items-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-white/5 dark:hover:text-white"
-												aria-label={`Edit ${rule.keyword} rule`}
+												aria-label={`Edit ${rule.name} rule`}
 											>
 												<Edit3 size={16} />
 											</button>
 											<button
 												type="button"
 												onClick={() => {
-													onRequestDelete(rule.keyword);
+													onRequestDelete(rule.id);
 												}}
 												className="grid size-9 place-items-center rounded-lg text-gray-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-500/10"
-												aria-label={`Delete ${rule.keyword} rule`}
+												aria-label={`Delete ${rule.name} rule`}
 											>
 												<Trash2 size={16} />
 											</button>

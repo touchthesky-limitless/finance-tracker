@@ -7,11 +7,18 @@ import { CATEGORY_HIERARCHY } from "@/constants";
 import { createClient } from "@/lib/supabase";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
+import type { TransactionRule } from "@/lib/rules/ruleEngine";
+import { applyTransactionRule } from "@/lib/rules/ruleEngine";
+import {
+	deleteTransactionRule,
+	fetchTransactionRules,
+	saveTransactionRule,
+} from "@/lib/rules/ruleRepository";
 
 const supabase = createClient();
 
 const TRANSACTION_COLUMNS =
-	"id, user_id, date, merchant, merchant_id, description, amount, category, account_id, account, needs_review, needs_subcat, tags, created_at";
+	"id, user_id, date, merchant, merchant_id, description, amount, category, account_id, account, needs_review, needs_subcat, tags, is_hidden, created_at";
 const CUSTOM_CATEGORY_COLUMNS =
 	"id, user_id, name, parent_name, icon_name, color_key, created_at, is_system";
 const DATABASE_BATCH_SIZE = 100;
@@ -77,6 +84,7 @@ export interface Transaction {
 	created_at?: string;
 	tags?: string[];
 	note?: string;
+	is_hidden?: boolean;
 }
 
 export interface Account {
@@ -124,11 +132,7 @@ const getTransactionFingerprint = (
 	].join("\u001f");
 };
 
-export interface Rule {
-	keyword: string;
-	category: string;
-	matchCategory?: string;
-}
+export type Rule = TransactionRule;
 
 export interface CustomCategory {
 	id: string;
@@ -201,8 +205,15 @@ interface BudgetState {
 	undoBulkUpdate: (previousTransactions: Transaction[]) => void;
 	getCategoryTotals: () => Record<string, number>;
 
-	saveRule: (rule: Rule, oldKeyword?: string) => Promise<void>;
-	deleteRule: (keyword: string) => Promise<void>;
+	saveRule: (
+		rule: Rule,
+		applyToExisting?: boolean,
+	) => Promise<{
+		count: number;
+		snapshot: Transaction[];
+	}>;
+
+	deleteRule: (ruleId: string) => Promise<void>;
 
 	addCustomTag: (tag: string) => void;
 	fetchCustomCategories: () => Promise<void>;
@@ -232,11 +243,6 @@ interface BudgetState {
 	fetchMerchants: () => Promise<void>;
 
 	addCustomMerchant: (name: string) => Promise<Merchant>;
-}
-
-interface PreparedRule extends Rule {
-	normalizedKeyword: string;
-	normalizedMatchCategory: string;
 }
 
 const uniqueStrings = (values: string[]): string[] => {
@@ -419,54 +425,6 @@ const savePreferences = async (
 	}
 };
 
-const prepareRules = (rules: Rule[]): PreparedRule[] => {
-	return rules
-		.map((rule) => {
-			return {
-				...rule,
-				normalizedKeyword: normalize(rule.keyword),
-				normalizedMatchCategory: normalize(rule.matchCategory),
-			};
-		})
-		.filter((rule) => rule.normalizedKeyword)
-		.sort((a, b) => {
-			return b.normalizedKeyword.length - a.normalizedKeyword.length;
-		});
-};
-
-const matchesRule = (transaction: Transaction, rule: PreparedRule): boolean => {
-	if (!normalize(transaction.merchant).includes(rule.normalizedKeyword)) {
-		return false;
-	}
-
-	return (
-		!rule.normalizedMatchCategory ||
-		normalize(transaction.category) === rule.normalizedMatchCategory
-	);
-};
-
-const applyRules = (
-	transaction: Transaction,
-	rules: PreparedRule[],
-): Transaction => {
-	for (const rule of rules) {
-		if (!matchesRule(transaction, rule)) {
-			continue;
-		}
-
-		const needsReview = GENERIC_CATEGORY_NAMES.has(normalize(rule.category));
-
-		return {
-			...transaction,
-			category: rule.category,
-			needs_review: needsReview,
-			needs_subcat: needsReview,
-		};
-	}
-
-	return transaction;
-};
-
 const splitIntoBatches = <T>(values: T[]): T[][] => {
 	const batches: T[][] = [];
 
@@ -526,6 +484,16 @@ function parseCategoryIds(value: unknown): CategoryId[] {
 	}
 
 	return result;
+}
+
+function applyAllRules(transaction: Transaction, rules: Rule[]): Transaction {
+	let updatedTransaction = transaction;
+
+	for (const rule of rules) {
+		updatedTransaction = applyTransactionRule(updatedTransaction, rule);
+	}
+
+	return updatedTransaction;
 }
 
 export const useBudgetStore = create<BudgetState>()(
@@ -743,10 +711,10 @@ export const useBudgetStore = create<BudgetState>()(
 					throw new Error("You must be signed in to add transactions.");
 				}
 
-				const rules = prepareRules(get().rules);
+				const rules = get().rules;
 
 				const preparedTransactions = newTransactions.map((transaction) => {
-					const processed = applyRules(transaction, rules);
+					const processed = applyAllRules(transaction, rules);
 
 					const accountName = processed.account?.trim();
 
@@ -807,6 +775,7 @@ export const useBudgetStore = create<BudgetState>()(
 						needs_review: processed.needs_review ?? true,
 						needs_subcat: processed.needs_subcat ?? true,
 						tags: processed.tags ?? [],
+						is_hidden: processed.is_hidden ?? false,
 					};
 				});
 
@@ -929,33 +898,22 @@ export const useBudgetStore = create<BudgetState>()(
 						return;
 					}
 
-					const [transactionResponse, ruleResponse] = await Promise.all([
+					const [transactionResponse, loadedRules] = await Promise.all([
 						supabase
 							.from("transactions")
 							.select(TRANSACTION_COLUMNS)
 							.order("date", { ascending: false })
 							.order("created_at", { ascending: false }),
-						supabase.from("rules").select("keyword, category, match_category"),
+						fetchTransactionRules(),
 					]);
 
 					if (transactionResponse.error) {
 						throw transactionResponse.error;
 					}
 
-					if (ruleResponse.error) {
-						throw ruleResponse.error;
-					}
-
 					set({
-						transactions: mergeTransactionsById(
-							(transactionResponse.data ?? []) as Transaction[],
-							[],
-						),
-						rules: (ruleResponse.data ?? []).map((rule) => ({
-							keyword: rule.keyword,
-							category: rule.category,
-							matchCategory: rule.match_category ?? undefined,
-						})),
+						transactions: (transactionResponse.data ?? []) as Transaction[],
+						rules: loadedRules,
 						isLoading: false,
 					});
 				} catch (error) {
@@ -1109,120 +1067,32 @@ export const useBudgetStore = create<BudgetState>()(
 				set({ transactions: previousTransactions });
 			},
 
-			saveRule: async (newRule, oldKeyword) => {
-				const rule: Rule = {
-					keyword: newRule.keyword.trim(),
-					category: newRule.category.trim(),
-					matchCategory: newRule.matchCategory?.trim() || undefined,
-				};
-
-				if (!rule.keyword || !rule.category) {
-					throw new Error("Rule keyword and category are required.");
-				}
-
-				const userId = await getUserId();
-
-				if (!userId) {
-					throw new Error("You must be signed in to save a rule.");
-				}
-
-				const preparedRule = prepareRules([rule])[0];
-				const needsReview = GENERIC_CATEGORY_NAMES.has(
-					normalize(rule.category),
+			saveRule: async (rule, applyToExisting = false) => {
+				const result = await saveTransactionRule(
+					rule,
+					get().transactions,
+					applyToExisting,
 				);
-				const matchingIds = get()
-					.transactions.filter((transaction) => {
-						return matchesRule(transaction, preparedRule);
-					})
-					.map((transaction) => transaction.id);
-
-				const { error: saveError } = await supabase.from("rules").upsert(
-					{
-						user_id: userId,
-						keyword: rule.keyword,
-						category: rule.category,
-						match_category: rule.matchCategory ?? null,
-					},
-					{ onConflict: "user_id,keyword" },
-				);
-
-				if (saveError) {
-					throw saveError;
-				}
-
-				for (const batch of splitIntoBatches(matchingIds)) {
-					const { error } = await supabase
-						.from("transactions")
-						.update({
-							category: rule.category,
-							needs_review: needsReview,
-							needs_subcat: needsReview,
-						})
-						.in("id", batch);
-
-					if (error) {
-						throw error;
-					}
-				}
-
-				if (oldKeyword && normalize(oldKeyword) !== normalize(rule.keyword)) {
-					const { error } = await supabase
-						.from("rules")
-						.delete()
-						.eq("user_id", userId)
-						.eq("keyword", oldKeyword);
-
-					if (error) {
-						throw error;
-					}
-				}
 
 				set((state) => ({
 					rules: [
-						...state.rules.filter((existingRule) => {
-							return (
-								normalize(existingRule.keyword) !== normalize(rule.keyword) &&
-								normalize(existingRule.keyword) !== normalize(oldKeyword)
-							);
-						}),
-						rule,
+						result.rule,
+						...state.rules.filter((item) => item.id !== result.rule.id),
 					],
-					transactions: state.transactions.map((transaction) => {
-						if (!matchesRule(transaction, preparedRule)) {
-							return transaction;
-						}
-
-						return {
-							...transaction,
-							category: rule.category,
-							needs_review: needsReview,
-							needs_subcat: needsReview,
-						};
-					}),
+					transactions: result.updatedTransactions,
 				}));
+
+				return {
+					count: applyToExisting ? result.matchingTransactions.length : 0,
+					snapshot: result.snapshot,
+				};
 			},
 
-			deleteRule: async (keyword) => {
-				const userId = await getUserId();
-
-				if (!userId) {
-					throw new Error("You must be signed in to delete a rule.");
-				}
-
-				const { error } = await supabase
-					.from("rules")
-					.delete()
-					.eq("user_id", userId)
-					.eq("keyword", keyword);
-
-				if (error) {
-					throw error;
-				}
+			deleteRule: async (ruleId) => {
+				await deleteTransactionRule(ruleId);
 
 				set((state) => ({
-					rules: state.rules.filter((rule) => {
-						return normalize(rule.keyword) !== normalize(keyword);
-					}),
+					rules: state.rules.filter((rule) => rule.id !== ruleId),
 				}));
 			},
 

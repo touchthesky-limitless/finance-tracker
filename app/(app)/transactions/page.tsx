@@ -29,6 +29,9 @@ import {
 	type TransactionFilters,
 } from "@/components/Transactions/transactionFilters";
 import { useMerchantOptions } from "@/hooks/useMerchantOptions";
+import type { RuleModalSeed } from "@/components/Transactions/RuleModal";
+import type { TransactionRule } from "@/lib/rules/ruleEngine";
+import { MerchantRuleToast } from "@/components/Transactions/MerchantRuleToast";
 
 const DEFAULT_SORTING: SortingState = [
 	{
@@ -44,6 +47,14 @@ const EditTransactionModal = dynamic(
 	{
 		ssr: false,
 	},
+);
+
+const RuleModal = dynamic(
+	() =>
+		import("@/components/Transactions/RuleModal").then(
+			(module) => module.RuleModal,
+		),
+	{ ssr: false },
 );
 
 function readLocalStorage<T>(key: string, fallback: T): T {
@@ -104,9 +115,16 @@ export default function TransactionsPage() {
 
 	const customTags = useBudgetStore((state) => state.customTags);
 
+	const saveRule = useBudgetStore((state) => state.saveRule);
+const deleteRule = useBudgetStore((state) => state.deleteRule);
+
 	const confirmedRecurringMerchants = useBudgetStore(
 		(state) => state.confirmedRecurringMerchants,
 	);
+
+	const merchants = useBudgetStore((state) => {
+	return state.merchants;
+});
 
 	// Page state
 	const [searchQuery, setSearchQuery] = useState("");
@@ -141,6 +159,16 @@ export default function TransactionsPage() {
 			return readLocalStorage<VisibilityState>("sort_cols", {});
 		},
 	);
+
+	const [merchantRuleSuggestion, setMerchantRuleSuggestion] = useState<{
+	transaction: Transaction;
+	merchant: Pick<Merchant, "id" | "name">;
+} | null>(null);
+
+const [ruleModalState, setRuleModalState] = useState<{
+	rule?: TransactionRule | null;
+	seed?: RuleModalSeed | null;
+} | null>(null);
 
 	const [sorting, setSorting] = useState<SortingState>(() => {
 		return readLocalStorage<SortingState>("custom_sort", DEFAULT_SORTING);
@@ -451,6 +479,12 @@ export default function TransactionsPage() {
 		transactions,
 	]);
 
+	const ruleCategoryNames = useMemo(() => {
+	return filterData.categories
+		.filter((option) => !option.isParent)
+		.map((option) => option.value);
+}, [filterData.categories]);
+
 	const normalizedRecurringMerchants = useMemo(() => {
 		return new Set(
 			confirmedRecurringMerchants.map((merchantName) => {
@@ -622,14 +656,32 @@ export default function TransactionsPage() {
 	}, []);
 
 	const handleMerchantChange = useCallback(
-		async (transactionId: string, merchant: Pick<Merchant, "id" | "name">) => {
-			await updateTransaction(transactionId, {
-				merchant: merchant.name,
-				merchant_id: merchant.id,
-			});
-		},
-		[updateTransaction],
-	);
+	async (
+		transactionId: string,
+		merchant: Pick<Merchant, "id" | "name">,
+	) => {
+		const originalTransaction = transactions.find((transaction) => {
+			return transaction.id === transactionId;
+		});
+
+		await updateTransaction(transactionId, {
+			merchant: merchant.name,
+			merchant_id: merchant.id,
+		});
+
+		if (!originalTransaction) {
+			return;
+		}
+
+		setMerchantRuleSuggestion({
+			// Keep the pre-update transaction so the rule criterion uses the
+			// bank's original statement/old merchant, not the new merchant.
+			transaction: originalTransaction,
+			merchant,
+		});
+	},
+	[transactions, updateTransaction],
+);
 
 	// Update only the category field
 	const handleCategoryChange = useCallback(
@@ -810,6 +862,54 @@ export default function TransactionsPage() {
 					}}
 				/>
 			)}
+
+			<MerchantRuleToast
+	show={Boolean(merchantRuleSuggestion)}
+	merchantName={merchantRuleSuggestion?.merchant.name ?? ""}
+	onDismiss={() => {
+		setMerchantRuleSuggestion(null);
+	}}
+	onCreateRule={() => {
+		if (!merchantRuleSuggestion) {
+			return;
+		}
+
+		setRuleModalState({
+			seed: {
+				sourceTransaction: merchantRuleSuggestion.transaction,
+				renameMerchant: merchantRuleSuggestion.merchant,
+			},
+		});
+		setMerchantRuleSuggestion(null);
+	}}
+/>
+
+<RuleModal
+	isOpen={Boolean(ruleModalState)}
+	initialRule={ruleModalState?.rule ?? null}
+	seed={ruleModalState?.seed ?? null}
+	transactions={transactions}
+	accounts={accounts}
+	merchants={merchants}
+	categories={ruleCategoryNames}
+	tags={customTags}
+	onClose={() => {
+		setRuleModalState(null);
+	}}
+	onSave={async (rule, options) => {
+		const result = await saveRule(rule, options.applyToExisting);
+
+		if (result.count > 0) {
+			setToast({
+				count: result.count,
+				snapshot: result.snapshot,
+			});
+		}
+	}}
+	onDelete={async (rule) => {
+		await deleteRule(rule.id);
+	}}
+/>
 
 			{toast && (
 				<UndoToast
