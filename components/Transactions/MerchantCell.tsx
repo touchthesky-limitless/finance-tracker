@@ -27,8 +27,6 @@ import type { Merchant, Transaction } from "@/store/useBudgetStore";
 import { useBudgetStore } from "@/store/useBudgetStore";
 import type { MerchantListItem } from "@/components/Merchants/types";
 import { MerchantOptionContent } from "@/components/Merchants/MerchantOptionContent";
-import { MerchantLogo } from "@/components/Merchants/MerchantLogo";
-import { MerchantTransactionCount } from "@/components/Merchants/MerchantTransactionCount";
 
 interface MerchantCellProps {
 	transaction: Transaction;
