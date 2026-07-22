@@ -1,18 +1,42 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
+import {
+	autoUpdate,
+	flip,
+	offset,
+	shift,
+	size,
+	useDismiss,
+	useFloating,
+	useInteractions,
+} from "@floating-ui/react";
 import {
 	AlertCircle,
 	Check,
 	ChevronDown,
+	CircleMinus,
+	CirclePlus,
 	Loader2,
 	Plus,
+	Search,
 	Trash2,
 	X,
 } from "lucide-react";
 
-import type { Account, Merchant, Transaction } from "@/store/useBudgetStore";
+import { CategorySelector } from "@/components/CategorySelector";
+import { CategoryIcon } from "@/components/CategoryIcon";
+import { MerchantOptionContent } from "@/components/Merchants/MerchantOptionContent";
+import type { MerchantListItem } from "@/components/Merchants/types";
+import { findParentCategory, getCategoryTheme } from "@/constants";
+import { useMerchantOptions } from "@/hooks/useMerchantOptions";
+import {
+	type Account,
+	type Merchant,
+	type Transaction,
+	useBudgetStore,
+} from "@/store/useBudgetStore";
 import {
 	describeRuleChanges,
 	getOriginalStatement,
@@ -56,10 +80,15 @@ interface RuleModalProps {
 
 type RuleModalTab = "settings" | "preview";
 
-interface TextCriterionDraft {
-	enabled: boolean;
+interface TextCriterionConditionDraft {
+	id: string;
 	operator: RuleTextOperator;
 	value: string;
+}
+
+interface TextCriterionDraft {
+	enabled: boolean;
+	conditions: TextCriterionConditionDraft[];
 }
 
 interface AmountCriterionDraft {
@@ -129,6 +158,17 @@ function createId(): string {
 	return `rule-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
+function createTextCondition(
+	value = "",
+	operator: RuleTextOperator = "contains",
+): TextCriterionConditionDraft {
+	return {
+		id: createId(),
+		operator,
+		value,
+	};
+}
+
 function normalize(value?: string | null): string {
 	return value?.trim().toLowerCase().replace(/\s+/g, " ") ?? "";
 }
@@ -162,14 +202,21 @@ function createDraft(
 			name: initialRule.name,
 			originalStatement: {
 				enabled: Boolean(initialRule.criteria.originalStatement),
-				operator:
-					initialRule.criteria.originalStatement?.operator ?? "contains",
-				value: initialRule.criteria.originalStatement?.value ?? "",
+				conditions: [
+					createTextCondition(
+						initialRule.criteria.originalStatement?.value ?? "",
+						initialRule.criteria.originalStatement?.operator ?? "contains",
+					),
+				],
 			},
 			merchantName: {
 				enabled: Boolean(initialRule.criteria.merchantName),
-				operator: initialRule.criteria.merchantName?.operator ?? "contains",
-				value: initialRule.criteria.merchantName?.value ?? "",
+				conditions: [
+					createTextCondition(
+						initialRule.criteria.merchantName?.value ?? "",
+						initialRule.criteria.merchantName?.operator ?? "contains",
+					),
+				],
 			},
 			amount: {
 				enabled: Boolean(initialRule.criteria.amount),
@@ -214,19 +261,14 @@ function createDraft(
 	const source = seed?.sourceTransaction ?? null;
 	const renamedMerchant = seed?.renameMerchant ?? null;
 	const requestedCategory = seed?.updateCategory?.trim() ?? "";
-
 	const originalStatement = source ? getOriginalStatement(source) : "";
-
 	const sourceMerchant = source?.merchant?.trim() ?? "";
-
 	const sourceCategory = source?.category?.trim() ?? "";
-
 	const isMerchantRename = Boolean(renamedMerchant);
 	const isCategoryUpdate = Boolean(requestedCategory);
 
 	return {
 		id: createId(),
-
 		name: isMerchantRename
 			? `Rename ${originalStatement || sourceMerchant}`
 			: isCategoryUpdate
@@ -234,19 +276,18 @@ function createDraft(
 				: sourceMerchant
 					? `${sourceMerchant} rule`
 					: "New transaction rule",
-
 		originalStatement: {
 			enabled: Boolean(isMerchantRename && originalStatement),
-			operator: "contains",
-			value: isMerchantRename ? originalStatement : "",
+			conditions: [
+				createTextCondition(isMerchantRename ? originalStatement : ""),
+			],
 		},
-
 		merchantName: {
 			enabled: Boolean(!isMerchantRename && sourceMerchant),
-			operator: "contains",
-			value: !isMerchantRename ? sourceMerchant : "",
+			conditions: [
+				createTextCondition(!isMerchantRename ? sourceMerchant : ""),
+			],
 		},
-
 		amount: {
 			enabled: false,
 			direction:
@@ -254,23 +295,19 @@ function createDraft(
 			operator: "greater_than",
 			value: "",
 		},
-
 		categories: {
 			enabled: false,
 			values: [],
 		},
-
 		accounts: {
 			enabled: false,
 			values: [],
 		},
-
 		renameMerchant: {
 			enabled: isMerchantRename,
 			merchantId: renamedMerchant?.id ?? "",
 			name: renamedMerchant?.name ?? "",
 		},
-
 		updateCategory: {
 			enabled: Boolean(
 				!isMerchantRename && (requestedCategory || sourceCategory),
@@ -281,16 +318,13 @@ function createDraft(
 					? sourceCategory
 					: "",
 		},
-
 		addTags: {
 			enabled: false,
 			values: [],
 		},
-
 		hideTransaction: {
 			enabled: false,
 		},
-
 		reviewStatus: {
 			enabled: false,
 			value: "needs_review",
@@ -298,58 +332,94 @@ function createDraft(
 	};
 }
 
-function buildRule(draft: RuleDraft): TransactionRule {
-	const amountValue = Number(draft.amount.value);
+function getTextCriteriaOptions(
+	criterion: TextCriterionDraft,
+): Array<{ operator: RuleTextOperator; value: string } | undefined> {
+	if (!criterion.enabled) {
+		return [undefined];
+	}
 
-	return {
-		id: draft.id,
-		name: draft.name.trim() || "Untitled rule",
-		criteria: {
-			originalStatement: draft.originalStatement.enabled
-				? {
-						operator: draft.originalStatement.operator,
-						value: draft.originalStatement.value.trim(),
-					}
-				: undefined,
-			merchantName: draft.merchantName.enabled
-				? {
-						operator: draft.merchantName.operator,
-						value: draft.merchantName.value.trim(),
-					}
-				: undefined,
-			amount: draft.amount.enabled
-				? {
-						direction: draft.amount.direction,
-						operator: draft.amount.operator,
-						value: amountValue,
-					}
-				: undefined,
-			categories: draft.categories.enabled
-				? uniqueStrings(draft.categories.values)
-				: undefined,
-			accountIds: draft.accounts.enabled
-				? uniqueStrings(draft.accounts.values)
-				: undefined,
-		},
-		actions: {
-			renameMerchant: draft.renameMerchant.enabled
-				? {
-						merchantId: draft.renameMerchant.merchantId || null,
-						name: draft.renameMerchant.name.trim(),
-					}
-				: undefined,
-			updateCategory: draft.updateCategory.enabled
-				? draft.updateCategory.value.trim()
-				: undefined,
-			addTags: draft.addTags.enabled
-				? uniqueStrings(draft.addTags.values)
-				: undefined,
-			hideTransaction: draft.hideTransaction.enabled ? true : undefined,
-			reviewStatus: draft.reviewStatus.enabled
-				? draft.reviewStatus.value
-				: undefined,
-		},
-	};
+	const conditions = criterion.conditions
+		.map((condition) => ({
+			operator: condition.operator,
+			value: condition.value.trim(),
+		}))
+		.filter((condition) => condition.value.length > 0);
+
+	return conditions.length > 0 ? conditions : [undefined];
+}
+
+/*
+ * TransactionRule currently stores one original-statement criterion and one
+ * merchant-name criterion. Multiple rows are therefore saved as rule variants:
+ * OR within each text section, AND across different sections.
+ */
+function buildRuleVariants(
+	draft: RuleDraft,
+	options: { createPersistentIds?: boolean } = {},
+): TransactionRule[] {
+	const amountValue = Number(draft.amount.value);
+	const originalStatements = getTextCriteriaOptions(draft.originalStatement);
+	const merchantNames = getTextCriteriaOptions(draft.merchantName);
+	const baseName = draft.name.trim() || "Untitled rule";
+	const rules: TransactionRule[] = [];
+
+	for (const originalStatement of originalStatements) {
+		for (const merchantName of merchantNames) {
+			const ruleIndex = rules.length;
+
+			rules.push({
+				id:
+					ruleIndex === 0
+						? draft.id
+						: options.createPersistentIds
+							? createId()
+							: `${draft.id}-preview-${ruleIndex}`,
+				name: ruleIndex === 0 ? baseName : `${baseName} (${ruleIndex + 1})`,
+				criteria: {
+					originalStatement,
+					merchantName,
+					amount: draft.amount.enabled
+						? {
+								direction: draft.amount.direction,
+								operator: draft.amount.operator,
+								value: amountValue,
+							}
+						: undefined,
+					categories: draft.categories.enabled
+						? uniqueStrings(draft.categories.values)
+						: undefined,
+					accountIds: draft.accounts.enabled
+						? uniqueStrings(draft.accounts.values)
+						: undefined,
+				},
+				actions: {
+					renameMerchant: draft.renameMerchant.enabled
+						? {
+								merchantId: draft.renameMerchant.merchantId || null,
+								name: draft.renameMerchant.name.trim(),
+							}
+						: undefined,
+					updateCategory: draft.updateCategory.enabled
+						? draft.updateCategory.value.trim()
+						: undefined,
+					addTags: draft.addTags.enabled
+						? uniqueStrings(draft.addTags.values)
+						: undefined,
+					hideTransaction: draft.hideTransaction.enabled ? true : undefined,
+					reviewStatus: draft.reviewStatus.enabled
+						? draft.reviewStatus.value
+						: undefined,
+				},
+			});
+		}
+	}
+
+	return rules;
+}
+
+function buildRule(draft: RuleDraft): TransactionRule {
+	return buildRuleVariants(draft)[0];
 }
 
 function validateDraft(draft: RuleDraft): ValidationErrors {
@@ -366,13 +436,20 @@ function validateDraft(draft: RuleDraft): ValidationErrors {
 
 	if (
 		draft.originalStatement.enabled &&
-		!draft.originalStatement.value.trim()
+		draft.originalStatement.conditions.some((condition) => {
+			return !condition.value.trim();
+		})
 	) {
-		errors.originalStatement = "Original statement value is required.";
+		errors.originalStatement = "Original statement is a required field.";
 	}
 
-	if (draft.merchantName.enabled && !draft.merchantName.value.trim()) {
-		errors.merchantName = "Merchant name value is required.";
+	if (
+		draft.merchantName.enabled &&
+		draft.merchantName.conditions.some((condition) => {
+			return !condition.value.trim();
+		})
+	) {
+		errors.merchantName = "Merchant name is a required field.";
 	}
 
 	if (draft.amount.enabled) {
@@ -416,13 +493,13 @@ export function RuleModal({
 	seed,
 	transactions,
 	accounts,
-	merchants,
-	categories,
 	tags,
 	onClose,
 	onSave,
 	onDelete,
 }: RuleModalProps) {
+	const merchantItems = useMerchantOptions();
+
 	const [draft, setDraft] = useState(() => {
 		return createDraft(initialRule, seed);
 	});
@@ -433,6 +510,8 @@ export function RuleModal({
 	const [isDeleting, setIsDeleting] = useState(false);
 	const [deleteArmed, setDeleteArmed] = useState(false);
 	const [saveError, setSaveError] = useState<string | null>(null);
+	const [floatingLayerElement, setFloatingLayerElement] =
+		useState<HTMLDivElement | null>(null);
 
 	useEffect(() => {
 		if (!isOpen) {
@@ -460,8 +539,8 @@ export function RuleModal({
 		return validateDraft(draft);
 	}, [draft]);
 
-	const rule = useMemo(() => {
-		return buildRule(draft);
+	const ruleVariants = useMemo(() => {
+		return buildRuleVariants(draft);
 	}, [draft]);
 
 	const matchingTransactions = useMemo(() => {
@@ -470,47 +549,11 @@ export function RuleModal({
 		}
 
 		return transactions.filter((transaction) => {
-			return matchesTransactionRule(transaction, rule);
-		});
-	}, [rule, transactions, validation]);
-
-	const merchantOptions = useMemo<Option[]>(() => {
-		const byId = new Map<string, Option>();
-
-		for (const merchant of merchants) {
-			const name = merchant.name.trim();
-
-			if (!merchant.id || !name) {
-				continue;
-			}
-
-			byId.set(merchant.id, {
-				value: merchant.id,
-				label: name,
+			return ruleVariants.some((candidateRule) => {
+				return matchesTransactionRule(transaction, candidateRule);
 			});
-		}
-
-		if (
-			draft.renameMerchant.merchantId &&
-			draft.renameMerchant.name &&
-			!byId.has(draft.renameMerchant.merchantId)
-		) {
-			byId.set(draft.renameMerchant.merchantId, {
-				value: draft.renameMerchant.merchantId,
-				label: draft.renameMerchant.name,
-			});
-		}
-
-		return [...byId.values()].sort((first, second) => {
-			return first.label.localeCompare(second.label);
 		});
-	}, [draft.renameMerchant.merchantId, draft.renameMerchant.name, merchants]);
-
-	const categoryOptions = useMemo<Option[]>(() => {
-		return uniqueStrings(categories)
-			.sort((first, second) => first.localeCompare(second))
-			.map((category) => ({ value: category, label: category }));
-	}, [categories]);
+	}, [ruleVariants, transactions, validation]);
 
 	const accountOptions = useMemo<Option[]>(() => {
 		return accounts
@@ -540,10 +583,21 @@ export function RuleModal({
 		setIsSaving(true);
 
 		try {
-			await onSave(rule, {
-				applyToExisting,
-				matchingTransactions,
+			const rulesToSave = buildRuleVariants(draft, {
+				createPersistentIds: true,
 			});
+
+			for (const ruleToSave of rulesToSave) {
+				const variantMatches = transactions.filter((transaction) => {
+					return matchesTransactionRule(transaction, ruleToSave);
+				});
+
+				await onSave(ruleToSave, {
+					applyToExisting,
+					matchingTransactions: variantMatches,
+				});
+			}
+
 			onClose();
 		} catch (error) {
 			console.error("Failed to save rule:", error);
@@ -587,7 +641,7 @@ export function RuleModal({
 	}
 
 	return createPortal(
-		<div className="fixed inset-0 z-300 flex items-center justify-center p-2 sm:p-4">
+		<div className="fixed inset-0 z-[100] flex items-center justify-center p-2 sm:p-4">
 			<button
 				type="button"
 				aria-label="Close rule dialog"
@@ -605,6 +659,12 @@ export function RuleModal({
 				aria-labelledby="rule-modal-title"
 				className="relative flex h-[min(94vh,980px)] w-full max-w-[1500px] flex-col overflow-hidden rounded-2xl border border-black/10 bg-[#f6f6f4] text-gray-900 shadow-[0_30px_120px_rgba(0,0,0,0.42)] dark:border-white/10 dark:bg-[#1b1b1a] dark:text-white"
 			>
+				<div
+					ref={setFloatingLayerElement}
+					className="pointer-events-none absolute inset-0 z-[300]"
+					data-rule-modal-floating-layer
+				/>
+
 				<header className="shrink-0 border-b border-gray-200 bg-white/90 px-5 pt-4 backdrop-blur dark:border-white/10 dark:bg-[#20201f]/95 sm:px-7">
 					<div className="flex items-start justify-between gap-4">
 						<div className="min-w-0 flex-1">
@@ -663,104 +723,42 @@ export function RuleModal({
 									If transaction matches criteria…
 								</h3>
 
+								{attemptedSave && validation.criteria && (
+									<div className="mb-3">
+										<ValidationBanner message={validation.criteria} />
+									</div>
+								)}
+
 								<div className="space-y-3">
-									<RuleCard
+									<TextCriteriaEditor
 										title="Original statement"
-										enabled={draft.originalStatement.enabled}
-										onEnabledChange={(enabled) => {
-											setDraft((current) => ({
-												...current,
-												originalStatement: {
-													...current.originalStatement,
-													enabled,
-												},
-											}));
-										}}
+										required
+										placeholder="Original statement…"
+										criterion={draft.originalStatement}
 										error={
 											attemptedSave ? validation.originalStatement : undefined
 										}
-									>
-										<div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(150px,0.9fr)_minmax(0,1.6fr)]">
-											<TextOperatorSelect
-												value={draft.originalStatement.operator}
-												onChange={(operator) => {
-													setDraft((current) => ({
-														...current,
-														originalStatement: {
-															...current.originalStatement,
-															operator,
-														},
-													}));
-												}}
-											/>
-											<input
-												type="text"
-												value={draft.originalStatement.value}
-												onChange={(event) => {
-													setDraft((current) => ({
-														...current,
-														originalStatement: {
-															...current.originalStatement,
-															value: event.target.value,
-														},
-													}));
-												}}
-												placeholder="Original statement…"
-												className={fieldClass(
-													Boolean(
-														attemptedSave && validation.originalStatement,
-													),
-												)}
-											/>
-										</div>
-									</RuleCard>
-
-									<RuleCard
-										title="Merchant name"
-										enabled={draft.merchantName.enabled}
-										onEnabledChange={(enabled) => {
+										onChange={(originalStatement) => {
 											setDraft((current) => ({
 												...current,
-												merchantName: {
-													...current.merchantName,
-													enabled,
-												},
+												originalStatement,
 											}));
 										}}
+									/>
+
+									<TextCriteriaEditor
+										title="Merchant name"
+										required
+										placeholder="Merchant name…"
+										criterion={draft.merchantName}
 										error={attemptedSave ? validation.merchantName : undefined}
-									>
-										<div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(150px,0.9fr)_minmax(0,1.6fr)]">
-											<TextOperatorSelect
-												value={draft.merchantName.operator}
-												onChange={(operator) => {
-													setDraft((current) => ({
-														...current,
-														merchantName: {
-															...current.merchantName,
-															operator,
-														},
-													}));
-												}}
-											/>
-											<input
-												type="text"
-												value={draft.merchantName.value}
-												onChange={(event) => {
-													setDraft((current) => ({
-														...current,
-														merchantName: {
-															...current.merchantName,
-															value: event.target.value,
-														},
-													}));
-												}}
-												placeholder="Merchant name…"
-												className={fieldClass(
-													Boolean(attemptedSave && validation.merchantName),
-												)}
-											/>
-										</div>
-									</RuleCard>
+										onChange={(merchantName) => {
+											setDraft((current) => ({
+												...current,
+												merchantName,
+											}));
+										}}
+									/>
 
 									<RuleCard
 										title="Amount"
@@ -852,10 +850,8 @@ export function RuleModal({
 										}}
 										error={attemptedSave ? validation.categories : undefined}
 									>
-										<MultiSelectField
+										<CategoryCriteriaField
 											values={draft.categories.values}
-											options={categoryOptions}
-											placeholder="Category equals…"
 											onChange={(values) => {
 												setDraft((current) => ({
 													...current,
@@ -889,16 +885,16 @@ export function RuleModal({
 										/>
 									</RuleCard>
 								</div>
-
-								{attemptedSave && validation.criteria && (
-									<ValidationBanner message={validation.criteria} />
-								)}
 							</div>
 
 							<div className="p-4 sm:p-5">
 								<h3 className="mb-3 text-sm font-semibold">
 									Then apply these updates…
 								</h3>
+
+								{attemptedSave && validation.actions && (
+									<ValidationBanner message={validation.actions} />
+								)}
 
 								<div className="space-y-3">
 									<RuleCard
@@ -917,26 +913,26 @@ export function RuleModal({
 											attemptedSave ? validation.renameMerchant : undefined
 										}
 									>
-										<SelectField
-											value={draft.renameMerchant.merchantId}
-											onChange={(merchantId) => {
-												const merchant = merchants.find((item) => {
-													return item.id === merchantId;
-												});
+										<MerchantSearchField
+											portalRoot={floatingLayerElement}
+											boundaryElement={floatingLayerElement}
+											merchantItems={merchantItems}
+											selectedMerchantId={draft.renameMerchant.merchantId}
+											selectedMerchantName={draft.renameMerchant.name}
+											error={Boolean(
+												attemptedSave && validation.renameMerchant,
+											)}
+											onChange={(merchant) => {
 												setDraft((current) => ({
 													...current,
 													renameMerchant: {
 														...current.renameMerchant,
-														merchantId,
-														name: merchant?.name ?? "",
+														enabled: true,
+														merchantId: merchant.id,
+														name: merchant.name,
 													},
 												}));
 											}}
-											options={merchantOptions}
-											placeholder="Rename to…"
-											error={Boolean(
-												attemptedSave && validation.renameMerchant,
-											)}
 										/>
 									</RuleCard>
 
@@ -956,23 +952,29 @@ export function RuleModal({
 											attemptedSave ? validation.updateCategory : undefined
 										}
 									>
-										<SelectField
-											value={draft.updateCategory.value}
-											onChange={(value) => {
-												setDraft((current) => ({
-													...current,
-													updateCategory: {
-														...current.updateCategory,
-														value,
-													},
-												}));
-											}}
-											options={categoryOptions}
-											placeholder="Change category to…"
-											error={Boolean(
-												attemptedSave && validation.updateCategory,
-											)}
-										/>
+										<div
+											className={`rounded-xl border bg-white dark:bg-[#1f1f1e] ${
+												attemptedSave && validation.updateCategory
+													? "border-red-500 dark:border-red-500"
+													: "border-gray-200 dark:border-white/10"
+											}`}
+										>
+											<CategorySelector
+												currentCategory={draft.updateCategory.value}
+												placeholder="Change category to…"
+												showChevron
+												onSelect={(value) => {
+													setDraft((current) => ({
+														...current,
+														updateCategory: {
+															...current.updateCategory,
+															enabled: true,
+															value,
+														},
+													}));
+												}}
+											/>
+										</div>
 									</RuleCard>
 
 									<RuleCard
@@ -1042,17 +1044,13 @@ export function RuleModal({
 										/>
 									</RuleCard>
 								</div>
-
-								{attemptedSave && validation.actions && (
-									<ValidationBanner message={validation.actions} />
-								)}
 							</div>
 						</div>
 					</div>
 				) : (
 					<PreviewPanel
 						transactions={matchingTransactions}
-						rule={rule}
+						rules={ruleVariants}
 						accountNameById={
 							new Map(accounts.map((account) => [account.id, account.name]))
 						}
@@ -1162,6 +1160,7 @@ function TabButton({ active, label, count, onClick }: TabButtonProps) {
 
 interface RuleCardProps {
 	title: string;
+	required?: boolean;
 	enabled: boolean;
 	onEnabledChange: (enabled: boolean) => void;
 	children: React.ReactNode;
@@ -1170,6 +1169,7 @@ interface RuleCardProps {
 
 function RuleCard({
 	title,
+	required = false,
 	enabled,
 	onEnabledChange,
 	children,
@@ -1183,24 +1183,574 @@ function RuleCard({
 					: "border-gray-200 dark:border-white/10"
 			} bg-white dark:bg-[#252523]`}
 		>
-			<header className="flex items-center justify-between gap-3 border-b border-gray-200 px-4 py-3 dark:border-white/10">
-				<h4 className="text-sm font-semibold">{title}</h4>
-				<Toggle checked={enabled} onChange={onEnabledChange} />
-			</header>
-			<div
-				className={`p-3.5 transition ${
-					enabled ? "opacity-100" : "pointer-events-none opacity-40"
-				}`}
+			<button
+				type="button"
+				role="switch"
+				aria-checked={enabled}
+				onClick={() => onEnabledChange(!enabled)}
+				className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-orange-500/40 dark:hover:bg-white/[0.03]"
 			>
-				{children}
-				{error && (
-					<p className="mt-2 flex items-center gap-1.5 text-xs text-red-600 dark:text-red-400">
-						<AlertCircle size={13} />
-						{error}
-					</p>
-				)}
-			</div>
+				<h4 className="text-sm font-semibold">
+					{title}
+					{required && (
+						<span className="ml-1 text-red-500" aria-hidden="true">
+							*
+						</span>
+					)}
+				</h4>
+				<Toggle checked={enabled} />
+			</button>
+			{enabled && (
+				<div className="border-t border-gray-200 p-3.5 dark:border-white/10">
+					{children}
+					{error && (
+						<p className="mt-2 flex items-center gap-1.5 text-xs text-red-600 dark:text-red-400">
+							<AlertCircle size={13} />
+							{error}
+						</p>
+					)}
+				</div>
+			)}
 		</section>
+	);
+}
+
+interface TextCriteriaEditorProps {
+	title: string;
+	required?: boolean;
+	placeholder: string;
+	criterion: TextCriterionDraft;
+	onChange: (criterion: TextCriterionDraft) => void;
+	error?: string;
+}
+
+function TextCriteriaEditor({
+	title,
+	required = false,
+	placeholder,
+	criterion,
+	onChange,
+	error,
+}: TextCriteriaEditorProps) {
+	const updateCondition = (
+		conditionId: string,
+		patch: Partial<TextCriterionConditionDraft>,
+	) => {
+		onChange({
+			...criterion,
+			conditions: criterion.conditions.map((condition) => {
+				return condition.id === conditionId
+					? { ...condition, ...patch }
+					: condition;
+			}),
+		});
+	};
+
+	const removeCondition = (conditionId: string) => {
+		const remaining = criterion.conditions.filter((condition) => {
+			return condition.id !== conditionId;
+		});
+
+		onChange({
+			...criterion,
+			conditions: remaining.length > 0 ? remaining : [createTextCondition()],
+		});
+	};
+
+	return (
+		<RuleCard
+			title={title}
+			required={required}
+			enabled={criterion.enabled}
+			onEnabledChange={(enabled) => {
+				onChange({ ...criterion, enabled });
+			}}
+			error={error}
+		>
+			<div className="space-y-2.5">
+				{criterion.conditions.map((condition, index) => {
+					const isLastCondition = index === criterion.conditions.length - 1;
+					const canRemoveCondition = criterion.conditions.length > 1;
+
+					return (
+						<React.Fragment key={condition.id}>
+							{index > 0 && (
+								<p className="px-3 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+									Or
+								</p>
+							)}
+
+							<div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
+								<div className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-[minmax(150px,0.8fr)_minmax(0,1.5fr)]">
+									<TextOperatorSelect
+										value={condition.operator}
+										onChange={(operator) => {
+											updateCondition(condition.id, { operator });
+										}}
+									/>
+									<input
+										type="text"
+										required={required && criterion.enabled}
+										aria-required={required && criterion.enabled}
+										aria-invalid={Boolean(error)}
+										value={condition.value}
+										onChange={(event) => {
+											updateCondition(condition.id, {
+												value: event.target.value,
+											});
+										}}
+										placeholder={placeholder}
+										className={fieldClass(Boolean(error))}
+									/>
+								</div>
+
+								<div className="flex items-center justify-end gap-0.5">
+									{isLastCondition && canRemoveCondition && (
+										<button
+											type="button"
+											onClick={() => removeCondition(condition.id)}
+											className="grid h-9 w-9 place-items-center rounded-full text-gray-500 transition hover:bg-gray-100 hover:text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/30 dark:text-gray-400 dark:hover:bg-white/10 dark:hover:text-white"
+											aria-label={`Remove ${title.toLowerCase()} condition`}
+										>
+											<CircleMinus size={20} />
+										</button>
+									)}
+
+									{isLastCondition && (
+										<button
+											type="button"
+											onClick={() => {
+												onChange({
+													...criterion,
+													enabled: true,
+													conditions: [
+														...criterion.conditions,
+														createTextCondition(),
+													],
+												});
+											}}
+											className="grid h-9 w-9 place-items-center rounded-full text-gray-500 transition hover:bg-gray-100 hover:text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/30 dark:text-gray-400 dark:hover:bg-white/10 dark:hover:text-white"
+											aria-label={`Add ${title.toLowerCase()} condition`}
+										>
+											<CirclePlus size={20} />
+										</button>
+									)}
+								</div>
+							</div>
+						</React.Fragment>
+					);
+				})}
+			</div>
+		</RuleCard>
+	);
+}
+
+interface MerchantSearchFieldProps {
+	portalRoot: HTMLElement | null;
+	boundaryElement: HTMLElement | null;
+	merchantItems: MerchantListItem[];
+	selectedMerchantId: string;
+	selectedMerchantName: string;
+	error?: boolean;
+	onChange: (merchant: Pick<Merchant, "id" | "name">) => void;
+}
+
+function MerchantSearchField({
+	portalRoot,
+	boundaryElement,
+	merchantItems,
+	selectedMerchantId,
+	selectedMerchantName,
+	error = false,
+	onChange,
+}: MerchantSearchFieldProps) {
+	const addCustomMerchant = useBudgetStore((state) => {
+		return state.addCustomMerchant;
+	});
+
+	const [query, setQuery] = useState(() => selectedMerchantName);
+	const [isOpen, setIsOpen] = useState(false);
+	const [isCreating, setIsCreating] = useState(false);
+	const [createError, setCreateError] = useState<string | null>(null);
+
+	const [referenceElement, setReferenceElement] =
+		useState<HTMLInputElement | null>(null);
+
+	const [floatingElement, setFloatingElement] = useState<HTMLDivElement | null>(
+		null,
+	);
+
+	const handleReferenceElement = useCallback(
+		(node: HTMLInputElement | null) => {
+			setReferenceElement(node);
+		},
+		[],
+	);
+
+	const handleFloatingElement = useCallback((node: HTMLDivElement | null) => {
+		setFloatingElement(node);
+	}, []);
+
+	const { floatingStyles, context } = useFloating({
+		elements: {
+			reference: referenceElement,
+			floating: floatingElement,
+		},
+		open: isOpen,
+		onOpenChange: (nextOpen) => {
+			setIsOpen(nextOpen);
+
+			if (!nextOpen) {
+				setQuery(selectedMerchantName);
+				setCreateError(null);
+			}
+		},
+		placement: "bottom-start",
+		strategy: "absolute",
+		whileElementsMounted: autoUpdate,
+		middleware: [
+			offset(6),
+			flip({
+				boundary: boundaryElement ?? undefined,
+				padding: 8,
+			}),
+			shift({
+				boundary: boundaryElement ?? undefined,
+				padding: 8,
+			}),
+			size({
+				boundary: boundaryElement ?? undefined,
+				padding: 8,
+				apply({ rects, elements, availableHeight, availableWidth }) {
+					const width = Math.min(
+						rects.reference.width,
+						Math.max(0, availableWidth),
+					);
+
+					Object.assign(elements.floating.style, {
+						width: `${width}px`,
+						maxWidth: `${Math.max(0, availableWidth)}px`,
+						maxHeight: `${Math.max(0, Math.min(384, availableHeight))}px`,
+					});
+				},
+			}),
+		],
+	});
+
+	const dismiss = useDismiss(context);
+
+	const { getReferenceProps, getFloatingProps } = useInteractions([dismiss]);
+
+	const options = useMemo(() => {
+		const hasSelectedMerchant = merchantItems.some((merchant) => {
+			return merchant.id === selectedMerchantId;
+		});
+
+		if (
+			hasSelectedMerchant ||
+			!selectedMerchantId ||
+			!selectedMerchantName.trim()
+		) {
+			return merchantItems;
+		}
+
+		return [
+			...merchantItems,
+			{
+				id: selectedMerchantId,
+				name: selectedMerchantName.trim(),
+				logoUrl: null,
+				transactionCount: 0,
+			},
+		];
+	}, [merchantItems, selectedMerchantId, selectedMerchantName]);
+
+	const visibleMerchants = useMemo(() => {
+		const normalizedQuery = normalize(query);
+		const filtered = normalizedQuery
+			? options.filter((merchant) => {
+					return normalize(merchant.name).includes(normalizedQuery);
+				})
+			: options;
+
+		return [...filtered]
+			.sort((first, second) => {
+				return (
+					second.transactionCount - first.transactionCount ||
+					first.name.localeCompare(second.name)
+				);
+			})
+			.slice(0, 20);
+	}, [options, query]);
+
+	const exactMerchantExists = useMemo(() => {
+		const normalizedQuery = normalize(query);
+
+		if (!normalizedQuery) {
+			return false;
+		}
+
+		return options.some((merchant) => {
+			return normalize(merchant.name) === normalizedQuery;
+		});
+	}, [options, query]);
+
+	const selectMerchant = (merchant: MerchantListItem) => {
+		onChange({
+			id: merchant.id,
+			name: merchant.name,
+		});
+		setQuery(merchant.name);
+		setIsOpen(false);
+		setCreateError(null);
+	};
+
+	const createMerchant = async () => {
+		const cleanName = query.trim();
+
+		if (!cleanName || exactMerchantExists || isCreating) {
+			return;
+		}
+
+		setIsCreating(true);
+		setCreateError(null);
+
+		try {
+			const merchant = await addCustomMerchant(cleanName);
+
+			onChange({
+				id: merchant.id,
+				name: merchant.name,
+			});
+			setQuery(merchant.name);
+			setIsOpen(false);
+		} catch (caughtError) {
+			console.error("Failed to create merchant:", caughtError);
+			setCreateError(
+				caughtError instanceof Error
+					? caughtError.message
+					: "Failed to create merchant.",
+			);
+		} finally {
+			setIsCreating(false);
+		}
+	};
+
+	return (
+		<div className="relative">
+			<div className="relative">
+				<Search
+					size={17}
+					aria-hidden="true"
+					className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+				/>
+				<input
+					ref={handleReferenceElement}
+					{...getReferenceProps()}
+					type="search"
+					role="combobox"
+					aria-expanded={isOpen}
+					aria-controls="rule-merchant-options"
+					aria-autocomplete="list"
+					aria-invalid={error}
+					autoComplete="off"
+					value={query}
+					onFocus={() => {
+						setIsOpen(true);
+					}}
+					onChange={(event) => {
+						setQuery(event.target.value);
+						setIsOpen(true);
+						setCreateError(null);
+					}}
+					onKeyDown={(event) => {
+						if (event.key === "Escape") {
+							event.preventDefault();
+							setIsOpen(false);
+							setQuery(selectedMerchantName);
+							return;
+						}
+
+						if (event.key !== "Enter") {
+							return;
+						}
+
+						event.preventDefault();
+
+						const exactMerchant = options.find((merchant) => {
+							return normalize(merchant.name) === normalize(query);
+						});
+
+						if (exactMerchant) {
+							selectMerchant(exactMerchant);
+							return;
+						}
+
+						if (visibleMerchants[0] && !query.trim()) {
+							selectMerchant(visibleMerchants[0]);
+							return;
+						}
+
+						void createMerchant();
+					}}
+					placeholder="Search merchants…"
+					className={`${fieldClass(error)} pl-10 pr-9`}
+				/>
+				<ChevronDown
+					size={16}
+					aria-hidden="true"
+					className={`pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 transition-transform ${
+						isOpen ? "rotate-180" : ""
+					}`}
+				/>
+			</div>
+
+			{isOpen && portalRoot
+				? createPortal(
+						<div
+							ref={handleFloatingElement}
+							style={floatingStyles}
+							{...getFloatingProps()}
+							id="rule-merchant-options"
+							role="listbox"
+							className="pointer-events-auto z-[1000] flex min-w-[280px] max-w-[calc(100vw-24px)] flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-[0_18px_50px_rgba(0,0,0,0.20)] dark:border-white/10 dark:bg-[#202020]"
+						>
+							<div className="min-h-0 flex-1 overflow-y-auto p-2">
+								{visibleMerchants.map((merchant) => {
+									const isSelected = merchant.id === selectedMerchantId;
+
+									return (
+										<button
+											key={merchant.id}
+											type="button"
+											role="option"
+											aria-selected={isSelected}
+											disabled={isCreating}
+											onClick={() => {
+												selectMerchant(merchant);
+											}}
+											className={`flex w-full items-center gap-2 rounded-xl px-3 py-3 text-left transition-colors hover:bg-gray-100 disabled:cursor-wait disabled:opacity-60 dark:hover:bg-white/5 ${
+												isSelected
+													? "bg-cyan-500/10 text-cyan-600 dark:text-cyan-400"
+													: ""
+											}`}
+										>
+											<MerchantOptionContent merchant={merchant} size="sm" />
+											{isSelected && (
+												<Check size={16} className="shrink-0 text-orange-500" />
+											)}
+										</button>
+									);
+								})}
+
+								{visibleMerchants.length === 0 && !query.trim() && (
+									<p className="px-3 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
+										No merchants found.
+									</p>
+								)}
+							</div>
+
+							{query.trim() && !exactMerchantExists && (
+								<div className="shrink-0 border-t border-gray-200 bg-white p-2 dark:border-white/10 dark:bg-[#202020]">
+									<button
+										type="button"
+										disabled={isCreating}
+										onClick={() => {
+											void createMerchant();
+										}}
+										className="flex min-h-11 w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-semibold text-cyan-600 transition-colors hover:bg-cyan-50 disabled:cursor-wait disabled:opacity-60 dark:text-cyan-400 dark:hover:bg-cyan-500/10"
+									>
+										{isCreating ? (
+											<Loader2 size={17} className="animate-spin" />
+										) : (
+											<Plus size={17} />
+										)}
+										<span className="truncate">
+											Create new &quot;{query.trim()}&quot; merchant
+										</span>
+									</button>
+								</div>
+							)}
+
+							{createError && (
+								<p className="shrink-0 border-t border-red-200 bg-red-50 px-4 py-2 text-sm text-red-600 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-400">
+									{createError}
+								</p>
+							)}
+						</div>,
+						portalRoot,
+					)
+				: null}
+		</div>
+	);
+}
+
+interface CategoryCriteriaFieldProps {
+	values: string[];
+	onChange: (values: string[]) => void;
+}
+
+function CategoryCriteriaField({
+	values,
+	onChange,
+}: CategoryCriteriaFieldProps) {
+	return (
+		<div className="overflow-visible rounded-xl border border-gray-200 bg-white dark:border-white/10 dark:bg-[#1f1f1e]">
+			{values.length > 0 && (
+				<div className="flex flex-wrap gap-1.5 p-2 pb-0">
+					{values.map((value) => {
+						const parentCategory = findParentCategory(value);
+
+						return (
+							<span
+								key={value}
+								className="inline-flex items-center gap-1.5 rounded-lg bg-gray-100 px-2 py-1.5 text-xs font-medium text-gray-700 dark:bg-white/10 dark:text-gray-200"
+							>
+								<CategoryIcon
+									name={value}
+									size={14}
+									colorClass={getCategoryTheme(parentCategory).text}
+								/>
+								<span>{value}</span>
+								<button
+									type="button"
+									onClick={() => {
+										onChange(values.filter((item) => item !== value));
+									}}
+									className="rounded p-0.5 text-gray-400 transition hover:bg-black/10 hover:text-gray-800 dark:hover:bg-white/10 dark:hover:text-white"
+									aria-label={`Remove ${value}`}
+								>
+									<X size={12} />
+								</button>
+							</span>
+						);
+					})}
+				</div>
+			)}
+
+			<div
+				className={
+					values.length > 0
+						? "mt-2 border-t border-gray-100 dark:border-white/5"
+						: ""
+				}
+			>
+				<CategorySelector
+					currentCategory=""
+					placeholder="Search categories…"
+					showChevron
+					onSelect={(category) => {
+						const alreadySelected = values.some((value) => {
+							return normalize(value) === normalize(category);
+						});
+
+						if (!alreadySelected) {
+							onChange([...values, category]);
+						}
+					}}
+				/>
+			</div>
+		</div>
 	);
 }
 
@@ -1218,40 +1768,42 @@ function CompactActionCard({
 	onEnabledChange,
 }: CompactActionCardProps) {
 	return (
-		<section className="flex items-center justify-between gap-4 rounded-2xl border border-gray-200 bg-white px-4 py-3 dark:border-white/10 dark:bg-[#252523]">
+		<button
+			type="button"
+			role="switch"
+			aria-checked={enabled}
+			onClick={() => onEnabledChange(!enabled)}
+			className="flex w-full items-center justify-between gap-4 rounded-2xl border border-gray-200 bg-white px-4 py-3 text-left transition hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/40 dark:border-white/10 dark:bg-[#252523] dark:hover:bg-white/[0.03]"
+		>
 			<div>
 				<h4 className="text-sm font-semibold">{title}</h4>
 				<p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
 					{description}
 				</p>
 			</div>
-			<Toggle checked={enabled} onChange={onEnabledChange} />
-		</section>
+			<Toggle checked={enabled} />
+		</button>
 	);
 }
 
 interface ToggleProps {
 	checked: boolean;
-	onChange: (checked: boolean) => void;
 }
 
-function Toggle({ checked, onChange }: ToggleProps) {
+function Toggle({ checked }: ToggleProps) {
 	return (
-		<button
-			type="button"
-			role="switch"
-			aria-checked={checked}
-			onClick={() => onChange(!checked)}
-			className={`relative h-6 w-11 shrink-0 rounded-full transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/40 ${
+		<span
+			aria-hidden="true"
+			className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
 				checked ? "bg-orange-500" : "bg-gray-300 dark:bg-gray-600"
 			}`}
 		>
 			<span
-				className={`absolute top-0.5 size-5 rounded-full bg-white shadow transition-transform ${
-					checked ? "translate-x-5" : "translate-x-0.5"
+				className={`absolute left-0.5 top-0.5 size-5 rounded-full bg-white shadow transition-transform ${
+					checked ? "translate-x-5" : "translate-x-0"
 				}`}
 			/>
-		</button>
+		</span>
 	);
 }
 
@@ -1409,13 +1961,13 @@ function ValidationBanner({ message }: { message: string }) {
 
 interface PreviewPanelProps {
 	transactions: Transaction[];
-	rule: TransactionRule;
+	rules: TransactionRule[];
 	accountNameById: Map<string, string>;
 }
 
 function PreviewPanel({
 	transactions,
-	rule,
+	rules,
 	accountNameById,
 }: PreviewPanelProps) {
 	return (
@@ -1436,7 +1988,12 @@ function PreviewPanel({
 			) : (
 				<div className="space-y-3">
 					{transactions.map((transaction) => {
-						const changes = describeRuleChanges(transaction, rule);
+						const matchingRule = rules.find((candidateRule) => {
+							return matchesTransactionRule(transaction, candidateRule);
+						});
+						const changes = matchingRule
+							? describeRuleChanges(transaction, matchingRule)
+							: [];
 						const accountName =
 							(transaction.account_id
 								? accountNameById.get(transaction.account_id)

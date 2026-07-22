@@ -91,6 +91,10 @@ function normalizeCategoryName(name: string): string {
 	return name.trim().toLowerCase();
 }
 
+function normalizeMerchantName(name: string): string {
+	return name.trim().toLocaleLowerCase();
+}
+
 export default function TransactionsPage() {
 	// Store selectors
 	const transactions = useBudgetStore((state) => state.transactions);
@@ -671,14 +675,23 @@ export default function TransactionsPage() {
 				return transaction.id === transactionId;
 			});
 
+			if (!originalTransaction) {
+				return;
+			}
+
+			const isSameMerchant = originalTransaction.merchant_id
+				? originalTransaction.merchant_id === merchant.id
+				: normalizeMerchantName(originalTransaction.merchant) ===
+					normalizeMerchantName(merchant.name);
+
+			if (isSameMerchant) {
+				return;
+			}
+
 			await updateTransaction(transactionId, {
 				merchant: merchant.name,
 				merchant_id: merchant.id,
 			});
-
-			if (!originalTransaction) {
-				return;
-			}
 
 			setTransactionRuleSuggestion({
 				type: "merchant",
@@ -897,6 +910,7 @@ export default function TransactionsPage() {
 							: transactionRuleSuggestion.category,
 					].join(":")}
 					show
+					variant={transactionRuleSuggestion.type}
 					updatedValue={
 						transactionRuleSuggestion.type === "merchant"
 							? transactionRuleSuggestion.merchant.name
