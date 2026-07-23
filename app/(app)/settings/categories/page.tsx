@@ -10,11 +10,11 @@ import {
 	Loader2,
 	Pencil,
 	Plus,
-	Search,
 	Trash2,
 	X,
 } from "lucide-react";
 
+import { CategoryEmojiPicker } from "@/components/Categories/CategoryEmojiPicker";
 import {
 	CategoryGlyph,
 	encodeEmojiIcon,
@@ -23,7 +23,6 @@ import {
 import { SettingsContentCard } from "@/components/Settings/SettingsShell";
 import { CATEGORY_HIERARCHY, getCategoryTheme } from "@/constants";
 import { type CustomCategory, useBudgetStore } from "@/store/useBudgetStore";
-import { CategoryEmojiPicker } from "@/components/Categories/CategoryEmojiPicker";
 
 type EditorMode =
 	| "create-group"
@@ -264,55 +263,53 @@ export default function SettingsCategoriesPage() {
 			}
 		}
 
-		return (
-			orderedParentNames
-				.map((parentName) => {
-					const record = parentByName.get(parentName);
-					const key = getGroupKey(parentName, record);
-					const preference = groupPreferences[key];
+		return orderedParentNames
+			.map((parentName) => {
+				const record = parentByName.get(parentName);
+				const key = getGroupKey(parentName, record);
+				const preference = groupPreferences[key];
 
-					return {
-						key,
-						name: parentName,
-						displayName: preference?.name?.trim() || parentName,
-						budgetMode: preference?.budgetMode ?? "category",
-						sectionId: preference?.sectionId ?? getDefaultSectionId(parentName),
-						record,
-						children: [...(childrenByParent.get(parentName) ?? [])].sort(
-							(first, second) => {
-								const firstIndex = CATEGORY_HIERARCHY[parentName]?.indexOf(
-									first.name,
-								);
-								const secondIndex = CATEGORY_HIERARCHY[parentName]?.indexOf(
-									second.name,
-								);
+				return {
+					key,
+					name: parentName,
+					displayName: preference?.name?.trim() || parentName,
+					budgetMode: preference?.budgetMode ?? "category",
+					sectionId: preference?.sectionId ?? getDefaultSectionId(parentName),
+					record,
+					children: [...(childrenByParent.get(parentName) ?? [])].sort(
+						(first, second) => {
+							const firstIndex = CATEGORY_HIERARCHY[parentName]?.indexOf(
+								first.name,
+							);
+							const secondIndex = CATEGORY_HIERARCHY[parentName]?.indexOf(
+								second.name,
+							);
 
-								if (firstIndex !== undefined && firstIndex >= 0) {
-									if (secondIndex === undefined || secondIndex < 0) {
-										return -1;
-									}
-
-									return firstIndex - secondIndex;
+							if (firstIndex !== undefined && firstIndex >= 0) {
+								if (secondIndex === undefined || secondIndex < 0) {
+									return -1;
 								}
 
-								if (secondIndex !== undefined && secondIndex >= 0) {
-									return 1;
-								}
+								return firstIndex - secondIndex;
+							}
 
-								return first.name.localeCompare(second.name);
-							},
-						),
-						hidden: preference?.hidden === true,
-					};
-				})
-				.filter((group) => {
-					return (
-						!group.hidden && Boolean(group.record || group.children.length > 0)
-					);
-				})
-				// eslint-disable-next-line @typescript-eslint/no-unused-vars
-				.map(({ hidden: _hidden, ...group }) => group)
-		);
+							if (secondIndex !== undefined && secondIndex >= 0) {
+								return 1;
+							}
+
+							return first.name.localeCompare(second.name);
+						},
+					),
+					hidden: preference?.hidden === true,
+				};
+			})
+			.filter((group) => {
+				return (
+					!group.hidden && Boolean(group.record || group.children.length > 0)
+				);
+			})
+			// eslint-disable-next-line @typescript-eslint/no-unused-vars
+			.map(({ hidden: _hidden, ...group }) => group);
 	}, [customCategories, groupPreferences]);
 
 	const groupsBySection = useMemo(() => {
@@ -998,215 +995,6 @@ function BudgetModeSelect({
 	);
 }
 
-interface EmojiOption {
-	emoji: string;
-	keywords: string[];
-}
-
-interface EmojiSection {
-	id: string;
-	label: string;
-	tab: string;
-	items: EmojiOption[];
-}
-
-const EMOJI_SECTIONS: EmojiSection[] = [
-	{
-		id: "frequent",
-		label: "Frequently used",
-		tab: "◷",
-		items: [
-			{ emoji: "👍", keywords: ["thumb", "like", "good"] },
-			{ emoji: "😀", keywords: ["smile", "happy", "face"] },
-			{ emoji: "😘", keywords: ["kiss", "love", "face"] },
-			{ emoji: "😍", keywords: ["heart", "love", "face"] },
-			{ emoji: "😆", keywords: ["laugh", "happy", "face"] },
-			{ emoji: "😜", keywords: ["wink", "tongue", "face"] },
-			{ emoji: "😱", keywords: ["shock", "surprised", "face"] },
-			{ emoji: "😬", keywords: ["grimace", "face"] },
-			{ emoji: "🙏", keywords: ["pray", "thanks", "hands"] },
-			{ emoji: "💸", keywords: ["money", "spending", "cash"] },
-			{ emoji: "💳", keywords: ["card", "credit", "payment"] },
-			{ emoji: "🛒", keywords: ["shopping", "cart", "grocery"] },
-		],
-	},
-	{
-		id: "smileys",
-		label: "Smileys & People",
-		tab: "😀",
-		items: [
-			{ emoji: "😀", keywords: ["smile", "happy", "face"] },
-			{ emoji: "😃", keywords: ["smile", "happy", "face"] },
-			{ emoji: "😄", keywords: ["smile", "happy", "face"] },
-			{ emoji: "😁", keywords: ["grin", "happy", "face"] },
-			{ emoji: "😆", keywords: ["laugh", "happy", "face"] },
-			{ emoji: "😅", keywords: ["sweat", "relief", "face"] },
-			{ emoji: "😂", keywords: ["tears", "laugh", "face"] },
-			{ emoji: "😊", keywords: ["blush", "happy", "face"] },
-			{ emoji: "😇", keywords: ["angel", "face"] },
-			{ emoji: "🙂", keywords: ["smile", "face"] },
-			{ emoji: "😉", keywords: ["wink", "face"] },
-			{ emoji: "😍", keywords: ["love", "heart", "face"] },
-			{ emoji: "🥳", keywords: ["party", "celebration"] },
-			{ emoji: "🤓", keywords: ["nerd", "glasses", "study"] },
-			{ emoji: "🤠", keywords: ["cowboy", "hat"] },
-			{ emoji: "🤝", keywords: ["handshake", "business"] },
-			{ emoji: "👨‍👩‍👧‍👦", keywords: ["family", "household"] },
-			{ emoji: "👶", keywords: ["baby", "child"] },
-			{ emoji: "🧑‍⚕️", keywords: ["doctor", "medical", "health"] },
-			{ emoji: "🧑‍💻", keywords: ["computer", "work", "developer"] },
-		],
-	},
-	{
-		id: "animals",
-		label: "Animals & Nature",
-		tab: "🐶",
-		items: [
-			{ emoji: "🐶", keywords: ["dog", "pet"] },
-			{ emoji: "🐱", keywords: ["cat", "pet"] },
-			{ emoji: "🐭", keywords: ["mouse", "pet"] },
-			{ emoji: "🐹", keywords: ["hamster", "pet"] },
-			{ emoji: "🐰", keywords: ["rabbit", "pet"] },
-			{ emoji: "🦊", keywords: ["fox", "animal"] },
-			{ emoji: "🐻", keywords: ["bear", "animal"] },
-			{ emoji: "🐼", keywords: ["panda", "animal"] },
-			{ emoji: "🐨", keywords: ["koala", "animal"] },
-			{ emoji: "🐯", keywords: ["tiger", "animal"] },
-			{ emoji: "🦁", keywords: ["lion", "animal"] },
-			{ emoji: "🐮", keywords: ["cow", "farm"] },
-			{ emoji: "🐷", keywords: ["pig", "farm"] },
-			{ emoji: "🐸", keywords: ["frog", "animal"] },
-			{ emoji: "🐵", keywords: ["monkey", "animal"] },
-			{ emoji: "🌱", keywords: ["plant", "garden", "nature"] },
-			{ emoji: "🌳", keywords: ["tree", "nature"] },
-			{ emoji: "🌸", keywords: ["flower", "nature"] },
-			{ emoji: "☀️", keywords: ["sun", "weather"] },
-			{ emoji: "🌙", keywords: ["moon", "night"] },
-		],
-	},
-	{
-		id: "food",
-		label: "Food & Drink",
-		tab: "🍎",
-		items: [
-			{ emoji: "🍎", keywords: ["apple", "fruit", "food"] },
-			{ emoji: "🍌", keywords: ["banana", "fruit", "food"] },
-			{ emoji: "🥑", keywords: ["avocado", "food"] },
-			{ emoji: "🥦", keywords: ["broccoli", "vegetable", "food"] },
-			{ emoji: "🍞", keywords: ["bread", "food"] },
-			{ emoji: "🧀", keywords: ["cheese", "food"] },
-			{ emoji: "🍳", keywords: ["egg", "breakfast", "food"] },
-			{ emoji: "🍔", keywords: ["burger", "restaurant", "food"] },
-			{ emoji: "🍕", keywords: ["pizza", "restaurant", "food"] },
-			{ emoji: "🍜", keywords: ["noodle", "restaurant", "food"] },
-			{ emoji: "🍣", keywords: ["sushi", "restaurant", "food"] },
-			{ emoji: "🍰", keywords: ["cake", "dessert", "food"] },
-			{ emoji: "☕", keywords: ["coffee", "drink"] },
-			{ emoji: "🧋", keywords: ["boba", "tea", "drink"] },
-			{ emoji: "🍺", keywords: ["beer", "drink"] },
-			{ emoji: "🍷", keywords: ["wine", "drink"] },
-			{ emoji: "🍽️", keywords: ["dining", "restaurant"] },
-			{ emoji: "🛒", keywords: ["grocery", "shopping", "food"] },
-		],
-	},
-	{
-		id: "travel",
-		label: "Travel & Places",
-		tab: "🚗",
-		items: [
-			{ emoji: "🚗", keywords: ["car", "auto", "transport"] },
-			{ emoji: "🚕", keywords: ["taxi", "ride", "transport"] },
-			{ emoji: "🚌", keywords: ["bus", "transit", "transport"] },
-			{ emoji: "🚆", keywords: ["train", "transit", "transport"] },
-			{ emoji: "✈️", keywords: ["plane", "flight", "travel"] },
-			{ emoji: "🚢", keywords: ["ship", "cruise", "travel"] },
-			{ emoji: "⛽", keywords: ["gas", "fuel", "car"] },
-			{ emoji: "🅿️", keywords: ["parking", "car"] },
-			{ emoji: "🏠", keywords: ["home", "house", "housing"] },
-			{ emoji: "🏢", keywords: ["office", "business"] },
-			{ emoji: "🏨", keywords: ["hotel", "travel"] },
-			{ emoji: "🏥", keywords: ["hospital", "medical"] },
-			{ emoji: "🏫", keywords: ["school", "education"] },
-			{ emoji: "🏦", keywords: ["bank", "finance"] },
-			{ emoji: "🏛️", keywords: ["government", "tax"] },
-			{ emoji: "🏖️", keywords: ["beach", "vacation", "travel"] },
-			{ emoji: "🗺️", keywords: ["map", "travel"] },
-			{ emoji: "🧳", keywords: ["luggage", "travel"] },
-		],
-	},
-	{
-		id: "activities",
-		label: "Activities",
-		tab: "⚽",
-		items: [
-			{ emoji: "⚽", keywords: ["soccer", "sport"] },
-			{ emoji: "🏀", keywords: ["basketball", "sport"] },
-			{ emoji: "🏈", keywords: ["football", "sport"] },
-			{ emoji: "⚾", keywords: ["baseball", "sport"] },
-			{ emoji: "🎾", keywords: ["tennis", "sport"] },
-			{ emoji: "🏋️", keywords: ["gym", "fitness", "sport"] },
-			{ emoji: "🎮", keywords: ["game", "gaming", "entertainment"] },
-			{ emoji: "🎬", keywords: ["movie", "cinema", "entertainment"] },
-			{ emoji: "🎵", keywords: ["music", "audio"] },
-			{ emoji: "🎨", keywords: ["art", "hobby"] },
-			{ emoji: "📚", keywords: ["books", "reading", "education"] },
-			{ emoji: "🎁", keywords: ["gift", "present"] },
-			{ emoji: "🎉", keywords: ["party", "celebration"] },
-			{ emoji: "🎟️", keywords: ["ticket", "event"] },
-			{ emoji: "🏆", keywords: ["award", "achievement"] },
-			{ emoji: "🧘", keywords: ["yoga", "wellness"] },
-		],
-	},
-	{
-		id: "objects",
-		label: "Objects",
-		tab: "💡",
-		items: [
-			{ emoji: "💡", keywords: ["light", "electricity", "idea"] },
-			{ emoji: "📱", keywords: ["phone", "mobile"] },
-			{ emoji: "💻", keywords: ["computer", "technology"] },
-			{ emoji: "⌚", keywords: ["watch", "technology"] },
-			{ emoji: "📺", keywords: ["tv", "entertainment"] },
-			{ emoji: "📷", keywords: ["camera", "photo"] },
-			{ emoji: "🔧", keywords: ["repair", "tool"] },
-			{ emoji: "🧰", keywords: ["tool", "repair"] },
-			{ emoji: "🧹", keywords: ["clean", "household"] },
-			{ emoji: "🛏️", keywords: ["bed", "home"] },
-			{ emoji: "🛋️", keywords: ["furniture", "home"] },
-			{ emoji: "👕", keywords: ["shirt", "clothing"] },
-			{ emoji: "👟", keywords: ["shoe", "clothing"] },
-			{ emoji: "💊", keywords: ["medicine", "pharmacy"] },
-			{ emoji: "🩺", keywords: ["medical", "health"] },
-			{ emoji: "✂️", keywords: ["hair", "beauty", "service"] },
-			{ emoji: "📝", keywords: ["note", "subscription"] },
-			{ emoji: "📦", keywords: ["package", "shipping"] },
-		],
-	},
-	{
-		id: "symbols",
-		label: "Symbols",
-		tab: "🌐",
-		items: [
-			{ emoji: "💰", keywords: ["money", "income", "cash"] },
-			{ emoji: "💵", keywords: ["cash", "money", "income"] },
-			{ emoji: "💸", keywords: ["spending", "money", "expense"] },
-			{ emoji: "💳", keywords: ["credit", "card", "payment"] },
-			{ emoji: "🧾", keywords: ["receipt", "bill"] },
-			{ emoji: "📈", keywords: ["investment", "growth"] },
-			{ emoji: "📉", keywords: ["loss", "investment"] },
-			{ emoji: "🏷️", keywords: ["tag", "price", "shopping"] },
-			{ emoji: "🔒", keywords: ["security", "insurance"] },
-			{ emoji: "❤️", keywords: ["heart", "love", "charity"] },
-			{ emoji: "✅", keywords: ["check", "complete"] },
-			{ emoji: "⚠️", keywords: ["warning", "alert"] },
-			{ emoji: "❓", keywords: ["question", "other", "unknown"] },
-			{ emoji: "⭐", keywords: ["star", "favorite"] },
-			{ emoji: "♻️", keywords: ["recycle", "environment"] },
-			{ emoji: "🌐", keywords: ["internet", "web", "global"] },
-		],
-	},
-];
-
 function CategoryEditorModal({
 	editor,
 	groups,
@@ -1540,140 +1328,6 @@ function GroupOptionSection({
 					</button>
 				);
 			})}
-		</div>
-	);
-}
-
-function EmojiPicker({
-	selectedEmoji,
-	onSelect,
-	onClose,
-}: {
-	selectedEmoji: string;
-	onSelect: (emoji: string) => void;
-	onClose: () => void;
-}) {
-	const [activeSectionId, setActiveSectionId] = useState("frequent");
-	const [query, setQuery] = useState("");
-
-	const normalizedQuery = query.trim().toLowerCase();
-	const visibleSections = useMemo(() => {
-		if (!normalizedQuery) {
-			return EMOJI_SECTIONS.filter((section) => {
-				return section.id === activeSectionId;
-			});
-		}
-
-		return EMOJI_SECTIONS.map((section) => ({
-			...section,
-			items: section.items.filter((item) => {
-				return (
-					item.emoji.includes(normalizedQuery) ||
-					item.keywords.some((keyword) => {
-						return keyword.includes(normalizedQuery);
-					})
-				);
-			}),
-		})).filter((section) => section.items.length > 0);
-	}, [activeSectionId, normalizedQuery]);
-
-	return (
-		<div
-			className="absolute left-0 top-[calc(100%+14px)] z-40 w-full max-w-[520px] overflow-hidden rounded-[20px] border border-[#ddd9d4] bg-white shadow-[0_22px_65px_rgba(0,0,0,0.24)] dark:border-white/15 dark:bg-[#2a2a28]"
-			onKeyDown={(event) => {
-				if (event.key === "Escape") {
-					event.preventDefault();
-					event.stopPropagation();
-					onClose();
-				}
-			}}
-		>
-			<div className="flex items-center justify-between border-b border-black/[0.06] px-4 dark:border-white/10">
-				<div className="flex min-w-0 flex-1 overflow-x-auto">
-					{EMOJI_SECTIONS.map((section) => {
-						const active = !normalizedQuery && section.id === activeSectionId;
-
-						return (
-							<button
-								key={section.id}
-								type="button"
-								onClick={() => {
-									setQuery("");
-									setActiveSectionId(section.id);
-								}}
-								aria-label={section.label}
-								className={`relative grid h-14 min-w-14 place-items-center text-[24px] transition hover:bg-[#f7f6f4] dark:hover:bg-white/5 ${
-									active
-										? "after:absolute after:inset-x-2 after:bottom-0 after:h-1 after:rounded-full after:bg-[#282826] dark:after:bg-white"
-										: ""
-								}`}
-							>
-								{section.tab}
-							</button>
-						);
-					})}
-				</div>
-				<button
-					type="button"
-					onClick={onClose}
-					className="grid size-10 shrink-0 place-items-center rounded-full hover:bg-[#f3f2ef] dark:hover:bg-white/10"
-					aria-label="Close emoji picker"
-				>
-					<X size={19} />
-				</button>
-			</div>
-
-			<div className="p-4">
-				<label className="relative block">
-					<Search
-						size={22}
-						className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[#777570]"
-					/>
-					<input
-						value={query}
-						onChange={(event) => setQuery(event.target.value)}
-						placeholder="Search"
-						className="h-12 w-full rounded-[14px] border border-[#cfcac4] bg-white pl-12 pr-4 text-[20px] outline-none focus:border-[#008eae] focus:ring-2 focus:ring-[#008eae]/15 dark:border-white/15 dark:bg-[#20201f]"
-					/>
-				</label>
-
-				<div className="mt-4 max-h-[310px] overflow-y-auto pr-1">
-					{visibleSections.length === 0 ? (
-						<div className="py-12 text-center text-sm text-[#777570]">
-							No emoji found.
-						</div>
-					) : (
-						visibleSections.map((section) => (
-							<section key={section.id} className="mb-5 last:mb-0">
-								<h4 className="mb-3 text-[20px] font-semibold">
-									{section.label}
-								</h4>
-								<div className="grid grid-cols-8 gap-2">
-									{section.items.map((item) => {
-										const selected = item.emoji === selectedEmoji;
-
-										return (
-											<button
-												key={`${section.id}-${item.emoji}`}
-												type="button"
-												onClick={() => onSelect(item.emoji)}
-												className={`grid aspect-square place-items-center rounded-xl text-[28px] transition hover:bg-[#f2f1ef] dark:hover:bg-white/10 ${
-													selected
-														? "bg-[#d4f3f7] ring-2 ring-[#008eae]/30 dark:bg-cyan-500/15"
-														: ""
-												}`}
-												aria-label={`Use ${item.emoji}`}
-											>
-												{item.emoji}
-											</button>
-										);
-									})}
-								</div>
-							</section>
-						))
-					)}
-				</div>
-			</div>
 		</div>
 	);
 }
