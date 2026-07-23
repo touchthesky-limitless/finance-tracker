@@ -1,7 +1,7 @@
 import { forwardRef, type ButtonHTMLAttributes } from "react";
 import { ChevronDown, Filter } from "lucide-react";
 
-import { CategoryIcon } from "@/components/CategoryIcon";
+import { CategoryGlyph } from "@/components/Categories/CategoryGlyph";
 
 interface CategoryTriggerProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 	variant?: "form" | "filter";
@@ -74,9 +74,9 @@ dark:group-hover:border-white/20
 					<>
 						{!isDefaultCategory && (
 							<div className="shrink-0 rounded-xl border border-gray-100 p-1.5 shadow-sm dark:border-white/5">
-								<CategoryIcon
+								<CategoryGlyph
 									name={displayIcon}
-									size={18}
+									size={16}
 									colorClass={displayColorClass}
 								/>
 							</div>

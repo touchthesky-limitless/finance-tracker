@@ -23,6 +23,7 @@ import {
 import { SettingsContentCard } from "@/components/Settings/SettingsShell";
 import { CATEGORY_HIERARCHY, getCategoryTheme } from "@/constants";
 import { type CustomCategory, useBudgetStore } from "@/store/useBudgetStore";
+import { CategoryEmojiPicker } from "@/components/Categories/CategoryEmojiPicker";
 
 type EditorMode =
 	| "create-group"
@@ -30,11 +31,13 @@ type EditorMode =
 	| "create-category"
 	| "edit-category";
 
+type CategorySectionId = "income" | "expenses" | "transfers";
 type GroupBudgetMode = "group" | "category";
 
 interface GroupPreference {
 	name?: string;
 	budgetMode?: GroupBudgetMode;
+	sectionId?: CategorySectionId;
 	hidden?: boolean;
 }
 
@@ -47,12 +50,14 @@ interface CategoryGroup {
 	name: string;
 	displayName: string;
 	budgetMode: GroupBudgetMode;
+	sectionId: CategorySectionId;
 	record?: CustomCategory;
 	children: CustomCategory[];
 }
 
 interface EditorState {
 	mode: EditorMode;
+	sectionId?: CategorySectionId;
 	parentName?: string;
 	category?: CustomCategory;
 	group?: CategoryGroup;
@@ -62,6 +67,15 @@ const DEFAULT_ICON = encodeEmojiIcon("❓");
 const DEFAULT_COLOR = "slate";
 const GROUP_PREFERENCES_STORAGE_KEY = "finance-category-group-preferences-v1";
 const CATEGORY_PREFERENCES_STORAGE_KEY = "finance-category-preferences-v1";
+
+const CATEGORY_SECTIONS: ReadonlyArray<{
+	id: CategorySectionId;
+	title: string;
+}> = [
+	{ id: "income", title: "Income" },
+	{ id: "expenses", title: "Expenses" },
+	{ id: "transfers", title: "Transfers" },
+];
 
 function readGroupPreferences(): Record<string, GroupPreference> {
 	if (typeof window === "undefined") {
@@ -159,6 +173,20 @@ function normalize(value: string): string {
 	return value.trim().toLowerCase();
 }
 
+function getDefaultSectionId(groupName: string): CategorySectionId {
+	const normalizedName = normalize(groupName);
+
+	if (normalizedName === "income") {
+		return "income";
+	}
+
+	if (normalizedName.includes("transfer")) {
+		return "transfers";
+	}
+
+	return "expenses";
+}
+
 export default function SettingsCategoriesPage() {
 	const customCategories = useBudgetStore((state) => state.customCategories);
 	const fetchCustomCategories = useBudgetStore(
@@ -236,53 +264,70 @@ export default function SettingsCategoriesPage() {
 			}
 		}
 
-		return orderedParentNames
-			.map((parentName) => {
-				const record = parentByName.get(parentName);
-				const key = getGroupKey(parentName, record);
-				const preference = groupPreferences[key];
+		return (
+			orderedParentNames
+				.map((parentName) => {
+					const record = parentByName.get(parentName);
+					const key = getGroupKey(parentName, record);
+					const preference = groupPreferences[key];
 
-				return {
-					key,
-					name: parentName,
-					displayName: preference?.name?.trim() || parentName,
-					budgetMode: preference?.budgetMode ?? "category",
-					record,
-					children: [...(childrenByParent.get(parentName) ?? [])].sort(
-						(first, second) => {
-							const firstIndex = CATEGORY_HIERARCHY[parentName]?.indexOf(
-								first.name,
-							);
-							const secondIndex = CATEGORY_HIERARCHY[parentName]?.indexOf(
-								second.name,
-							);
+					return {
+						key,
+						name: parentName,
+						displayName: preference?.name?.trim() || parentName,
+						budgetMode: preference?.budgetMode ?? "category",
+						sectionId: preference?.sectionId ?? getDefaultSectionId(parentName),
+						record,
+						children: [...(childrenByParent.get(parentName) ?? [])].sort(
+							(first, second) => {
+								const firstIndex = CATEGORY_HIERARCHY[parentName]?.indexOf(
+									first.name,
+								);
+								const secondIndex = CATEGORY_HIERARCHY[parentName]?.indexOf(
+									second.name,
+								);
 
-							if (firstIndex !== undefined && firstIndex >= 0) {
-								if (secondIndex === undefined || secondIndex < 0) {
-									return -1;
+								if (firstIndex !== undefined && firstIndex >= 0) {
+									if (secondIndex === undefined || secondIndex < 0) {
+										return -1;
+									}
+
+									return firstIndex - secondIndex;
 								}
 
-								return firstIndex - secondIndex;
-							}
+								if (secondIndex !== undefined && secondIndex >= 0) {
+									return 1;
+								}
 
-							if (secondIndex !== undefined && secondIndex >= 0) {
-								return 1;
-							}
-
-							return first.name.localeCompare(second.name);
-						},
-					),
-					hidden: preference?.hidden === true,
-				};
-			})
-			.filter((group) => {
-				return (
-					!group.hidden && Boolean(group.record || group.children.length > 0)
-				);
-			})
-			// eslint-disable-next-line @typescript-eslint/no-unused-vars
-			.map(({ hidden: _hidden, ...group }) => group);
+								return first.name.localeCompare(second.name);
+							},
+						),
+						hidden: preference?.hidden === true,
+					};
+				})
+				.filter((group) => {
+					return (
+						!group.hidden && Boolean(group.record || group.children.length > 0)
+					);
+				})
+				// eslint-disable-next-line @typescript-eslint/no-unused-vars
+				.map(({ hidden: _hidden, ...group }) => group)
+		);
 	}, [customCategories, groupPreferences]);
+
+	const groupsBySection = useMemo(() => {
+		const result: Record<CategorySectionId, CategoryGroup[]> = {
+			income: [],
+			expenses: [],
+			transfers: [],
+		};
+
+		for (const group of groups) {
+			result[group.sectionId].push(group);
+		}
+
+		return result;
+	}, [groups]);
 
 	const updateGroupPreference = (
 		key: string,
@@ -425,6 +470,10 @@ export default function SettingsCategoriesPage() {
 
 		try {
 			if (editor.mode === "create-group") {
+				if (!editor.sectionId) {
+					throw new Error("Choose a category section.");
+				}
+
 				if (!validateGroupName(cleanName)) {
 					return;
 				}
@@ -439,6 +488,7 @@ export default function SettingsCategoriesPage() {
 				updateGroupPreference(groupKey, () => ({
 					name: cleanName,
 					budgetMode,
+					sectionId: editor.sectionId,
 				}));
 			} else if (editor.mode === "edit-group" && editor.group) {
 				if (!validateGroupName(cleanName, editor.group.key)) {
@@ -449,6 +499,7 @@ export default function SettingsCategoriesPage() {
 					...current,
 					name: cleanName,
 					budgetMode,
+					sectionId: editor.group?.sectionId,
 					hidden: false,
 				}));
 			} else if (editor.mode === "edit-category" && editor.category) {
@@ -518,6 +569,7 @@ export default function SettingsCategoriesPage() {
 				} else {
 					updateGroupPreference(editor.group.key, (current) => ({
 						...current,
+						sectionId: editor.group?.sectionId,
 						hidden: true,
 					}));
 				}
@@ -551,121 +603,132 @@ export default function SettingsCategoriesPage() {
 					</p>
 				</div>
 
-				<div className="space-y-7">
-					{groups.map((group, groupIndex) => {
-						const theme = getCategoryTheme(group.name);
-						const isIncome = group.name === "Income";
+				<div className="space-y-9">
+					{CATEGORY_SECTIONS.map((section) => {
+						const sectionGroups = groupsBySection[section.id];
 
 						return (
-							<section key={group.key}>
-								<div className="mb-3 flex items-center justify-between gap-4">
-									<div className="flex min-w-0 items-center gap-3">
-										<h3 className="truncate text-lg font-semibold">
-											{isIncome
-												? "Income"
-												: groupIndex === 1
-													? "Expenses"
-													: group.displayName}
-										</h3>
-
-										{!isIncome && groupIndex === 1 && (
-											<span className="sr-only">{group.displayName}</span>
-										)}
-									</div>
+							<section key={section.id}>
+								<div className="mb-4 flex items-center justify-between gap-4">
+									<h2 className="text-xl font-semibold tracking-[-0.01em]">
+										{section.title}
+									</h2>
 
 									<button
 										type="button"
 										onClick={() => {
-											openEditor({ mode: "create-group" });
+											openEditor({
+												mode: "create-group",
+												sectionId: section.id,
+											});
 										}}
-										className="text-sm font-semibold text-cyan-600 hover:text-cyan-700 dark:text-cyan-400"
+										className="text-sm font-semibold text-cyan-600 transition hover:text-cyan-700 dark:text-cyan-400 dark:hover:text-cyan-300"
 									>
 										Create group
 									</button>
 								</div>
 
-								<div className="overflow-hidden rounded-2xl bg-[#f4f4f2] dark:bg-white/[0.04]">
-									<div className="flex min-h-13 items-center gap-3 border-b border-black/5 px-5 dark:border-white/10">
-										<CategoryGlyph
-											name={group.record?.icon_name || group.name}
-											size={18}
-											colorClass={theme.text}
-										/>
-										<span className="font-semibold">{group.displayName}</span>
+								<div className="space-y-4">
+									{sectionGroups.map((group) => {
+										const theme = getCategoryTheme(group.name);
 
-										<button
-											type="button"
-											onClick={() => {
-												openEditor({ mode: "edit-group", group });
-											}}
-											className="text-sm text-[#73736f] hover:text-[#222220] dark:hover:text-white"
-										>
-											Edit
-										</button>
-									</div>
-
-									<div className="space-y-2 p-4">
-										{group.children.map((category) => (
+										return (
 											<div
-												key={category.id}
-												className="flex min-h-12 items-center gap-3 rounded-xl border border-black/[0.03] bg-white px-3 shadow-sm dark:border-white/[0.06] dark:bg-[#222220]"
+												key={group.key}
+												className="overflow-hidden rounded-2xl bg-[#f4f4f2] dark:bg-white/[0.04]"
 											>
-												<GripVertical
-													size={16}
-													className="shrink-0 text-[#969691]"
-												/>
-												<CategoryGlyph
-													name={category.icon_name || category.name}
-													size={17}
-													colorClass={theme.text}
-												/>
-												<span className="min-w-0 flex-1 truncate text-[15px]">
-													{category.name}
-												</span>
+												<div className="flex min-h-13 items-center gap-3 border-b border-black/5 px-5 dark:border-white/10">
+													<CategoryGlyph
+														name={group.record?.icon_name || group.name}
+														size={18}
+														colorClass={theme.text}
+													/>
+													<span className="font-semibold">
+														{group.displayName}
+													</span>
 
-												{!category.is_system && (
-													<>
-														<span className="text-xs font-medium text-[#6e6e69] dark:text-[#aaa9a4]">
-															Custom
-														</span>
-														{categoryPreferences[category.id]
-															?.excludedFromBudget && (
-															<span className="rounded-md bg-amber-100 px-2 py-1 text-[11px] font-semibold text-amber-800 dark:bg-amber-500/15 dark:text-amber-300">
-																Excluded
-															</span>
-														)}
-														<button
-															type="button"
-															onClick={() => {
-																openEditor({
-																	mode: "edit-category",
-																	category,
-																});
-															}}
-															className="grid size-8 place-items-center rounded-lg text-[#777671] hover:bg-black/[0.05] hover:text-[#222220] dark:hover:bg-white/10 dark:hover:text-white"
-															aria-label={`Edit ${category.name}`}
+													<button
+														type="button"
+														onClick={() => {
+															openEditor({ mode: "edit-group", group });
+														}}
+														className="text-sm text-[#73736f] hover:text-[#222220] dark:hover:text-white"
+													>
+														Edit
+													</button>
+												</div>
+
+												<div className="space-y-2 p-4">
+													{group.children.map((category) => (
+														<div
+															key={category.id}
+															className="flex min-h-12 items-center gap-3 rounded-xl border border-black/[0.03] bg-white px-3 shadow-sm dark:border-white/[0.06] dark:bg-[#222220]"
 														>
-															<Pencil size={15} />
-														</button>
-													</>
-												)}
-											</div>
-										))}
+															<GripVertical
+																size={16}
+																className="shrink-0 text-[#969691]"
+															/>
+															<CategoryGlyph
+																name={category.icon_name || category.name}
+																size={17}
+																colorClass={theme.text}
+															/>
+															<span className="min-w-0 flex-1 truncate text-[15px]">
+																{category.name}
+															</span>
 
-										<button
-											type="button"
-											onClick={() => {
-												openEditor({
-													mode: "create-category",
-													parentName: group.name,
-												});
-											}}
-											className="flex min-h-10 w-full items-center gap-2 rounded-lg px-1 text-left text-sm font-medium text-[#777671] hover:text-cyan-700 dark:text-[#aaa9a4] dark:hover:text-cyan-300"
-										>
-											<Plus size={15} />
-											Create Category
-										</button>
-									</div>
+															{!category.is_system && (
+																<>
+																	<span className="text-xs font-medium text-[#6e6e69] dark:text-[#aaa9a4]">
+																		Custom
+																	</span>
+																	{categoryPreferences[category.id]
+																		?.excludedFromBudget && (
+																		<span className="rounded-md bg-amber-100 px-2 py-1 text-[11px] font-semibold text-amber-800 dark:bg-amber-500/15 dark:text-amber-300">
+																			Excluded
+																		</span>
+																	)}
+																	<button
+																		type="button"
+																		onClick={() => {
+																			openEditor({
+																				mode: "edit-category",
+																				category,
+																			});
+																		}}
+																		className="grid size-8 place-items-center rounded-lg text-[#777671] hover:bg-black/[0.05] hover:text-[#222220] dark:hover:bg-white/10 dark:hover:text-white"
+																		aria-label={`Edit ${category.name}`}
+																	>
+																		<Pencil size={15} />
+																	</button>
+																</>
+															)}
+														</div>
+													))}
+
+													<button
+														type="button"
+														onClick={() => {
+															openEditor({
+																mode: "create-category",
+																parentName: group.name,
+															});
+														}}
+														className="flex min-h-10 w-full items-center gap-2 rounded-lg px-1 text-left text-sm font-medium text-[#777671] hover:text-cyan-700 dark:text-[#aaa9a4] dark:hover:text-cyan-300"
+													>
+														<Plus size={15} />
+														Create Category
+													</button>
+												</div>
+											</div>
+										);
+									})}
+
+									{sectionGroups.length === 0 && (
+										<div className="rounded-2xl border border-dashed border-black/10 px-5 py-8 text-center text-sm text-[#777671] dark:border-white/10 dark:text-[#aaa9a4]">
+											No groups in {section.title.toLowerCase()} yet.
+										</div>
+									)}
 								</div>
 							</section>
 						);
@@ -1234,13 +1297,15 @@ function CategoryEditorModal({
 							</div>
 
 							{isEmojiPickerOpen && (
-								<EmojiPicker
+								<CategoryEmojiPicker
 									selectedEmoji={selectedEmoji}
 									onSelect={(emoji) => {
 										onIconChange(encodeEmojiIcon(emoji));
 										setIsEmojiPickerOpen(false);
 									}}
-									onClose={() => setIsEmojiPickerOpen(false)}
+									onClose={() => {
+										setIsEmojiPickerOpen(false);
+									}}
 								/>
 							)}
 						</div>
@@ -1356,8 +1421,16 @@ function CategoryGroupSelect({
 	onChange: (value: string) => void;
 }) {
 	const [isOpen, setIsOpen] = useState(false);
-	const incomeGroups = groups.filter((group) => group.name === "Income");
-	const expenseGroups = groups.filter((group) => group.name !== "Income");
+	const incomeGroups = groups.filter((group) => {
+		return group.sectionId === "income";
+	});
+	const expenseGroups = groups.filter((group) => {
+		return group.sectionId === "expenses";
+	});
+	const transferGroups = groups.filter((group) => {
+		return group.sectionId === "transfers";
+	});
+	const selectedGroup = groups.find((group) => group.name === value);
 
 	return (
 		<div className="relative">
@@ -1380,7 +1453,7 @@ function CategoryGroupSelect({
 						: "border-[#d8d6d2] dark:border-white/15"
 				} ${disabled ? "cursor-not-allowed opacity-70" : ""}`}
 			>
-				<span>{value}</span>
+				<span>{selectedGroup?.displayName ?? value}</span>
 				<ChevronDown
 					size={27}
 					strokeWidth={1.8}
@@ -1403,8 +1476,17 @@ function CategoryGroupSelect({
 						}}
 					/>
 					<GroupOptionSection
-						label="Expense"
+						label="Expenses"
 						groups={expenseGroups}
+						value={value}
+						onChange={(nextValue) => {
+							onChange(nextValue);
+							setIsOpen(false);
+						}}
+					/>
+					<GroupOptionSection
+						label="Transfers"
+						groups={transferGroups}
 						value={value}
 						onChange={(nextValue) => {
 							onChange(nextValue);

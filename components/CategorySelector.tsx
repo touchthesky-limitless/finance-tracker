@@ -1,4 +1,9 @@
-import { useDeferredValue, useMemo, useRef, useState } from "react";
+import {
+	useDeferredValue,
+	useMemo,
+	useRef,
+	useState,
+} from "react";
 import {
 	FloatingPortal,
 	autoUpdate,
@@ -123,7 +128,7 @@ export function CategorySelector({
 				displayColorClass={displayColorClass}
 				placeholder={placeholder}
 				showChevron={showChevron}
-	hideChevronUntilHover={hideChevronUntilHover}
+				hideChevronUntilHover={hideChevronUntilHover}
 			/>
 
 			{isOpen && (
