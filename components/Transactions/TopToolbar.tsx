@@ -2,6 +2,8 @@
 
 import {
 	forwardRef,
+	useCallback,
+	useEffect,
 	useRef,
 	useState,
 	type ButtonHTMLAttributes,
@@ -11,6 +13,7 @@ import {
 	type ReactNode,
 	type SetStateAction,
 } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
 	Calendar,
 	Filter,
@@ -66,6 +69,202 @@ const EMPTY_DATE_RANGE: TransactionDateRange = {
 	startDate: "",
 	endDate: "",
 };
+
+const TRANSACTION_URL_KEYS = [
+	"search",
+	"startDate",
+	"endDate",
+	"categoryNames",
+	"merchantNames",
+	"accountNames",
+	"tags",
+	"goalIds",
+	"amountMode",
+	"amountValue",
+	"amountMaxValue",
+	"transactionType",
+	"needsReview",
+	"recurring",
+	"attachments",
+	"split",
+] as const;
+
+interface SearchParamReader {
+	get: (name: string) => string | null;
+	getAll: (name: string) => string[];
+}
+
+function readDateParam(
+	searchParams: SearchParamReader,
+	key: "startDate" | "endDate",
+): string {
+	const value = searchParams.get(key)?.trim() ?? "";
+
+	return /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : "";
+}
+
+function readStringList(
+	searchParams: SearchParamReader,
+	key: "categoryNames" | "merchantNames" | "accountNames" | "tags" | "goalIds",
+): string[] {
+	const seen = new Set<string>();
+	const values: string[] = [];
+
+	for (const rawValue of searchParams.getAll(key)) {
+		const value = rawValue.trim();
+
+		if (!value || seen.has(value)) {
+			continue;
+		}
+
+		seen.add(value);
+		values.push(value);
+	}
+
+	return values;
+}
+
+function readEnumParam<TValue extends string>(
+	searchParams: SearchParamReader,
+	key: string,
+	allowedValues: readonly TValue[],
+	fallback: TValue,
+): TValue {
+	const value = searchParams.get(key);
+
+	return value && allowedValues.includes(value as TValue)
+		? (value as TValue)
+		: fallback;
+}
+
+function readTransactionFiltersFromUrl(
+	searchParams: SearchParamReader,
+): TransactionFilters {
+	return {
+		categoryNames: readStringList(searchParams, "categoryNames"),
+		merchantNames: readStringList(searchParams, "merchantNames"),
+		accountNames: readStringList(searchParams, "accountNames"),
+		tags: readStringList(searchParams, "tags"),
+		goalIds: readStringList(searchParams, "goalIds"),
+		amountMode: readEnumParam(
+			searchParams,
+			"amountMode",
+			["none", "greater-than", "less-than", "equal-to", "between"] as const,
+			"none",
+		),
+		amountValue: searchParams.get("amountValue")?.trim() ?? "",
+		amountMaxValue: searchParams.get("amountMaxValue")?.trim() ?? "",
+		transactionType: readEnumParam(
+			searchParams,
+			"transactionType",
+			["all", "debits", "credits"] as const,
+			"all",
+		),
+		needsReview: readEnumParam(
+			searchParams,
+			"needsReview",
+			["any", "yes", "no"] as const,
+			"any",
+		),
+		recurring: readEnumParam(
+			searchParams,
+			"recurring",
+			["any", "yes", "no"] as const,
+			"any",
+		),
+		attachments: readEnumParam(
+			searchParams,
+			"attachments",
+			["any", "yes", "no"] as const,
+			"any",
+		),
+		split: readEnumParam(
+			searchParams,
+			"split",
+			["any", "yes", "no"] as const,
+			"any",
+		),
+	};
+}
+
+function appendStringList(
+	searchParams: URLSearchParams,
+	key: "categoryNames" | "merchantNames" | "accountNames" | "tags" | "goalIds",
+	values: string[],
+): void {
+	for (const rawValue of values) {
+		const value = rawValue.trim();
+
+		if (value) {
+			searchParams.append(key, value);
+		}
+	}
+}
+
+function writeTransactionStateToUrl(
+	searchParams: URLSearchParams,
+	searchQuery: string,
+	dateRange: TransactionDateRange,
+	filters: TransactionFilters,
+): void {
+	for (const key of TRANSACTION_URL_KEYS) {
+		searchParams.delete(key);
+	}
+
+	const cleanSearch = searchQuery.trim();
+
+	if (cleanSearch) {
+		searchParams.set("search", cleanSearch);
+	}
+
+	if (dateRange.startDate) {
+		searchParams.set("startDate", dateRange.startDate);
+	}
+
+	if (dateRange.endDate) {
+		searchParams.set("endDate", dateRange.endDate);
+	}
+
+	appendStringList(searchParams, "categoryNames", filters.categoryNames);
+	appendStringList(searchParams, "merchantNames", filters.merchantNames);
+	appendStringList(searchParams, "accountNames", filters.accountNames);
+	appendStringList(searchParams, "tags", filters.tags);
+	appendStringList(searchParams, "goalIds", filters.goalIds);
+
+	if (filters.amountMode !== "none") {
+		searchParams.set("amountMode", filters.amountMode);
+	}
+
+	if (filters.amountValue.trim()) {
+		searchParams.set("amountValue", filters.amountValue.trim());
+	}
+
+	if (filters.amountMaxValue.trim()) {
+		searchParams.set("amountMaxValue", filters.amountMaxValue.trim());
+	}
+
+	if (filters.transactionType !== "all") {
+		searchParams.set("transactionType", filters.transactionType);
+	}
+
+	if (filters.needsReview !== "any") {
+		searchParams.set("needsReview", filters.needsReview);
+	}
+
+	if (filters.recurring !== "any") {
+		searchParams.set("recurring", filters.recurring);
+	}
+
+	if (filters.attachments !== "any") {
+		searchParams.set("attachments", filters.attachments);
+	}
+
+	if (filters.split !== "any") {
+		searchParams.set("split", filters.split);
+	}
+
+	searchParams.sort();
+}
 
 const DATE_PRESETS: ReadonlyArray<{
 	value: DatePreset;
@@ -154,12 +353,81 @@ export function TopToolbar({
 	filterData,
 	onFiltersChange,
 }: TopToolbarProps) {
+	const router = useRouter();
+	const pathname = usePathname();
+	const searchParams = useSearchParams();
+	const searchParamsString = searchParams.toString();
+
 	const searchInputRef = useRef<HTMLInputElement>(null);
+	const hydratedUrlRef = useRef<string | null>(null);
 	const [openPopover, setOpenPopover] = useState<OpenPopover>(null);
 	const [draftSearch, setDraftSearch] = useState(searchQuery);
 	const [draftDateRange, setDraftDateRange] =
 		useState<TransactionDateRange>(dateRange);
 	const [draftFilters, setDraftFilters] = useState<TransactionFilters>(filters);
+
+	const replaceUrlState = useCallback(
+		(
+			nextSearchQuery: string,
+			nextDateRange: TransactionDateRange,
+			nextFilters: TransactionFilters,
+		) => {
+			const nextSearchParams = new URLSearchParams(searchParamsString);
+
+			writeTransactionStateToUrl(
+				nextSearchParams,
+				nextSearchQuery,
+				nextDateRange,
+				nextFilters,
+			);
+
+			const nextQueryString = nextSearchParams.toString();
+			const nextUrl = nextQueryString
+				? `${pathname}?${nextQueryString}`
+				: pathname;
+
+			router.replace(nextUrl, {
+				scroll: false,
+			});
+		},
+		[pathname, router, searchParamsString],
+	);
+
+	useEffect(() => {
+		if (hydratedUrlRef.current === searchParamsString) {
+			return;
+		}
+
+		hydratedUrlRef.current = searchParamsString;
+
+		const nextSearchParams = new URLSearchParams(searchParamsString);
+		const nextSearchQuery = nextSearchParams.get("search")?.trim() ?? "";
+		const nextDateRange: TransactionDateRange = {
+			startDate: readDateParam(nextSearchParams, "startDate"),
+			endDate: readDateParam(nextSearchParams, "endDate"),
+		};
+		const nextFilters = readTransactionFiltersFromUrl(nextSearchParams);
+
+		if (nextSearchQuery !== searchQuery) {
+			setSearchQuery(nextSearchQuery);
+		}
+
+		if (!rangesEqual(nextDateRange, dateRange)) {
+			setDateRange(nextDateRange);
+		}
+
+		if (!transactionFiltersEqual(nextFilters, filters)) {
+			onFiltersChange(nextFilters);
+		}
+	}, [
+		dateRange,
+		filters,
+		onFiltersChange,
+		searchParamsString,
+		searchQuery,
+		setDateRange,
+		setSearchQuery,
+	]);
 
 	const resetDrafts = () => {
 		setDraftSearch(searchQuery);
@@ -293,7 +561,13 @@ export function TopToolbar({
 				{hasActiveFilters && (
 					<button
 						type="button"
-						onClick={onClearAll}
+						onClick={() => {
+							onClearAll();
+							setDraftSearch("");
+							setDraftDateRange(EMPTY_DATE_RANGE);
+							setDraftFilters(EMPTY_TRANSACTION_FILTERS);
+							replaceUrlState("", EMPTY_DATE_RANGE, EMPTY_TRANSACTION_FILTERS);
+						}}
 						className="mr-2 text-sm font-medium text-cyan-600 hover:text-cyan-700 dark:text-cyan-400"
 					>
 						Clear
@@ -354,7 +628,11 @@ export function TopToolbar({
 										}
 
 										event.preventDefault();
-										setSearchQuery(draftSearch.trim());
+
+										const nextSearchQuery = draftSearch.trim();
+
+										setSearchQuery(nextSearchQuery);
+										replaceUrlState(nextSearchQuery, dateRange, filters);
 										setOpenPopover(null);
 									}}
 									placeholder="Enter a search term..."
@@ -371,6 +649,7 @@ export function TopToolbar({
 								onClear={() => {
 									setDraftSearch("");
 									setSearchQuery("");
+									replaceUrlState("", dateRange, filters);
 									setOpenPopover(null);
 								}}
 								onCancel={() => {
@@ -378,7 +657,10 @@ export function TopToolbar({
 									setOpenPopover(null);
 								}}
 								onApply={() => {
-									setSearchQuery(draftSearch.trim());
+									const nextSearchQuery = draftSearch.trim();
+
+									setSearchQuery(nextSearchQuery);
+									replaceUrlState(nextSearchQuery, dateRange, filters);
 									setOpenPopover(null);
 								}}
 								clearDisabled={!draftSearch && !isSearchActive}
@@ -436,6 +718,7 @@ export function TopToolbar({
 													onClick={() => {
 														setDraftDateRange(range);
 														setDateRange(range);
+														replaceUrlState(searchQuery, range, filters);
 														setOpenPopover(null);
 													}}
 													className={`rounded-xl px-5 py-3 text-left text-base font-medium transition-colors ${
@@ -490,6 +773,7 @@ export function TopToolbar({
 								onClear={() => {
 									setDraftDateRange(EMPTY_DATE_RANGE);
 									setDateRange(EMPTY_DATE_RANGE);
+									replaceUrlState(searchQuery, EMPTY_DATE_RANGE, filters);
 									setOpenPopover(null);
 								}}
 								onCancel={() => {
@@ -502,6 +786,7 @@ export function TopToolbar({
 									}
 
 									setDateRange(draftDateRange);
+									replaceUrlState(searchQuery, draftDateRange, filters);
 									setOpenPopover(null);
 								}}
 								clearDisabled={
@@ -556,6 +841,11 @@ export function TopToolbar({
 								onClear={() => {
 									setDraftFilters(EMPTY_TRANSACTION_FILTERS);
 									onFiltersChange(EMPTY_TRANSACTION_FILTERS);
+									replaceUrlState(
+										searchQuery,
+										dateRange,
+										EMPTY_TRANSACTION_FILTERS,
+									);
 									setOpenPopover(null);
 								}}
 								onCancel={() => {
@@ -564,6 +854,7 @@ export function TopToolbar({
 								}}
 								onApply={() => {
 									onFiltersChange(draftFilters);
+									replaceUrlState(searchQuery, dateRange, draftFilters);
 									setOpenPopover(null);
 								}}
 								applyDisabled={!canApplyFilters}

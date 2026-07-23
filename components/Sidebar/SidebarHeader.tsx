@@ -2,8 +2,9 @@
 
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { Bell, PanelLeft, Settings, Search } from "lucide-react";
+import { Bell, PanelLeft, Search, Settings } from "lucide-react";
 import * as Tooltip from "@radix-ui/react-tooltip";
+
 import Logo from "@/components/ui/Logo";
 
 interface SidebarHeaderProps {
@@ -71,12 +72,18 @@ export default function SidebarHeader({
 				<HeaderIconButton label="Search">
 					<Search size={19} strokeWidth={1.8} />
 				</HeaderIconButton>
+
 				<HeaderIconButton label="Notifications">
-					<Bell size={19} strokeWidth={1.8} />
+					<span className="relative">
+						<Bell size={19} strokeWidth={1.8} />
+						<span className="absolute -right-0.5 -top-0.5 size-1.5 rounded-full bg-[#ff5a35]" />
+					</span>
 				</HeaderIconButton>
-				<HeaderIconButton label="Settings">
+
+				<HeaderIconButton label="Settings" href="/settings/categories">
 					<Settings size={19} strokeWidth={1.8} />
 				</HeaderIconButton>
+
 				<HeaderIconButton label="Close sidebar" onClick={onToggle}>
 					<PanelLeft size={19} strokeWidth={1.8} />
 				</HeaderIconButton>
@@ -87,23 +94,38 @@ export default function SidebarHeader({
 
 interface HeaderIconButtonProps {
 	label: string;
+	href?: string;
 	onClick?: () => void;
 	children: ReactNode;
 }
 
-function HeaderIconButton({ label, onClick, children }: HeaderIconButtonProps) {
+function HeaderIconButton({
+	label,
+	href,
+	onClick,
+	children,
+}: HeaderIconButtonProps) {
+	const className =
+		"flex h-9 w-9 items-center justify-center rounded-lg text-[#5d5d5d] transition-colors hover:bg-[#ececec] hover:text-[#0d0d0d] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/20 dark:text-[#b4b4b4] dark:hover:bg-[#2a2a2a] dark:hover:text-[#ececec] dark:focus-visible:ring-white/20";
+
 	return (
 		<Tooltip.Provider delayDuration={350}>
 			<Tooltip.Root>
 				<Tooltip.Trigger asChild>
-					<button
-						type="button"
-						onClick={onClick}
-						aria-label={label}
-						className="flex h-9 w-9 items-center justify-center rounded-lg text-[#5d5d5d] transition-colors hover:bg-[#ececec] hover:text-[#0d0d0d] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/20 dark:text-[#b4b4b4] dark:hover:bg-[#2a2a2a] dark:hover:text-[#ececec] dark:focus-visible:ring-white/20"
-					>
-						{children}
-					</button>
+					{href ? (
+						<Link href={href} aria-label={label} className={className}>
+							{children}
+						</Link>
+					) : (
+						<button
+							type="button"
+							onClick={onClick}
+							aria-label={label}
+							className={className}
+						>
+							{children}
+						</button>
+					)}
 				</Tooltip.Trigger>
 
 				<Tooltip.Portal>
