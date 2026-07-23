@@ -11,13 +11,10 @@ import {
 import { createPortal } from "react-dom";
 import {
 	AlertCircle,
-	Check,
-	ChevronDown,
 	CircleMinus,
 	CirclePlus,
 	Loader2,
 	Plus,
-	Search,
 	Tag,
 	X,
 } from "lucide-react";
@@ -25,6 +22,7 @@ import {
 import { CategorySelector } from "@/components/CategorySelector";
 import { type Transaction, useBudgetStore } from "@/store/useBudgetStore";
 import { getInitialDisplayAmount, parseAmountInput } from "@/utils/formatters";
+import { MerchantSelect } from "@/components/Merchants/MerchantSelect";
 
 interface AddTransactionModalProps {
 	initialTransaction: Transaction;
@@ -87,10 +85,6 @@ export default function AddTransactionModal({
 	const [displayAmount, setDisplayAmount] = useState(() => {
 		return getInitialDisplayAmount(Math.abs(initialTransaction.amount));
 	});
-	const [merchantQuery, setMerchantQuery] = useState(
-		initialTransaction.merchant ?? "",
-	);
-	const [merchantOpen, setMerchantOpen] = useState(false);
 	const [tagQuery, setTagQuery] = useState("");
 	const [tagOpen, setTagOpen] = useState(false);
 	const [attemptedSave, setAttemptedSave] = useState(false);
@@ -98,7 +92,6 @@ export default function AddTransactionModal({
 	const [saveError, setSaveError] = useState<string | null>(null);
 	const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
 
-	const merchantInputRef = useRef<HTMLInputElement>(null);
 	const tagInputRef = useRef<HTMLInputElement>(null);
 
 	useEffect(() => {
@@ -121,36 +114,6 @@ export default function AddTransactionModal({
 			document.body.style.overflow = previousOverflow;
 		};
 	}, [isOpen]);
-
-	const filteredMerchants = useMemo(() => {
-		const query = normalize(merchantQuery);
-		const seen = new Set<string>();
-
-		return merchants
-			.filter((merchant) => {
-				const normalizedName = normalize(merchant.name);
-
-				if (!normalizedName || seen.has(normalizedName)) {
-					return false;
-				}
-
-				seen.add(normalizedName);
-				return !query || normalizedName.includes(query);
-			})
-			.slice(0, 10);
-	}, [merchantQuery, merchants]);
-
-	const exactMerchant = useMemo(() => {
-		const query = normalize(merchantQuery);
-
-		if (!query) {
-			return undefined;
-		}
-
-		return merchants.find((merchant) => {
-			return normalize(merchant.name) === query;
-		});
-	}, [merchantQuery, merchants]);
 
 	const availableTags = useMemo(() => {
 		const selected = new Set(
@@ -200,21 +163,6 @@ export default function AddTransactionModal({
 		);
 	}, [editedData, initialSnapshot]);
 
-	const selectMerchant = useCallback(
-		(name: string, merchantId?: string | null) => {
-			const cleanName = name.trim();
-
-			setMerchantQuery(cleanName);
-			setEditedData((current) => ({
-				...current,
-				merchant: cleanName,
-				merchant_id: merchantId ?? null,
-			}));
-			setMerchantOpen(false);
-		},
-		[],
-	);
-
 	const toggleTag = useCallback((tagName: string) => {
 		const cleanTag = tagName.trim();
 
@@ -261,7 +209,6 @@ export default function AddTransactionModal({
 		onClose();
 	}, [hasUnsavedChanges, isSaving, onClose]);
 
-	const exactMerchantId = exactMerchant?.id;
 	const selectedAccountName = selectedAccount?.name;
 
 	const handleSave = useCallback(async () => {
@@ -276,12 +223,15 @@ export default function AddTransactionModal({
 
 		try {
 			const cleanMerchant = editedData.merchant.trim();
+			const normalizedMerchant = normalize(cleanMerchant);
+			const matchingMerchant = merchants.find((merchant) => {
+				return normalize(merchant.name) === normalizedMerchant;
+			});
 
-			let merchantId = editedData.merchant_id?.trim() || exactMerchantId;
+			let merchantId = editedData.merchant_id?.trim() || matchingMerchant?.id;
 
 			if (!merchantId) {
 				const createdMerchant = await addCustomMerchant(cleanMerchant);
-
 				merchantId = createdMerchant.id;
 			}
 
@@ -320,9 +270,9 @@ export default function AddTransactionModal({
 		createTransaction,
 		direction,
 		editedData,
-		exactMerchantId,
 		hasValidationErrors,
 		isSaving,
+		merchants,
 		onClose,
 		onCreated,
 		selectedAccountName,
@@ -340,8 +290,7 @@ export default function AddTransactionModal({
 					return;
 				}
 
-				if (merchantOpen || tagOpen) {
-					setMerchantOpen(false);
+				if (tagOpen) {
 					setTagOpen(false);
 					return;
 				}
@@ -358,14 +307,7 @@ export default function AddTransactionModal({
 
 		window.addEventListener("keydown", handleKeyDown);
 		return () => window.removeEventListener("keydown", handleKeyDown);
-	}, [
-		handleSave,
-		isOpen,
-		merchantOpen,
-		requestClose,
-		showDiscardConfirm,
-		tagOpen,
-	]);
+	}, [handleSave, isOpen, requestClose, showDiscardConfirm, tagOpen]);
 
 	if (!isOpen || typeof document === "undefined") {
 		return null;
@@ -487,73 +429,35 @@ export default function AddTransactionModal({
 								label="Merchant"
 								error={attemptedSave ? validation.merchant : null}
 							>
-								<div className="relative">
-									<Search
-										size={18}
-										className="pointer-events-none absolute left-4 top-1/2 z-10 -translate-y-1/2 text-gray-400"
-									/>
-									<input
-										ref={merchantInputRef}
-										type="text"
-										autoComplete="off"
-										placeholder="Search merchants or enter a new one"
-										value={merchantQuery}
-										onFocus={() => setMerchantOpen(true)}
-										onBlur={() => {
-											window.setTimeout(() => setMerchantOpen(false), 120);
-										}}
-										onChange={(event) => {
-											const name = event.target.value;
-											setMerchantQuery(name);
-											setMerchantOpen(true);
-											setEditedData((current) => ({
-												...current,
-												merchant: name,
-												merchant_id: null,
-											}));
-										}}
-										className="h-13 w-full rounded-xl border border-gray-200 bg-white pl-11 pr-11 text-[15px] outline-none transition focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 dark:border-white/10 dark:bg-white/[0.03]"
-									/>
-									<ChevronDown
-										size={18}
-										className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-gray-400"
-									/>
+								<MerchantSelect
+									value={
+										editedData.merchant
+											? {
+													id: editedData.merchant_id ?? "",
+													name: editedData.merchant,
+												}
+											: null
+									}
+									onInputChange={(name) => {
+										const matchingMerchant = merchants.find((merchant) => {
+											return normalize(merchant.name) === normalize(name);
+										});
 
-									{merchantOpen && (
-										<div className="absolute left-0 right-0 top-[calc(100%+6px)] z-40 max-h-64 overflow-y-auto rounded-xl border border-gray-200 bg-white p-1.5 shadow-xl dark:border-white/10 dark:bg-[#202020]">
-											{filteredMerchants.map((merchant) => (
-												<button
-													type="button"
-													key={merchant.id}
-													onMouseDown={(event) => {
-														event.preventDefault();
-														selectMerchant(merchant.name, merchant.id);
-													}}
-													className="flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left text-sm transition-colors hover:bg-gray-50 dark:hover:bg-white/5"
-												>
-													<span className="truncate">{merchant.name}</span>
-													{merchant.id === editedData.merchant_id && (
-														<Check size={16} className="text-orange-500" />
-													)}
-												</button>
-											))}
-
-											{merchantQuery.trim() && !exactMerchant && (
-												<button
-													type="button"
-													onMouseDown={(event) => {
-														event.preventDefault();
-														selectMerchant(merchantQuery, null);
-													}}
-													className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm font-medium text-orange-600 transition-colors hover:bg-orange-50 dark:text-orange-400 dark:hover:bg-orange-500/10"
-												>
-													<Plus size={16} />
-													Use “{merchantQuery.trim()}”
-												</button>
-											)}
-										</div>
-									)}
-								</div>
+										setEditedData((current) => ({
+											...current,
+											merchant: name,
+											merchant_id: matchingMerchant?.id ?? null,
+										}));
+									}}
+									onChange={(merchant) => {
+										setEditedData((current) => ({
+											...current,
+											merchant: merchant.name,
+											merchant_id: merchant.id,
+										}));
+									}}
+									placeholder="Search merchants or enter a new one"
+								/>
 							</FieldGroup>
 
 							<FieldGroup label="Original statement" hint="Optional">

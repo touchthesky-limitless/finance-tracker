@@ -11,8 +11,13 @@ import {
 	X,
 } from "lucide-react";
 
+import { CategorySelector } from "@/components/CategorySelector";
 import { CATEGORY_HIERARCHY } from "@/constants";
 import { type Transaction, useBudgetStore } from "@/store/useBudgetStore";
+import {
+	MerchantSelect,
+	type MerchantSelection,
+} from "@/components/Merchants/MerchantSelect";
 
 type RecurringChoice = "" | "mark";
 type NotesChoice = "" | "replace" | "clear";
@@ -69,40 +74,6 @@ function getUniqueAccountSummaries(transactions: Transaction[]) {
 	return Array.from(accountByKey.values());
 }
 
-function getCategoryOptions(
-	customCategories: Array<{
-		name: string;
-		parent_name?: string | null;
-	}>,
-): SelectOption[] {
-	const names = new Set<string>();
-
-	for (const [parent, children] of Object.entries(CATEGORY_HIERARCHY)) {
-		names.add(parent);
-
-		for (const child of children) {
-			names.add(child);
-		}
-	}
-
-	for (const category of customCategories) {
-		const name = category.name.trim();
-
-		if (name) {
-			names.add(name);
-		}
-	}
-
-	names.add("Uncategorized");
-
-	return Array.from(names)
-		.sort((first, second) => first.localeCompare(second))
-		.map((name) => ({
-			value: name,
-			label: name,
-		}));
-}
-
 function parseTags(value: string): string[] {
 	const seen = new Set<string>();
 	const result: string[] = [];
@@ -129,20 +100,15 @@ export default function BulkEditTransactionsDrawer({
 	onSaved,
 	onDeleted,
 }: BulkEditTransactionsDrawerProps) {
-	const merchants = useBudgetStore((state) => state.merchants);
-	const customCategories = useBudgetStore((state) => state.customCategories);
 	const customTags = useBudgetStore((state) => state.customTags);
-	const fetchMerchants = useBudgetStore((state) => state.fetchMerchants);
-	const fetchCustomCategories = useBudgetStore(
-		(state) => state.fetchCustomCategories,
-	);
 	const updateTransaction = useBudgetStore((state) => state.updateTransaction);
 	const bulkDeleteTransactions = useBudgetStore(
 		(state) => state.bulkDeleteTransactions,
 	);
 	const confirmRecurring = useBudgetStore((state) => state.confirmRecurring);
 
-	const [merchantId, setMerchantId] = useState("");
+	const [merchantSelection, setMerchantSelection] =
+		useState<MerchantSelection | null>(null);
 	const [category, setCategory] = useState("");
 	const [date, setDate] = useState("");
 	const [recurringChoice, setRecurringChoice] = useState<RecurringChoice>("");
@@ -160,10 +126,6 @@ export default function BulkEditTransactionsDrawer({
 	const transactionCount = transactions.length;
 	const transactionLabel = getTransactionLabel(transactionCount);
 	const accountSummaries = getUniqueAccountSummaries(transactions);
-	const categoryOptions = getCategoryOptions(customCategories);
-	const selectedMerchant = merchants.find((merchant) => {
-		return merchant.id === merchantId;
-	});
 	const commonMerchantName = (() => {
 		const firstMerchant = transactions[0]?.merchant?.trim() ?? "";
 
@@ -178,10 +140,10 @@ export default function BulkEditTransactionsDrawer({
 
 		return allMatch ? firstMerchant : null;
 	})();
-	const recurringMerchantName = selectedMerchant?.name ?? commonMerchantName;
+	const recurringMerchantName = merchantSelection?.name ?? commonMerchantName;
 
 	const hasChanges = Boolean(
-		merchantId ||
+		merchantSelection ||
 		category ||
 		date ||
 		recurringChoice !== "" ||
@@ -190,14 +152,6 @@ export default function BulkEditTransactionsDrawer({
 		hiddenChoice !== "" ||
 		reviewChoice !== "",
 	);
-
-	useEffect(() => {
-		if (!isOpen) {
-			return;
-		}
-
-		void Promise.all([fetchMerchants(), fetchCustomCategories()]);
-	}, [fetchCustomCategories, fetchMerchants, isOpen]);
 
 	useEffect(() => {
 		if (!isOpen) {
@@ -218,7 +172,7 @@ export default function BulkEditTransactionsDrawer({
 		}
 
 		const handleKeyDown = (event: KeyboardEvent) => {
-			if (event.key !== "Escape") {
+			if (event.key !== "Escape" || event.defaultPrevented) {
 				return;
 			}
 
@@ -254,9 +208,9 @@ export default function BulkEditTransactionsDrawer({
 				transactions.map(async (transaction) => {
 					const updates: Partial<Transaction> = {};
 
-					if (selectedMerchant) {
-						updates.merchant = selectedMerchant.name;
-						updates.merchant_id = selectedMerchant.id;
+					if (merchantSelection) {
+						updates.merchant = merchantSelection.name;
+						updates.merchant_id = merchantSelection.id;
 					}
 
 					if (category) {
@@ -423,36 +377,54 @@ export default function BulkEditTransactionsDrawer({
 						<div>
 							<div className="mb-2 flex items-center justify-between gap-3">
 								<label className="text-[15px] font-semibold">Merchant</label>
-								<button
-									type="button"
-									onClick={() => setMerchantId("")}
-									className="text-sm font-semibold text-cyan-400 hover:text-cyan-300"
-								>
-									Clear
-								</button>
+
+								{merchantSelection && (
+									<button
+										type="button"
+										onClick={() => setMerchantSelection(null)}
+										className="text-sm font-semibold text-cyan-400 hover:text-cyan-300"
+									>
+										Clear
+									</button>
+								)}
 							</div>
 
-							<BulkSelect
-								value={merchantId}
-								onChange={setMerchantId}
-								options={merchants
-									.slice()
-									.sort((first, second) =>
-										first.name.localeCompare(second.name),
-									)
-									.map((merchant) => ({
-										value: merchant.id,
-										label: merchant.name,
-									}))}
+							<MerchantSelect
+								value={merchantSelection}
+								onChange={setMerchantSelection}
+								placeholder="No change"
+								inputClassName="border-white/10 bg-[#20201f] text-white dark:bg-[#20201f]"
 							/>
 						</div>
 
-						<BulkSelectField
-							label="Category"
-							value={category}
-							onChange={setCategory}
-							options={categoryOptions}
-						/>
+						<div>
+							<div className="mb-2 flex items-center justify-between gap-3">
+								<label className="text-[15px] font-semibold">Category</label>
+
+								{category && (
+									<button
+										type="button"
+										onClick={() => setCategory("")}
+										className="text-sm font-semibold text-cyan-400 hover:text-cyan-300"
+									>
+										Clear
+									</button>
+								)}
+							</div>
+
+							<div className="rounded-xl border border-white/10 bg-[#20201f] px-1">
+								<CategorySelector
+									currentCategory={category || "No change"}
+									variant="form"
+									showChevron
+									onSelect={(selectedCategory) => {
+										setCategory(
+											selectedCategory === "All" ? "" : selectedCategory,
+										);
+									}}
+								/>
+							</div>
+						</div>
 
 						<BulkSelectField
 							label="Link to save up goal"

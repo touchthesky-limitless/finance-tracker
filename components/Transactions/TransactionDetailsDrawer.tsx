@@ -13,7 +13,6 @@ import { useRouter } from "next/navigation";
 import {
 	AlertCircle,
 	Check,
-	ChevronDown,
 	Copy,
 	Ellipsis,
 	Eye,
@@ -22,7 +21,6 @@ import {
 	Pencil,
 	Plus,
 	Repeat2,
-	Search,
 	Split,
 	Tag,
 	Trash2,
@@ -31,6 +29,7 @@ import {
 } from "lucide-react";
 
 import { CategorySelector } from "@/components/CategorySelector";
+import { MerchantSelect } from "@/components/Merchants/MerchantSelect";
 import { type Transaction, useBudgetStore } from "@/store/useBudgetStore";
 import {
 	formatCurrency,
@@ -103,12 +102,6 @@ export default function TransactionDetailsDrawer({
 	const [displayAmount, setDisplayAmount] = useState(() => {
 		return getInitialDisplayAmount(Math.abs(transaction.amount));
 	});
-
-	const [merchantQuery, setMerchantQuery] = useState(
-		transaction.merchant ?? "",
-	);
-
-	const [merchantOpen, setMerchantOpen] = useState(false);
 
 	const [tagQuery, setTagQuery] = useState("");
 
@@ -218,28 +211,17 @@ export default function TransactionDetailsDrawer({
 		}, 0);
 	}, [editedMerchantName, selectedMerchantId, transactions]);
 
-	const filteredMerchants = useMemo(() => {
-		const query = normalize(merchantQuery);
-		const seen = new Set<string>();
-
-		return merchants
-			.filter((merchant) => {
-				const name = normalize(merchant.name);
-
-				if (!name || seen.has(name)) {
-					return false;
-				}
-
-				seen.add(name);
-				return !query || name.includes(query);
-			})
-			.slice(0, 12);
-	}, [merchantQuery, merchants]);
-
 	const exactMerchant = useMemo(() => {
-		const query = normalize(merchantQuery);
-		return merchants.find((merchant) => normalize(merchant.name) === query);
-	}, [merchantQuery, merchants]);
+		const query = normalize(editedData.merchant);
+
+		if (!query) {
+			return undefined;
+		}
+
+		return merchants.find((merchant) => {
+			return normalize(merchant.name) === query;
+		});
+	}, [editedData.merchant, merchants]);
 
 	const availableTags = useMemo(() => {
 		const selected = new Set(
@@ -301,9 +283,7 @@ export default function TransactionDetailsDrawer({
 				showSavedStatus();
 			} catch (error) {
 				setEditedData((current) => ({ ...current, ...rollbackValues }));
-				setMerchantQuery(
-					(rollbackValues.merchant as string | undefined) ?? savedData.merchant,
-				);
+
 				if (typeof rollbackValues.amount === "number") {
 					setDisplayAmount(
 						getInitialDisplayAmount(Math.abs(rollbackValues.amount)),
@@ -339,13 +319,11 @@ export default function TransactionDetailsDrawer({
 					resolvedMerchantId = createdMerchant.id;
 				}
 
-				setMerchantQuery(cleanName);
 				setEditedData((current) => ({
 					...current,
 					merchant: cleanName,
 					merchant_id: resolvedMerchantId,
 				}));
-				setMerchantOpen(false);
 
 				if (
 					normalize(savedData.merchant) !== normalize(cleanName) ||
@@ -392,10 +370,10 @@ export default function TransactionDetailsDrawer({
 		}
 
 		if (
-			normalize(merchantQuery) !== normalize(savedData.merchant) ||
+			normalize(editedData.merchant) !== normalize(savedData.merchant) ||
 			editedData.merchant_id !== savedData.merchant_id
 		) {
-			await commitMerchant(merchantQuery, editedData.merchant_id);
+			await commitMerchant(editedData.merchant, editedData.merchant_id);
 		}
 
 		if (Object.keys(updates).length > 0) {
@@ -407,9 +385,9 @@ export default function TransactionDetailsDrawer({
 		direction,
 		editedData.amount,
 		editedData.description,
+		editedData.merchant,
 		editedData.merchant_id,
 		editedData.note,
-		merchantQuery,
 		persistUpdates,
 		savedData.amount,
 		savedData.description,
@@ -550,7 +528,7 @@ export default function TransactionDetailsDrawer({
 		const absoluteAmount = Math.abs(Number(editedData.amount) || 0);
 		const duplicateSource: Transaction = {
 			...editedData,
-			merchant: merchantQuery.trim() || editedData.merchant,
+			merchant: editedData.merchant.trim(),
 			description: editedData.description?.trim() ?? "",
 			note: editedData.note?.trim() ?? "",
 			amount: direction === "debit" ? -absoluteAmount : absoluteAmount,
@@ -580,7 +558,6 @@ export default function TransactionDetailsDrawer({
 		direction,
 		editedData,
 		isActionPending,
-		merchantQuery,
 		onDuplicate,
 		selectedAccountId,
 		selectedAccountName,
@@ -698,7 +675,7 @@ export default function TransactionDetailsDrawer({
 		}
 
 		const handleKeyDown = (event: KeyboardEvent) => {
-			if (event.key !== "Escape") {
+			if (event.key !== "Escape" || event.defaultPrevented) {
 				return;
 			}
 
@@ -712,9 +689,8 @@ export default function TransactionDetailsDrawer({
 				return;
 			}
 
-			if (isMoreMenuOpen || merchantOpen || tagOpen) {
+			if (isMoreMenuOpen || tagOpen) {
 				setIsMoreMenuOpen(false);
-				setMerchantOpen(false);
 				setTagOpen(false);
 				return;
 			}
@@ -726,7 +702,6 @@ export default function TransactionDetailsDrawer({
 		return () => window.removeEventListener("keydown", handleKeyDown);
 	}, [
 		isOpen,
-		merchantOpen,
 		isMoreMenuOpen,
 		requestClose,
 		showDeleteConfirm,
@@ -899,79 +874,48 @@ export default function TransactionDetailsDrawer({
 
 					<div className="space-y-5">
 						<DrawerField label="Merchant">
-							<div className="rounded-xl border border-gray-200 bg-white dark:border-white/10 dark:bg-white/[0.03]">
-								<div className="relative">
-									<Search
-										size={18}
-										className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"
-									/>
-									<input
-										type="text"
-										value={merchantQuery}
-										onFocus={() => setMerchantOpen(true)}
-										onChange={(event) => {
-											const name = event.target.value;
-											setMerchantQuery(name);
-											setMerchantOpen(true);
-											setEditedData((current) => ({
-												...current,
-												merchant: name,
-												merchant_id: null,
-											}));
-										}}
-										onBlur={() => {
-											window.setTimeout(() => {
-												if (!merchantOpen) {
-													return;
+							<div
+								onBlurCapture={() => {
+									window.setTimeout(() => {
+										void commitMerchant(
+											editedData.merchant,
+											editedData.merchant_id,
+										);
+									}, 0);
+								}}
+							>
+								<MerchantSelect
+									value={
+										editedData.merchant.trim()
+											? {
+													id: editedData.merchant_id ?? "",
+													name: editedData.merchant,
 												}
-												void commitMerchant(
-													merchantQuery,
-													editedData.merchant_id,
-												);
-											}, 140);
-										}}
-										className="h-15 w-full bg-transparent pl-11 pr-11 text-xl font-semibold outline-none"
-									/>
-									<ChevronDown
-										size={18}
-										className={`pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 transition ${merchantOpen ? "rotate-180" : ""}`}
-									/>
-								</div>
+											: null
+									}
+									onInputChange={(name) => {
+										const matchingMerchant = merchants.find((merchant) => {
+											return normalize(merchant.name) === normalize(name);
+										});
 
-								{merchantOpen && (
-									<div className="max-h-64 overflow-y-auto border-t border-gray-200 p-1.5 dark:border-white/10">
-										{filteredMerchants.map((merchant) => (
-											<button
-												type="button"
-												key={merchant.id}
-												onMouseDown={(event) => {
-													event.preventDefault();
-													void commitMerchant(merchant.name, merchant.id);
-												}}
-												className="flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left text-sm hover:bg-gray-50 dark:hover:bg-white/5"
-											>
-												<span className="truncate">{merchant.name}</span>
-												{merchant.id === editedData.merchant_id && (
-													<Check size={16} className="text-orange-500" />
-												)}
-											</button>
-										))}
+										setEditedData((current) => ({
+											...current,
+											merchant: name,
+											merchant_id: matchingMerchant?.id ?? null,
+										}));
+									}}
+									onChange={(merchant) => {
+										setEditedData((current) => ({
+											...current,
+											merchant: merchant.name,
+											merchant_id: merchant.id,
+										}));
 
-										{merchantQuery.trim() && !exactMerchant && (
-											<button
-												type="button"
-												onMouseDown={(event) => {
-													event.preventDefault();
-													void commitMerchant(merchantQuery, null);
-												}}
-												className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm font-medium text-orange-600 hover:bg-orange-50 dark:text-orange-400 dark:hover:bg-orange-500/10"
-											>
-												<Plus size={16} />
-												Create “{merchantQuery.trim()}”
-											</button>
-										)}
-									</div>
-								)}
+										void commitMerchant(merchant.name, merchant.id);
+									}}
+									placeholder="Search merchants or enter a new one"
+									inputClassName="h-15 text-xl font-semibold"
+								/>
 							</div>
 
 							{selectedMerchant?.id && (
