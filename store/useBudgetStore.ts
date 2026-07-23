@@ -4,6 +4,19 @@ import {
 	type CategoryId,
 } from "@/config/categoryDictionary";
 import { CATEGORY_HIERARCHY } from "@/constants";
+import {
+	clearLegacyCategoryPreferenceStorage,
+	parseCategoryPreferences,
+	parseGroupPreferences,
+	readLegacyCategoryPreferences,
+	readLegacyGroupPreferences,
+	type CategoryPreferences,
+	type GroupPreferences,
+} from "@/lib/categories/categoryPreferences";
+import {
+	fetchCategoryPreferenceSnapshot,
+	saveCategoryPreferenceSnapshot,
+} from "@/lib/categories/categoryPreferencesRepository";
 import { createClient } from "@/lib/supabase";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
@@ -24,6 +37,18 @@ const TRANSACTION_COLUMNS =
 const CUSTOM_CATEGORY_COLUMNS =
 	"id, user_id, name, parent_name, icon_name, color_key, created_at, is_system";
 const DATABASE_BATCH_SIZE = 100;
+
+let categoryPreferenceWriteQueue: Promise<void> = Promise.resolve();
+
+function enqueueCategoryPreferenceWrite(
+	write: () => Promise<void>,
+): Promise<void> {
+	const queuedWrite = categoryPreferenceWriteQueue.then(write, write);
+
+	categoryPreferenceWriteQueue = queuedWrite.catch(() => undefined);
+
+	return queuedWrite;
+}
 
 const DEFAULT_WALLET_IDS = [
 	"amex-bce",
@@ -168,6 +193,10 @@ export interface CreditCard {
 	image_url?: string;
 }
 
+type PreferenceUpdater<T> =
+	| T
+	| ((current: Readonly<T>) => T);
+
 interface BudgetState {
 	transactions: Transaction[];
 	isLoading: boolean;
@@ -182,6 +211,10 @@ interface BudgetState {
 	customRates: Record<string, Record<string, number>>;
 	preferredCards: Record<string, string>;
 	activeCategoryIds: CategoryId[];
+	groupPreferences: GroupPreferences;
+	categoryPreferences: CategoryPreferences;
+	categoryPreferencesLoaded: boolean;
+	categoryPreferenceUserId: string | null;
 	accounts: Account[];
 
 	addActiveCategory: (id: CategoryId) => Promise<void>;
@@ -193,6 +226,14 @@ interface BudgetState {
 		cardId: string | null,
 	) => Promise<void>;
 	fetchPreferredCards: () => Promise<void>;
+	fetchCategoryPreferences: () => Promise<void>;
+	setGroupPreferences: (
+		updater: PreferenceUpdater<GroupPreferences>,
+	) => Promise<void>;
+	setCategoryPreferences: (
+		updater: PreferenceUpdater<CategoryPreferences>,
+	) => Promise<void>;
+	resetCategoryPreferences: () => Promise<void>;
 
 	setHasHydrated: (state: boolean) => void;
 	setToast: (toast: { count: number; snapshot: Transaction[] } | null) => void;
@@ -493,6 +534,23 @@ function parseCategoryIds(value: unknown): CategoryId[] {
 	return result;
 }
 
+function resolvePreferenceUpdate<T>(
+	current: T,
+	updater: PreferenceUpdater<T>,
+): T {
+	return typeof updater === "function"
+		? (updater as (value: Readonly<T>) => T)(current)
+		: updater;
+}
+
+function clearLegacyPreferenceStorage(): void {
+	if (typeof window === "undefined") {
+		return;
+	}
+
+	clearLegacyCategoryPreferenceStorage(window.localStorage);
+}
+
 function applyAllRules(transaction: Transaction, rules: Rule[]): Transaction {
 	let updatedTransaction = transaction;
 
@@ -519,6 +577,10 @@ export const useBudgetStore = create<BudgetState>()(
 			customRates: {},
 			preferredCards: {},
 			activeCategoryIds: [...DEFAULT_CATEGORIES],
+			groupPreferences: {},
+			categoryPreferences: {},
+			categoryPreferencesLoaded: false,
+			categoryPreferenceUserId: null,
 			accounts: [],
 			merchants: [],
 
@@ -699,6 +761,196 @@ export const useBudgetStore = create<BudgetState>()(
 
 				if (data?.preferred_cards) {
 					set({ preferredCards: data.preferred_cards });
+				}
+			},
+
+			fetchCategoryPreferences: async () => {
+				const userId = await getUserId();
+
+				if (!userId) {
+					set({
+						groupPreferences: {},
+						categoryPreferences: {},
+						categoryPreferencesLoaded: true,
+						categoryPreferenceUserId: null,
+					});
+					return;
+				}
+
+				try {
+					const current = get();
+					const canUseCachedPreferences =
+						current.categoryPreferenceUserId === null ||
+						current.categoryPreferenceUserId === userId;
+					let cachedGroupPreferences = canUseCachedPreferences
+						? current.groupPreferences
+						: {};
+					let cachedCategoryPreferences = canUseCachedPreferences
+						? current.categoryPreferences
+						: {};
+
+					if (typeof window !== "undefined") {
+						if (Object.keys(cachedGroupPreferences).length === 0) {
+							cachedGroupPreferences = readLegacyGroupPreferences(
+								window.localStorage,
+							);
+						}
+
+						if (Object.keys(cachedCategoryPreferences).length === 0) {
+							cachedCategoryPreferences = readLegacyCategoryPreferences(
+								window.localStorage,
+							);
+						}
+					}
+
+					const snapshot = await fetchCategoryPreferenceSnapshot(userId);
+					const latest = get();
+					const groupPreferencesChangedWhileLoading =
+						latest.groupPreferences !== current.groupPreferences;
+					const categoryPreferencesChangedWhileLoading =
+						latest.categoryPreferences !== current.categoryPreferences;
+					const groupPreferences = groupPreferencesChangedWhileLoading
+						? latest.groupPreferences
+						: (snapshot.groupPreferences ?? cachedGroupPreferences);
+					const categoryPreferences = categoryPreferencesChangedWhileLoading
+						? latest.categoryPreferences
+						: (snapshot.categoryPreferences ?? cachedCategoryPreferences);
+
+					set({
+						groupPreferences,
+						categoryPreferences,
+						categoryPreferencesLoaded: true,
+						categoryPreferenceUserId: userId,
+					});
+
+					if (
+						snapshot.groupPreferences === null ||
+						snapshot.categoryPreferences === null
+					) {
+						await enqueueCategoryPreferenceWrite(() => {
+							return saveCategoryPreferenceSnapshot(userId, {
+								groupPreferences:
+									snapshot.groupPreferences === null
+										? groupPreferences
+										: undefined,
+								categoryPreferences:
+									snapshot.categoryPreferences === null
+										? categoryPreferences
+										: undefined,
+							});
+						});
+					}
+
+					clearLegacyPreferenceStorage();
+				} catch (error) {
+					set({ categoryPreferencesLoaded: true });
+					console.error("Failed to load category preferences:", error);
+				}
+			},
+
+			setGroupPreferences: async (updater) => {
+				const previous = get().groupPreferences;
+				const next = parseGroupPreferences(
+					resolvePreferenceUpdate(previous, updater),
+				);
+
+				set({ groupPreferences: next });
+
+				try {
+					const userId = await getUserId();
+
+					if (!userId) {
+						throw new Error("You must be signed in to update category groups.");
+					}
+
+					await enqueueCategoryPreferenceWrite(() => {
+						return saveCategoryPreferenceSnapshot(userId, {
+							groupPreferences: next,
+						});
+					});
+
+					set({ categoryPreferenceUserId: userId });
+					clearLegacyPreferenceStorage();
+				} catch (error) {
+					if (get().groupPreferences === next) {
+						set({ groupPreferences: previous });
+					}
+
+					throw error;
+				}
+			},
+
+			setCategoryPreferences: async (updater) => {
+				const previous = get().categoryPreferences;
+				const next = parseCategoryPreferences(
+					resolvePreferenceUpdate(previous, updater),
+				);
+
+				set({ categoryPreferences: next });
+
+				try {
+					const userId = await getUserId();
+
+					if (!userId) {
+						throw new Error("You must be signed in to update categories.");
+					}
+
+					await enqueueCategoryPreferenceWrite(() => {
+						return saveCategoryPreferenceSnapshot(userId, {
+							categoryPreferences: next,
+						});
+					});
+
+					set({ categoryPreferenceUserId: userId });
+					clearLegacyPreferenceStorage();
+				} catch (error) {
+					if (get().categoryPreferences === next) {
+						set({ categoryPreferences: previous });
+					}
+
+					throw error;
+				}
+			},
+
+			resetCategoryPreferences: async () => {
+				const previousGroupPreferences = get().groupPreferences;
+				const previousCategoryPreferences = get().categoryPreferences;
+				const nextGroupPreferences: GroupPreferences = {};
+				const nextCategoryPreferences: CategoryPreferences = {};
+
+				set({
+					groupPreferences: nextGroupPreferences,
+					categoryPreferences: nextCategoryPreferences,
+				});
+
+				try {
+					const userId = await getUserId();
+
+					if (!userId) {
+						throw new Error("You must be signed in to reset categories.");
+					}
+
+					await enqueueCategoryPreferenceWrite(() => {
+						return saveCategoryPreferenceSnapshot(userId, {
+							groupPreferences: nextGroupPreferences,
+							categoryPreferences: nextCategoryPreferences,
+						});
+					});
+
+					set({ categoryPreferenceUserId: userId });
+					clearLegacyPreferenceStorage();
+				} catch (error) {
+					if (
+						get().groupPreferences === nextGroupPreferences &&
+						get().categoryPreferences === nextCategoryPreferences
+					) {
+						set({
+							groupPreferences: previousGroupPreferences,
+							categoryPreferences: previousCategoryPreferences,
+						});
+					}
+
+					throw error;
 				}
 			},
 
@@ -1108,7 +1360,16 @@ export const useBudgetStore = create<BudgetState>()(
 			},
 
 			clearData: () => {
-				set({ transactions: [], customTags: [], rules: [], toast: null });
+				set({
+					transactions: [],
+					customTags: [],
+					rules: [],
+					toast: null,
+					groupPreferences: {},
+					categoryPreferences: {},
+					categoryPreferencesLoaded: true,
+					categoryPreferenceUserId: null,
+				});
 			},
 
 			getCategoryTotals: () => {
@@ -1642,10 +1903,28 @@ export const useBudgetStore = create<BudgetState>()(
 		}),
 		{
 			name: "budget-storage",
-			version: 2,
+			version: 3,
 			storage: createJSONStorage(() => localStorage),
-			migrate: (persistedState) => {
+			migrate: (persistedState, persistedVersion) => {
 				const state = persistedState as Partial<BudgetState>;
+				let groupPreferences = parseGroupPreferences(state.groupPreferences);
+				let categoryPreferences = parseCategoryPreferences(
+					state.categoryPreferences,
+				);
+
+				if (persistedVersion < 3 && typeof window !== "undefined") {
+					if (Object.keys(groupPreferences).length === 0) {
+						groupPreferences = readLegacyGroupPreferences(
+							window.localStorage,
+						);
+					}
+
+					if (Object.keys(categoryPreferences).length === 0) {
+						categoryPreferences = readLegacyCategoryPreferences(
+							window.localStorage,
+						);
+					}
+				}
 
 				return {
 					customTags: state.customTags ?? [],
@@ -1654,6 +1933,12 @@ export const useBudgetStore = create<BudgetState>()(
 					customRates: state.customRates ?? {},
 					preferredCards: state.preferredCards ?? {},
 					activeCategoryIds: state.activeCategoryIds ?? [...DEFAULT_CATEGORIES],
+					groupPreferences,
+					categoryPreferences,
+					categoryPreferenceUserId:
+						typeof state.categoryPreferenceUserId === "string"
+							? state.categoryPreferenceUserId
+							: null,
 				};
 			},
 			onRehydrateStorage: () => {
@@ -1670,6 +1955,7 @@ export const useBudgetStore = create<BudgetState>()(
 					void state?.fetchAccounts(true);
 					void state?.fetchActiveCategories();
 					void state?.fetchPreferredCards();
+					void state?.fetchCategoryPreferences();
 					void state?.fetchCustomCategories();
 					void state?.fetchMerchants();
 				};
@@ -1681,6 +1967,9 @@ export const useBudgetStore = create<BudgetState>()(
 				customRates: state.customRates,
 				preferredCards: state.preferredCards,
 				activeCategoryIds: state.activeCategoryIds,
+				groupPreferences: state.groupPreferences,
+				categoryPreferences: state.categoryPreferences,
+				categoryPreferenceUserId: state.categoryPreferenceUserId,
 			}),
 		},
 	),

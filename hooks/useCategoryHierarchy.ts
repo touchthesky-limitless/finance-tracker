@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
 import {
 	CATEGORY_HIERARCHY,
@@ -6,15 +6,11 @@ import {
 	type UnifiedCategory,
 } from "@/constants";
 import {
-	CATEGORY_PREFERENCES_CHANGED_EVENT,
-	CATEGORY_PREFERENCES_STORAGE_KEY,
-	GROUP_PREFERENCES_STORAGE_KEY,
 	getCategoryGroupPreferenceKey,
-	readCategoryPreferences,
-	readGroupPreferences,
 	type CategorySectionId,
 } from "@/lib/categories/categoryPreferences";
 import { useUnifiedCategories } from "@/hooks/useUnifiedCategories";
+import { useBudgetStore } from "@/store/useBudgetStore";
 
 function normalize(value: string | null | undefined): string {
 	return value?.trim().toLowerCase() ?? "";
@@ -59,57 +55,11 @@ export function useCategoryHierarchy(
 	deferredQuery: string,
 ) {
 	const { allUnifiedCategories } = useUnifiedCategories("Expense", "All");
-	const [preferenceVersion, setPreferenceVersion] = useState(0);
-	void preferenceVersion;
-
-	useEffect(() => {
-		const refreshPreferences = (): void => {
-			setPreferenceVersion((current) => current + 1);
-		};
-
-		const handleStorage = (event: StorageEvent): void => {
-			if (
-				event.key === GROUP_PREFERENCES_STORAGE_KEY ||
-				event.key === CATEGORY_PREFERENCES_STORAGE_KEY
-			) {
-				refreshPreferences();
-			}
-		};
-
-		window.addEventListener(
-			CATEGORY_PREFERENCES_CHANGED_EVENT,
-			refreshPreferences,
-		);
-		window.addEventListener("storage", handleStorage);
-
-		return () => {
-			window.removeEventListener(
-				CATEGORY_PREFERENCES_CHANGED_EVENT,
-				refreshPreferences,
-			);
-			window.removeEventListener("storage", handleStorage);
-		};
-	}, []);
-
-	const groupPreferences = readGroupPreferences();
-	const categoryPreferences = readCategoryPreferences();
-
-	const [selectedParent, setSelectedParent] = useState<string>(() => {
-		const parents = Object.keys(CATEGORY_HIERARCHY);
-
-		for (const parent of parents) {
-			const children = CATEGORY_HIERARCHY[parent];
-
-			if (
-				children.includes(currentCategory) ||
-				currentCategory.startsWith(parent)
-			) {
-				return parent;
-			}
-		}
-
-		return parents[0] ?? "Income";
-	});
+	const groupPreferences = useBudgetStore((state) => state.groupPreferences);
+	const categoryPreferences = useBudgetStore(
+		(state) => state.categoryPreferences,
+	);
+	const [selectedParent, setSelectedParent] = useState("");
 
 	const selectedCategoryData = useMemo(() => {
 		const category = allUnifiedCategories.find((item) => {
@@ -160,10 +110,7 @@ export function useCategoryHierarchy(
 		}
 
 		for (const category of allUnifiedCategories) {
-			if (
-				category.parentName ||
-				seenParentNames.has(normalize(category.name))
-			) {
+			if (category.parentName || seenParentNames.has(normalize(category.name))) {
 				continue;
 			}
 
@@ -184,8 +131,12 @@ export function useCategoryHierarchy(
 				parentName,
 				fallbackIndex,
 				hidden: preference?.hidden === true,
-				sectionId: preference?.sectionId ?? getDefaultSectionId(parentName),
-				order: typeof preference?.order === "number" ? preference.order : null,
+				sectionId:
+					preference?.sectionId ?? getDefaultSectionId(parentName),
+				order:
+					typeof preference?.order === "number"
+						? preference.order
+						: null,
 			};
 		});
 
@@ -231,10 +182,6 @@ export function useCategoryHierarchy(
 			category: UnifiedCategory,
 			defaultParentName: string,
 		): void => {
-			if (category.id && categoryPreferences[category.id]?.hidden === true) {
-				return;
-			}
-
 			const preferredParent = category.id
 				? categoryPreferences[category.id]?.parentName?.trim()
 				: undefined;
@@ -345,17 +292,21 @@ export function useCategoryHierarchy(
 		for (const parent of parents) {
 			const categories = dynamicHierarchy[parent];
 
-			const containsCurrentCategory = categories.some((category) => {
-				return category.name === currentCategory;
-			});
-
-			if (containsCurrentCategory) {
+			if (
+				categories.some((category) => {
+					return category.name === currentCategory;
+				})
+			) {
 				return parent;
 			}
 		}
 
 		return parents[0] ?? "Income";
-	}, [currentCategory, dynamicHierarchy, selectedCategoryData?.parentName]);
+	}, [
+		currentCategory,
+		dynamicHierarchy,
+		selectedCategoryData?.parentName,
+	]);
 
 	const resolvedSelectedParent = useMemo(() => {
 		if (selectedParent && dynamicHierarchy[selectedParent]) {
@@ -406,7 +357,12 @@ export function useCategoryHierarchy(
 		}
 
 		return visibleParents[0] ?? resolvedSelectedParent;
-	}, [deferredQuery, dynamicHierarchy, resolvedSelectedParent, visibleParents]);
+	}, [
+		deferredQuery,
+		dynamicHierarchy,
+		resolvedSelectedParent,
+		visibleParents,
+	]);
 
 	return {
 		selectedCategoryData,
