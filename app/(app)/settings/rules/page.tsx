@@ -1,6 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { DragDropProvider } from "@dnd-kit/react";
+import { move } from "@dnd-kit/helpers";
+import { useSortable } from "@dnd-kit/react/sortable";
 import dynamic from "next/dynamic";
 import {
 	ArrowRight,
@@ -10,6 +13,7 @@ import {
 	Plus,
 	Search,
 	Tag,
+	X,
 } from "lucide-react";
 
 import { CategoryIcon } from "@/components/CategoryIcon";
@@ -49,6 +53,16 @@ const AMOUNT_OPERATOR_LABELS: Record<RuleAmountOperator, string> = {
 	equals: "exactly equals",
 };
 
+function arraysEqual(
+	first: readonly string[],
+	second: readonly string[],
+): boolean {
+	return (
+		first.length === second.length &&
+		first.every((value, index) => value === second[index])
+	);
+}
+
 export default function SettingsRulesPage() {
 	const transactions = useBudgetStore((state) => state.transactions);
 	const accounts = useBudgetStore((state) => state.accounts);
@@ -64,6 +78,7 @@ export default function SettingsRulesPage() {
 	);
 	const saveRule = useBudgetStore((state) => state.saveRule);
 	const deleteRule = useBudgetStore((state) => state.deleteRule);
+	const reorderRules = useBudgetStore((state) => state.reorderRules);
 	const setToast = useBudgetStore((state) => state.setToast);
 
 	const [query, setQuery] = useState("");
@@ -72,6 +87,11 @@ export default function SettingsRulesPage() {
 	);
 	const [isCreating, setIsCreating] = useState(false);
 	const [isLoading, setIsLoading] = useState(true);
+	const [optimisticRuleIds, setOptimisticRuleIds] = useState<string[]>([]);
+	const [isReordering, setIsReordering] = useState(false);
+	const [reorderError, setReorderError] = useState<string | null>(null);
+
+	const isDraggingRuleRef = useRef(false);
 
 	useEffect(() => {
 		let active = true;
@@ -128,19 +148,49 @@ export default function SettingsRulesPage() {
 		return result;
 	}, [customCategories]);
 
+	useEffect(() => {
+		if (isDraggingRuleRef.current) {
+			return;
+		}
+
+		setOptimisticRuleIds(rules.map((rule) => rule.id));
+	}, [rules]);
+
+	const orderedRules = useMemo(() => {
+		const ruleById = new Map(rules.map((rule) => [rule.id, rule]));
+		const ordered = optimisticRuleIds
+			.map((id) => ruleById.get(id))
+			.filter((rule): rule is TransactionRule => Boolean(rule));
+
+		for (const rule of rules) {
+			if (!optimisticRuleIds.includes(rule.id)) {
+				ordered.push(rule);
+			}
+		}
+
+		return ordered;
+	}, [optimisticRuleIds, rules]);
+
 	const filteredRules = useMemo(() => {
 		const normalizedQuery = query.trim().toLowerCase();
 
 		if (!normalizedQuery) {
-			return rules;
+			return orderedRules;
 		}
 
-		return rules.filter((rule) => {
+		return orderedRules.filter((rule) => {
 			return JSON.stringify(rule).toLowerCase().includes(normalizedQuery);
 		});
-	}, [query, rules]);
+	}, [orderedRules, query]);
 
 	const modalOpen = isCreating || selectedRule !== null;
+	const dragDisabled =
+		Boolean(query.trim()) || isReordering || orderedRules.length < 2;
+
+	const handleRuleEdit = (rule: TransactionRule): void => {
+		setIsCreating(false);
+		setSelectedRule(rule);
+	};
 
 	return (
 		<SettingsContentCard
@@ -163,9 +213,17 @@ export default function SettingsRulesPage() {
 				</p>
 
 				<div className="mt-6 flex min-w-0 flex-col items-stretch gap-4 sm:mt-7 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-					<h3 className="text-lg font-semibold">
-						{rules.length} {rules.length === 1 ? "Rule" : "Rules"}
-					</h3>
+					<div className="flex items-center gap-3">
+						<h3 className="text-lg font-semibold">
+							{rules.length} {rules.length === 1 ? "Rule" : "Rules"}
+						</h3>
+						{isReordering && (
+							<span className="inline-flex items-center gap-1.5 text-xs font-medium text-[#777671] dark:text-[#aaa9a4]">
+								<Loader2 size={13} className="animate-spin" />
+								Saving order…
+							</span>
+						)}
+					</div>
 
 					<div className="grid w-full min-w-0 grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_auto] lg:w-auto lg:min-w-[420px]">
 						<label className="relative block min-w-0">
@@ -195,6 +253,26 @@ export default function SettingsRulesPage() {
 					</div>
 				</div>
 
+				{query.trim() && rules.length > 1 && (
+					<p className="mt-3 text-xs text-[#777671] dark:text-[#aaa9a4]">
+						Clear the search to change rule order.
+					</p>
+				)}
+
+				{reorderError && (
+					<div className="mt-4 flex items-start justify-between gap-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300">
+						<span>{reorderError}</span>
+						<button
+							type="button"
+							onClick={() => setReorderError(null)}
+							className="shrink-0"
+							aria-label="Dismiss reorder error"
+						>
+							<X size={16} />
+						</button>
+					</div>
+				)}
+
 				<div className="mt-4 min-w-0 space-y-4">
 					{isLoading ? (
 						<div className="flex min-h-40 items-center justify-center gap-2 text-sm text-[#777671]">
@@ -211,16 +289,55 @@ export default function SettingsRulesPage() {
 							</p>
 						</div>
 					) : (
-						filteredRules.map((rule) => (
-							<RuleCard
-								key={rule.id}
-								rule={rule}
-								onClick={() => {
-									setIsCreating(false);
-									setSelectedRule(rule);
-								}}
-							/>
-						))
+						<DragDropProvider
+							onDragStart={() => {
+								isDraggingRuleRef.current = true;
+								setReorderError(null);
+							}}
+							onDragEnd={(event) => {
+								isDraggingRuleRef.current = false;
+
+								if (event.canceled) {
+									setOptimisticRuleIds(rules.map((rule) => rule.id));
+									return;
+								}
+
+								const currentIds = orderedRules.map((rule) => rule.id);
+								const nextIds = move(currentIds, event);
+
+								if (arraysEqual(currentIds, nextIds)) {
+									return;
+								}
+
+								setOptimisticRuleIds(nextIds);
+								setIsReordering(true);
+
+								void reorderRules(nextIds)
+									.catch((error: unknown) => {
+										setOptimisticRuleIds(currentIds);
+										setReorderError(
+											error instanceof Error
+												? error.message
+												: "The rule order could not be saved.",
+										);
+									})
+									.finally(() => {
+										setIsReordering(false);
+									});
+							}}
+						>
+							<div className="space-y-4">
+								{filteredRules.map((rule, index) => (
+									<SortableRuleCard
+										key={rule.id}
+										rule={rule}
+										index={index}
+										dragDisabled={dragDisabled}
+										onEdit={() => handleRuleEdit(rule)}
+									/>
+								))}
+							</div>
+						</DragDropProvider>
 					)}
 				</div>
 			</div>
@@ -258,32 +375,80 @@ export default function SettingsRulesPage() {
 	);
 }
 
-function RuleCard({
-	rule,
-	onClick,
-}: {
+interface SortableRuleCardProps {
 	rule: TransactionRule;
-	onClick: () => void;
-}) {
+	index: number;
+	dragDisabled: boolean;
+	onEdit: () => void;
+}
+
+function SortableRuleCard({
+	rule,
+	index,
+	dragDisabled,
+	onEdit,
+}: SortableRuleCardProps) {
+	const [element, setElement] = useState<Element | null>(null);
+	const handleRef = useRef<HTMLButtonElement | null>(null);
+	const { isDragging, isDropTarget } = useSortable({
+		id: rule.id,
+		index,
+		element,
+		handle: handleRef,
+		type: "rule",
+		accept: "rule",
+		disabled: dragDisabled,
+	});
+
 	return (
-		<button
-			type="button"
-			onClick={onClick}
-			className="grid w-full min-w-0 overflow-hidden rounded-2xl border border-gray-200 bg-white text-left transition hover:border-gray-300 hover:shadow-sm dark:border-white/10 dark:bg-[#222220] dark:hover:border-white/20 xl:grid-cols-[minmax(0,1fr)_42px_minmax(0,1fr)]"
+		<div
+			ref={setElement}
+			data-shadow={isDragging || undefined}
+			className={`grid w-full min-w-0 overflow-hidden rounded-2xl border bg-white text-left transition-[border-color,box-shadow] dark:bg-[#222220] xl:grid-cols-[minmax(0,1fr)_42px_minmax(0,1fr)] ${
+				isDragging
+					? "relative z-20 border-cyan-500 shadow-[0_18px_48px_rgba(0,0,0,0.18)] ring-2 ring-cyan-500/15"
+					: isDropTarget
+						? "border-cyan-500 ring-2 ring-cyan-500/15"
+						: "border-gray-200 hover:border-gray-300 hover:shadow-sm dark:border-white/10 dark:hover:border-white/20"
+			}`}
 		>
 			<div className="flex min-w-0 gap-2.5 px-3 py-4 sm:gap-3 sm:px-5">
-				<GripVertical size={17} className="mt-1 shrink-0 text-[#9a9a95]" />
-				<div className="min-w-0 space-y-2">{renderCriteria(rule)}</div>
+				<button
+					ref={handleRef}
+					type="button"
+					disabled={dragDisabled}
+					aria-label={`Move rule ${rule.name}`}
+					title={
+						dragDisabled
+							? "Clear search to reorder rules"
+							: "Drag to reorder rule"
+					}
+					className="mt-0.5 grid size-8 shrink-0 cursor-grab touch-none place-items-center rounded-lg text-[#9a9a95] outline-none transition hover:bg-black/[0.04] focus-visible:ring-2 focus-visible:ring-cyan-500/30 active:cursor-grabbing disabled:cursor-default disabled:opacity-60 dark:hover:bg-white/[0.06]"
+				>
+					<GripVertical size={17} />
+				</button>
+
+				<button
+					type="button"
+					onClick={onEdit}
+					className="min-w-0 flex-1 space-y-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/25"
+				>
+					{renderCriteria(rule)}
+				</button>
 			</div>
 
 			<div className="hidden items-center justify-center border-x border-gray-200 bg-[#fafaf8] dark:border-white/10 dark:bg-white/[0.025] xl:flex">
 				<ArrowRight size={18} className="text-[#777671]" />
 			</div>
 
-			<div className="min-w-0 border-t border-gray-200 px-3 py-4 dark:border-white/10 sm:px-5 xl:border-l-0 xl:border-t-0">
+			<button
+				type="button"
+				onClick={onEdit}
+				className="min-w-0 border-t border-gray-200 px-3 py-4 text-left outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/25 dark:border-white/10 sm:px-5 xl:border-l-0 xl:border-t-0"
+			>
 				<div className="space-y-2">{renderActions(rule)}</div>
-			</div>
-		</button>
+			</button>
+		</div>
 	);
 }
 
