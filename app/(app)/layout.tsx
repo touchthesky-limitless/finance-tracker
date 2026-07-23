@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import React from "react";
 import ClientDashboardLayout from "@/components/ClientDashboardLayout";
+import { TransactionToastHost } from "@/components/Transactions/TransactionToastHost";
 
 export default async function ProtectedAppLayout({
     children,
@@ -37,6 +38,7 @@ export default async function ProtectedAppLayout({
     return (
         <ClientDashboardLayout>
             {children}
+            <TransactionToastHost />
         </ClientDashboardLayout>
     );
 }

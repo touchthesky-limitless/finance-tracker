@@ -21,8 +21,9 @@ import { CategoryTrigger } from "@/components/CategoryTrigger";
 import { DataTable } from "@/components/Transactions/DataTable";
 import { useMerchantOptions } from "@/hooks/useMerchantOptions";
 import { useUnifiedCategories } from "@/hooks/useUnifiedCategories";
-import dynamic from "next/dynamic";
-import { Transaction } from "@/store/useBudgetStore";
+import { useCallback } from "react";
+import type { Transaction } from "@/store/useBudgetStore";
+import { TRANSACTION_RETURN_URL_KEY } from "@/lib/transactions/navigation";
 
 interface ChartData {
 	period: string;
@@ -30,16 +31,27 @@ interface ChartData {
 	isActive: boolean;
 }
 
-const AddTransactionModal = dynamic(
-	() => {
-		return import("@/components/Budget/AddTransactionModal");
-	},
-	{ ssr: false },
-);
-
 export default function CategoryBreakdownPage() {
 	const params = useParams();
 	const router = useRouter();
+	const openTransaction = useCallback(
+		(transaction: Transaction) => {
+			if (typeof window !== "undefined") {
+				const returnUrl = [
+					window.location.pathname,
+					window.location.search,
+					window.location.hash,
+				].join("");
+
+				window.sessionStorage.setItem(TRANSACTION_RETURN_URL_KEY, returnUrl);
+			}
+
+			router.push(`/transactions/${encodeURIComponent(transaction.id)}`, {
+				scroll: false,
+			});
+		},
+		[router],
+	);
 	const searchParams = useSearchParams();
 
 	// Extract and decode the category name from the URL
@@ -63,8 +75,6 @@ export default function CategoryBreakdownPage() {
 
 	const merchantItems = useMerchantOptions();
 
-	const [selectedTransaction, setSelectedTransaction] =
-		useState<Transaction | null>(null);
 	const [selectedIds, setSelectedIds] = useState<string[]>([]);
 	const [sorting] = useState<SortingState>([{ id: "date", desc: true }]);
 
@@ -286,7 +296,7 @@ export default function CategoryBreakdownPage() {
 												: [...previous, id];
 										});
 									}}
-									onRowClick={setSelectedTransaction}
+									onRowClick={openTransaction}
 									columnVisibility={{
 										select: false,
 										amount: true,
@@ -359,23 +369,6 @@ export default function CategoryBreakdownPage() {
 					</div>
 				</div>
 			</div>
-			{selectedTransaction && (
-				<AddTransactionModal
-					key={selectedTransaction.id}
-					transaction={selectedTransaction}
-					isOpen={!!selectedTransaction}
-					onClose={() => {
-						setSelectedTransaction(null);
-					}}
-					onUpdate={updateTransaction}
-					// eslint-disable-next-line @typescript-eslint/no-unused-vars
-					onRuleSaved={(_count, _snapshot) => {
-						// Optional: If you want to add the UndoToast here later, you can wire it up.
-						// For now, just close the modal.
-						setSelectedTransaction(null);
-					}}
-				/>
-			)}
 		</div>
 	);
 }

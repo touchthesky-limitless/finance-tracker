@@ -40,6 +40,7 @@ import type { TransactionRule } from "@/lib/rules/ruleEngine";
 import { MerchantRuleToast } from "@/components/Transactions/MerchantRuleToast";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { TRANSACTION_RETURN_URL_KEY } from "@/lib/transactions/navigation";
+import { useTransactionToastStore } from "@/store/useTransactionToastStore";
 
 const DEFAULT_SORTING: SortingState = [
 	{
@@ -191,6 +192,10 @@ export default function TransactionsPageClient({
 		(state) => state.fetchCustomCategories,
 	);
 
+	const reportDeletedTransactions = useTransactionToastStore((state) => {
+		return state.reportDeletedTransactions;
+	});
+
 	const accounts = useBudgetStore((state) => state.accounts);
 
 	const fetchAccounts = useBudgetStore((state) => state.fetchAccounts);
@@ -337,24 +342,19 @@ export default function TransactionsPageClient({
 		]);
 	}, [fetchAccounts, fetchCustomCategories, fetchMerchants]);
 
-	const openDuplicateTransaction = useCallback(
-		(transaction: Transaction) => {
-			setAddTransactionState({
-				mode: "duplicate",
-				transaction: {
-					...transaction,
-					id: crypto.randomUUID(),
-					created_at: undefined,
-					user_id: undefined,
-				},
-			});
-
-			router.push(getTransactionUrl(), {
-				scroll: false,
-			});
-		},
-		[getTransactionUrl, router],
-	);
+	const openDuplicateTransaction = useCallback((transaction: Transaction) => {
+		setAddTransactionState({
+			mode: "duplicate",
+			transaction: {
+				...transaction,
+				id: crypto.randomUUID(),
+				created_at: undefined,
+				user_id: undefined,
+				is_hidden: false,
+				tags: [...(transaction.tags ?? [])],
+			},
+		});
+	}, []);
 
 	// Persist sorting
 	useEffect(() => {
@@ -1012,6 +1012,7 @@ export default function TransactionsPageClient({
 					transaction={selectedTransaction}
 					isOpen
 					onClose={closeTransaction}
+					onDeleted={reportDeletedTransactions}
 					onDuplicate={openDuplicateTransaction}
 					onCreateRule={(transaction) => {
 						setRuleModalState({

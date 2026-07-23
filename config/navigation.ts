@@ -23,7 +23,6 @@ export interface SidebarItemType {
 }
 
 export interface NavGroupType {
-	// label: string;
 	items: SidebarItemType[];
 }
 

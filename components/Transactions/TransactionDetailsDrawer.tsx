@@ -42,7 +42,8 @@ interface TransactionDetailsDrawerProps {
 	transaction: Transaction;
 	isOpen: boolean;
 	onClose: () => void;
-	onDuplicate: (transaction: Transaction) => void;
+	onDeleted: (count: number) => void;
+	onDuplicate: (transaction: Transaction) => void | Promise<void>;
 	onCreateRule: (transaction: Transaction) => void;
 }
 
@@ -68,6 +69,7 @@ export default function TransactionDetailsDrawer({
 	transaction,
 	isOpen,
 	onClose,
+	onDeleted,
 	onDuplicate,
 	onCreateRule,
 }: TransactionDetailsDrawerProps) {
@@ -259,6 +261,10 @@ export default function TransactionDetailsDrawer({
 	const selectedAccount = useMemo(() => {
 		return accounts.find((account) => account.id === editedData.account_id);
 	}, [accounts, editedData.account_id]);
+
+	const selectedAccountId =
+		selectedAccount?.id ?? editedData.account_id ?? null;
+	const selectedAccountName = selectedAccount?.name ?? editedData.account;
 
 	const showSavedStatus = useCallback(() => {
 		setSaveStatus("saved");
@@ -522,6 +528,64 @@ export default function TransactionDetailsDrawer({
 		}
 	}, [editedData.id, editedData.is_hidden, isActionPending, updateTransaction]);
 
+	const handleOpenAccount = useCallback(async () => {
+		if (!selectedAccountId) {
+			setSaveError("Select an account before opening account details.");
+			return;
+		}
+
+		try {
+			await commitPendingTextFields();
+			router.push(`/accounts/details/${encodeURIComponent(selectedAccountId)}`);
+		} catch {
+			// Keep the drawer open so the save error remains visible.
+		}
+	}, [commitPendingTextFields, router, selectedAccountId]);
+
+	const handleDuplicateTransaction = useCallback(async () => {
+		if (isActionPending) {
+			return;
+		}
+
+		const absoluteAmount = Math.abs(Number(editedData.amount) || 0);
+		const duplicateSource: Transaction = {
+			...editedData,
+			merchant: merchantQuery.trim() || editedData.merchant,
+			description: editedData.description?.trim() ?? "",
+			note: editedData.note?.trim() ?? "",
+			amount: direction === "debit" ? -absoluteAmount : absoluteAmount,
+			account: selectedAccountName,
+			account_id: selectedAccountId,
+			tags: [...(editedData.tags ?? [])],
+		};
+
+		setIsActionPending(true);
+		setSaveError(null);
+
+		try {
+			await commitPendingTextFields();
+			setIsMoreMenuOpen(false);
+			await onDuplicate(duplicateSource);
+		} catch (error) {
+			setSaveError(
+				error instanceof Error
+					? error.message
+					: "Failed to prepare the duplicate transaction.",
+			);
+		} finally {
+			setIsActionPending(false);
+		}
+	}, [
+		commitPendingTextFields,
+		direction,
+		editedData,
+		isActionPending,
+		merchantQuery,
+		onDuplicate,
+		selectedAccountId,
+		selectedAccountName,
+	]);
+
 	const handleEditMerchantDetails = useCallback(() => {
 		const merchantId = selectedMerchant?.id ?? editedData.merchant_id;
 
@@ -612,7 +676,10 @@ export default function TransactionDetailsDrawer({
 
 		try {
 			await deleteTransaction(editedData.id);
+
 			setShowDeleteConfirm(false);
+
+			onDeleted(1);
 			onClose();
 		} catch (error) {
 			setSaveError(
@@ -623,7 +690,7 @@ export default function TransactionDetailsDrawer({
 		} finally {
 			setIsActionPending(false);
 		}
-	}, [deleteTransaction, editedData.id, isActionPending, onClose]);
+	}, [deleteTransaction, editedData.id, isActionPending, onClose, onDeleted]);
 
 	useEffect(() => {
 		if (!isOpen) {
@@ -780,8 +847,7 @@ export default function TransactionDetailsDrawer({
 										icon={<Copy size={18} />}
 										label="Duplicate transaction"
 										onClick={() => {
-											setIsMoreMenuOpen(false);
-											onDuplicate(editedData);
+											void handleDuplicateTransaction();
 										}}
 									/>
 									<DrawerMenuButton
@@ -818,9 +884,16 @@ export default function TransactionDetailsDrawer({
 							<p className="truncate text-3xl font-semibold tracking-tight">
 								{formatCurrency(Number(editedData.amount))}
 							</p>
-							<p className="mt-2 truncate text-base text-gray-600 dark:text-gray-300">
-								{(selectedAccount?.name ?? editedData.account) || "No account"}
-							</p>
+							<button
+								type="button"
+								onClick={() => {
+									void handleOpenAccount();
+								}}
+								disabled={!selectedAccountId}
+								className="mt-2 block max-w-full truncate text-base font-medium text-cyan-600 hover:underline disabled:cursor-default disabled:text-gray-500 disabled:no-underline dark:text-cyan-400 dark:disabled:text-gray-400"
+							>
+								{selectedAccountName || "No account"}
+							</button>
 						</div>
 					</div>
 

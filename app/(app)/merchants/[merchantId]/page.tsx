@@ -15,7 +15,6 @@ import {
 } from "recharts";
 import type { SortingState } from "@tanstack/react-table";
 
-// import AddTransactionModal from "@/components/Budget/AddTransactionModal";
 import { DataTable } from "@/components/Transactions/DataTable";
 import { useUnifiedCategories } from "@/hooks/useUnifiedCategories";
 import {
@@ -232,8 +231,6 @@ export default function MerchantBreakdownPage() {
 		return state.updateTransaction;
 	});
 
-	// const [selectedTransaction, setSelectedTransaction] =
-	// 	useState<Transaction | null>(null);
 	const [selectedIds, setSelectedIds] = useState<string[]>([]);
 	const [sorting] = useState<SortingState>([{ id: "date", desc: true }]);
 
