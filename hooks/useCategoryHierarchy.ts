@@ -60,6 +60,7 @@ export function useCategoryHierarchy(
 ) {
 	const { allUnifiedCategories } = useUnifiedCategories("Expense", "All");
 	const [preferenceVersion, setPreferenceVersion] = useState(0);
+	void preferenceVersion;
 
 	useEffect(() => {
 		const refreshPreferences = (): void => {
@@ -90,15 +91,8 @@ export function useCategoryHierarchy(
 		};
 	}, []);
 
-	const groupPreferences = useMemo(() => {
-		void preferenceVersion;
-		return readGroupPreferences();
-	}, [preferenceVersion]);
-
-	const categoryPreferences = useMemo(() => {
-		void preferenceVersion;
-		return readCategoryPreferences();
-	}, [preferenceVersion]);
+	const groupPreferences = readGroupPreferences();
+	const categoryPreferences = readCategoryPreferences();
 
 	const [selectedParent, setSelectedParent] = useState<string>(() => {
 		const parents = Object.keys(CATEGORY_HIERARCHY);
@@ -166,7 +160,10 @@ export function useCategoryHierarchy(
 		}
 
 		for (const category of allUnifiedCategories) {
-			if (category.parentName || seenParentNames.has(normalize(category.name))) {
+			if (
+				category.parentName ||
+				seenParentNames.has(normalize(category.name))
+			) {
 				continue;
 			}
 
@@ -187,12 +184,8 @@ export function useCategoryHierarchy(
 				parentName,
 				fallbackIndex,
 				hidden: preference?.hidden === true,
-				sectionId:
-					preference?.sectionId ?? getDefaultSectionId(parentName),
-				order:
-					typeof preference?.order === "number"
-						? preference.order
-						: null,
+				sectionId: preference?.sectionId ?? getDefaultSectionId(parentName),
+				order: typeof preference?.order === "number" ? preference.order : null,
 			};
 		});
 
@@ -238,6 +231,10 @@ export function useCategoryHierarchy(
 			category: UnifiedCategory,
 			defaultParentName: string,
 		): void => {
+			if (category.id && categoryPreferences[category.id]?.hidden === true) {
+				return;
+			}
+
 			const preferredParent = category.id
 				? categoryPreferences[category.id]?.parentName?.trim()
 				: undefined;
@@ -336,32 +333,37 @@ export function useCategoryHierarchy(
 		return base;
 	}, [allUnifiedCategories, categoryPreferences, groupPreferences]);
 
-	// useEffect(() => {
-	// 	const preferredParent = selectedCategoryData?.parentName;
+	const preferredParent = useMemo(() => {
+		const categoryParent = selectedCategoryData?.parentName;
 
-	// 	if (preferredParent && dynamicHierarchy[preferredParent]) {
-	// 		setSelectedParent(preferredParent);
-	// 		return;
-	// 	}
+		if (categoryParent && dynamicHierarchy[categoryParent]) {
+			return categoryParent;
+		}
 
-	// 	if (!dynamicHierarchy[selectedParent]) {
-	// 		setSelectedParent(Object.keys(dynamicHierarchy)[0] ?? "Income");
-	// 	}
-	// }, [dynamicHierarchy, selectedCategoryData?.parentName, selectedParent]);
+		const parents = Object.keys(dynamicHierarchy);
 
-const preferredParent = selectedCategoryData?.parentName;
+		for (const parent of parents) {
+			const categories = dynamicHierarchy[parent];
 
-if (preferredParent && dynamicHierarchy[preferredParent]) {
-    // Only update if it actually differs to prevent infinite loops
-    if (selectedParent !== preferredParent) {
-        setSelectedParent(preferredParent);
-    }
-} else if (!dynamicHierarchy[selectedParent]) {
-    const fallbackParent = Object.keys(dynamicHierarchy)[0] ?? "Income";
-    if (selectedParent !== fallbackParent) {
-        setSelectedParent(fallbackParent);
-    }
-}
+			const containsCurrentCategory = categories.some((category) => {
+				return category.name === currentCategory;
+			});
+
+			if (containsCurrentCategory) {
+				return parent;
+			}
+		}
+
+		return parents[0] ?? "Income";
+	}, [currentCategory, dynamicHierarchy, selectedCategoryData?.parentName]);
+
+	const resolvedSelectedParent = useMemo(() => {
+		if (selectedParent && dynamicHierarchy[selectedParent]) {
+			return selectedParent;
+		}
+
+		return preferredParent;
+	}, [dynamicHierarchy, preferredParent, selectedParent]);
 
 	const visibleParents = useMemo(() => {
 		const query = deferredQuery.toLowerCase().trim();
@@ -386,32 +388,32 @@ if (preferredParent && dynamicHierarchy[preferredParent]) {
 		const query = deferredQuery.toLowerCase().trim();
 
 		if (!query) {
-			return selectedParent;
+			return resolvedSelectedParent;
 		}
 
-		if (selectedParent.toLowerCase().includes(query)) {
-			return selectedParent;
+		if (resolvedSelectedParent.toLowerCase().includes(query)) {
+			return resolvedSelectedParent;
 		}
 
-		const children = dynamicHierarchy[selectedParent];
+		const children = dynamicHierarchy[resolvedSelectedParent];
 
 		if (
 			children?.some((category) => {
 				return category.name.toLowerCase().includes(query);
 			})
 		) {
-			return selectedParent;
+			return resolvedSelectedParent;
 		}
 
-		return visibleParents[0] ?? selectedParent;
-	}, [deferredQuery, dynamicHierarchy, selectedParent, visibleParents]);
+		return visibleParents[0] ?? resolvedSelectedParent;
+	}, [deferredQuery, dynamicHierarchy, resolvedSelectedParent, visibleParents]);
 
 	return {
 		selectedCategoryData,
 		dynamicHierarchy,
 		visibleParents,
 		activeParent,
-		selectedParent,
+		selectedParent: resolvedSelectedParent,
 		setSelectedParent,
 	};
 }

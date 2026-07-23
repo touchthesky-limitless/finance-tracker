@@ -43,14 +43,14 @@ export function SettingsShell({ children }: SettingsShellProps) {
 	const pathname = usePathname();
 
 	return (
-		<div className="min-h-dvh overflow-x-hidden bg-[#f7f7f5] text-[#222220] dark:bg-[#121212] dark:text-[#efefed]">
-			<div className="mr-auto w-full min-w-0 max-w-[1800px] px-3 pb-8 pt-4 sm:px-5 lg:px-6">
-				<h1 className="mb-5 text-[22px] font-semibold tracking-tight">
+		<div className="min-h-dvh w-full min-w-0 max-w-none overflow-x-clip bg-[#f7f7f5] text-[#222220] dark:bg-[#121212] dark:text-[#efefed]">
+			<div className="w-full min-w-0 max-w-none px-3 pb-8 pt-4 sm:px-4 md:px-5 lg:px-6 2xl:px-8">
+				<h1 className="mb-4 text-xl font-semibold tracking-tight sm:mb-5 sm:text-[22px]">
 					Settings
 				</h1>
 
-				<div className="grid w-full min-w-0 items-start gap-4 xl:grid-cols-[minmax(220px,280px)_minmax(0,1fr)]">
-					<aside className="w-full min-w-0 space-y-4 xl:sticky xl:top-4">
+				<div className="grid w-full min-w-0 max-w-none items-start gap-4 xl:grid-cols-[minmax(230px,280px)_minmax(0,1fr)] 2xl:gap-5">
+					<aside className="grid w-full min-w-0 gap-4 md:grid-cols-2 xl:sticky xl:top-4 xl:block xl:space-y-4">
 						<SettingsNavCard
 							title="Account"
 							items={ACCOUNT_ITEMS}
@@ -63,7 +63,9 @@ export function SettingsShell({ children }: SettingsShellProps) {
 						/>
 					</aside>
 
-					<main className="w-full min-w-0 max-w-full overflow-x-hidden">{children}</main>
+					<main className="w-full min-w-0 max-w-none overflow-x-clip">
+						{children}
+					</main>
 				</div>
 			</div>
 		</div>
@@ -80,26 +82,29 @@ function SettingsNavCard({
 	pathname: string;
 }) {
 	return (
-		<section className="overflow-hidden rounded-2xl border border-black/5 bg-white shadow-sm dark:border-white/10 dark:bg-[#1b1b1a]">
-			<h2 className="border-b border-black/5 px-6 py-5 text-xl font-semibold dark:border-white/10">
+		<section className="min-w-0 overflow-hidden rounded-2xl border border-black/5 bg-white shadow-sm dark:border-white/10 dark:bg-[#1b1b1a]">
+			<h2 className="border-b border-black/5 px-4 py-4 text-lg font-semibold sm:px-5 sm:text-xl xl:px-6 xl:py-5 dark:border-white/10">
 				{title}
 			</h2>
 
-			<nav className="p-2" aria-label={`${title} settings`}>
+			<nav
+				className="grid grid-cols-1 gap-0.5 p-2"
+				aria-label={`${title} settings`}
+			>
 				{items.map((item) => {
 					const active = Boolean(item.href && pathname.startsWith(item.href));
 					const content = (
 						<>
-							<span>{item.label}</span>
+							<span className="min-w-0 truncate">{item.label}</span>
 							{item.badge && (
-								<span className="rounded-full bg-cyan-100 px-2 py-0.5 text-xs font-semibold text-cyan-700 dark:bg-cyan-500/15 dark:text-cyan-300">
+								<span className="shrink-0 rounded-full bg-cyan-100 px-2 py-0.5 text-xs font-semibold text-cyan-700 dark:bg-cyan-500/15 dark:text-cyan-300">
 									{item.badge}
 								</span>
 							)}
 						</>
 					);
 
-					const className = `flex min-h-11 w-full items-center justify-between rounded-xl px-4 py-2.5 text-left text-[15px] transition-colors ${
+					const className = `flex min-h-10 w-full min-w-0 items-center justify-between gap-3 rounded-xl px-3 py-2 text-left text-sm transition-colors sm:min-h-11 sm:px-4 sm:py-2.5 sm:text-[15px] ${
 						active
 							? "bg-cyan-100 text-cyan-800 dark:bg-cyan-500/15 dark:text-cyan-300"
 							: item.href
@@ -132,12 +137,14 @@ export function SettingsContentCard({
 	children: ReactNode;
 }) {
 	return (
-		<section className="w-full min-w-0 max-w-full overflow-hidden rounded-2xl border border-black/5 bg-white shadow-sm dark:border-white/10 dark:bg-[#1b1b1a]">
-			<header className="flex min-h-16 min-w-0 flex-wrap items-center justify-between gap-3 border-b border-black/5 px-4 py-4 sm:px-6 dark:border-white/10">
-				<h2 className="text-xl font-semibold">{title}</h2>
-				{actions}
+		<section className="w-full min-w-0 max-w-none overflow-hidden rounded-2xl border border-black/5 bg-white shadow-sm dark:border-white/10 dark:bg-[#1b1b1a]">
+			<header className="flex min-h-14 min-w-0 flex-col items-stretch gap-3 border-b border-black/5 px-4 py-4 sm:min-h-16 sm:flex-row sm:items-center sm:justify-between sm:px-5 lg:px-6 dark:border-white/10">
+				<h2 className="min-w-0 text-lg font-semibold sm:text-xl">{title}</h2>
+				{actions ? (
+					<div className="w-full min-w-0 sm:w-auto">{actions}</div>
+				) : null}
 			</header>
-			{children}
+			<div className="min-w-0 max-w-full">{children}</div>
 		</section>
 	);
 }

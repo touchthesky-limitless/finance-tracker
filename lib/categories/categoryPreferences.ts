@@ -13,6 +13,7 @@ export interface CategoryPreference {
 	excludedFromBudget?: boolean;
 	parentName?: string;
 	order?: number;
+	hidden?: boolean;
 }
 
 export const GROUP_PREFERENCES_STORAGE_KEY =
