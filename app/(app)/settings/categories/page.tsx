@@ -336,6 +336,7 @@ export default function SettingsCategoriesPage() {
 					!group.hidden && Boolean(group.record || group.children.length > 0)
 				);
 			})
+			// eslint-disable-next-line @typescript-eslint/no-unused-vars
 			.map(({ hidden: _hidden, ...group }) => group);
 	}, [categoryPreferences, customCategories, groupPreferences]);
 
