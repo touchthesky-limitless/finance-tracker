@@ -228,9 +228,8 @@ export default function SettingsCategoriesPage() {
 				continue;
 			}
 
-			const preferredParent = categoryPreferences[
-				category.id
-			]?.parentName?.trim();
+			const preferredParent =
+				categoryPreferences[category.id]?.parentName?.trim();
 			const parentName = preferredParent || category.parent_name?.trim();
 
 			if (!parentName) {
@@ -280,7 +279,10 @@ export default function SettingsCategoriesPage() {
 					const firstOrder = categoryPreferences[first.id]?.order;
 					const secondOrder = categoryPreferences[second.id]?.order;
 
-					if (typeof firstOrder === "number" || typeof secondOrder === "number") {
+					if (
+						typeof firstOrder === "number" ||
+						typeof secondOrder === "number"
+					) {
 						if (typeof firstOrder !== "number") {
 							return 1;
 						}
@@ -321,8 +323,7 @@ export default function SettingsCategoriesPage() {
 					name: parentName,
 					displayName: preference?.name?.trim() || parentName,
 					budgetMode: preference?.budgetMode ?? "category",
-					sectionId:
-						preference?.sectionId ?? getDefaultSectionId(parentName),
+					sectionId: preference?.sectionId ?? getDefaultSectionId(parentName),
 					order:
 						typeof preference?.order === "number" ? preference.order : null,
 					record,
@@ -331,7 +332,9 @@ export default function SettingsCategoriesPage() {
 				};
 			})
 			.filter((group) => {
-				return !group.hidden && Boolean(group.record || group.children.length > 0);
+				return (
+					!group.hidden && Boolean(group.record || group.children.length > 0)
+				);
 			})
 			.map(({ hidden: _hidden, ...group }) => group);
 	}, [categoryPreferences, customCategories, groupPreferences]);
@@ -548,7 +551,8 @@ export default function SettingsCategoriesPage() {
 		const parentName =
 			(nextEditor.category
 				? categoryPreferences[nextEditor.category.id]?.parentName
-				: undefined)?.trim() ||
+				: undefined
+			)?.trim() ||
 			nextEditor.category?.parent_name?.trim() ||
 			nextEditor.parentName?.trim() ||
 			groups[0]?.name ||
@@ -565,7 +569,8 @@ export default function SettingsCategoriesPage() {
 		setSelectedParentName(parentName);
 		setExcludeFromBudget(
 			nextEditor.category
-				? categoryPreferences[nextEditor.category.id]?.excludedFromBudget === true
+				? categoryPreferences[nextEditor.category.id]?.excludedFromBudget ===
+						true
 				: false,
 		);
 		setBudgetMode("category");
@@ -621,7 +626,11 @@ export default function SettingsCategoriesPage() {
 
 		try {
 			if (editor.mode === "create-group") {
-				if (!editor.sectionId) {
+				// 1. Extract the sectionId to a local constant
+				const targetSectionId = editor.sectionId;
+
+				// 2. The guard clause now narrows the local constant to a strict CategorySectionId
+				if (!targetSectionId) {
 					throw new Error("Choose a category section.");
 				}
 
@@ -640,11 +649,13 @@ export default function SettingsCategoriesPage() {
 					createdGroup.is_system,
 				);
 
+				// 3. Use the local constant in your callback!
+				// TypeScript now knows this is 100% defined.
 				updateGroupPreference(groupKey, () => ({
 					name: cleanName,
 					budgetMode,
-					sectionId: editor.sectionId,
-					order: groupsBySection[editor.sectionId].length,
+					sectionId: targetSectionId,
+					order: groupsBySection[targetSectionId].length,
 				}));
 			} else if (editor.mode === "edit-group" && editor.group) {
 				if (!validateGroupName(cleanName, editor.group.key)) {
@@ -935,7 +946,8 @@ export default function SettingsCategoriesPage() {
 																No categories in this group
 															</h3>
 															<p className="mt-3 max-w-full text-sm leading-6 text-[#85837f] sm:text-base dark:text-[#aaa9a4]">
-																Drag categories into this group or create new ones
+																Drag categories into this group or create new
+																ones
 															</p>
 															<button
 																type="button"
@@ -1216,7 +1228,10 @@ function GroupEditorModal({
 
 					<div>
 						<span className="mb-4 block text-[23px] font-semibold">Budget</span>
-						<BudgetModeSelect value={budgetMode} onChange={onBudgetModeChange} />
+						<BudgetModeSelect
+							value={budgetMode}
+							onChange={onBudgetModeChange}
+						/>
 						<p className="mt-4 text-[23px] leading-8 text-[#7d7b77] dark:text-[#aaa9a4]">
 							{budgetMode === "group"
 								? "Budget with a single number for all categories within this group."
@@ -1688,7 +1703,6 @@ function GroupOptionSection({
 		</div>
 	);
 }
-
 
 function DeleteConfirmModal({
 	title,
