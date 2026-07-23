@@ -1,9 +1,16 @@
 "use client";
 
-import { useState, useMemo, useEffect, useCallback } from "react";
+import {
+	useState,
+	useMemo,
+	useEffect,
+	useCallback,
+	type CSSProperties,
+	type ReactNode,
+} from "react";
 import { CreditCard, useBudgetStore } from "@/store/useBudgetStore";
 import { CATEGORY_DICTIONARY, CategoryId } from "@/config/categoryDictionary";
-import { Tag, CheckCircle2, SquarePen, Trash2 } from "lucide-react";
+import { Tag, CheckCircle2, SquarePen, Trash2, X } from "lucide-react";
 import { WalletHeader } from "@/components/Wallet/Header";
 import { BentoCard } from "@/components/Wallet/BentoCard";
 import { WalletManagerModal } from "@/components/Wallet/modals/WalletManagerModal";
@@ -11,25 +18,9 @@ import { EditRatesModal } from "@/components/Wallet/modals/EditRatesModal";
 import { QuickSearchModal } from "@/components/Wallet/modals/QuickSearchModal";
 import { DeleteCategoryModal } from "@/components/Wallet/modals/DeleteCategoryModal";
 import Image from "next/image";
-import {
-	DndContext,
-	closestCenter,
-	KeyboardSensor,
-	MouseSensor,
-	TouchSensor,
-	useSensor,
-	useSensors,
-	DragEndEvent,
-} from "@dnd-kit/core";
-import {
-	arrayMove,
-	SortableContext,
-	sortableKeyboardCoordinates,
-	rectSortingStrategy,
-	verticalListSortingStrategy,
-} from "@dnd-kit/sortable";
-import { SortableItem } from "@/components/Wallet/SortableItem";
-import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
+import { DragDropProvider } from "@dnd-kit/react";
+import { useSortable } from "@dnd-kit/react/sortable";
+import { move } from "@dnd-kit/helpers";
 import ViewToggle from "@/components/ViewToggle";
 
 export default function WalletRewardsPage() {
@@ -69,11 +60,24 @@ export default function WalletRewardsPage() {
 	const [isWalletManagerOpen, setIsWalletManagerOpen] = useState(false);
 	const [isSearchOpen, setIsSearchOpen] = useState(false);
 	const [hiddenCategories, setHiddenCategories] = useState<string[]>([]);
-	const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+	const [viewMode, setViewMode] = useState<"grid" | "list">(() => {
+		if (typeof window === "undefined") {
+			return "grid";
+		}
+
+		return window.matchMedia("(max-width: 767px)").matches ? "list" : "grid";
+	});
+	const [pendingCategoryOrder, setPendingCategoryOrder] = useState<
+		CategoryId[] | null
+	>(null);
+	const [reorderError, setReorderError] = useState<string | null>(null);
+	const [isReordering, setIsReordering] = useState(false);
 
 	// Modal Data States
 	const [editingCategory, setEditingCategory] = useState<string | null>(null);
-	const [deletingCategory, setDeletingCategory] = useState<CategoryId | null>(null);
+	const [deletingCategory, setDeletingCategory] = useState<CategoryId | null>(
+		null,
+	);
 	const [activeStackId, setActiveStackId] = useState<string | null>(null);
 
 	// Derived Data
@@ -136,11 +140,13 @@ export default function WalletRewardsPage() {
 		[userWallet, customRates, preferredCards],
 	);
 
+	const sortableCategoryIds = pendingCategoryOrder ?? activeCategoryIds;
+
 	const optimizedCategories = useMemo(() => {
 		const result = [];
 
-		for (let i = 0; i < activeCategoryIds.length; i++) {
-			const currentId = activeCategoryIds[i];
+		for (let i = 0; i < sortableCategoryIds.length; i++) {
+			const currentId = sortableCategoryIds[i];
 			let foundCategory = null;
 
 			// Find the matching category object
@@ -160,9 +166,43 @@ export default function WalletRewardsPage() {
 		}
 
 		return result;
-	}, [activeCategoryIds, unifiedCategories, getTopCardsForCategory]);
+	}, [sortableCategoryIds, unifiedCategories, getTopCardsForCategory]);
 
 	// Handlers
+	const releaseFocusedElement = useCallback((): void => {
+		const focusedElement = document.activeElement;
+
+		if (focusedElement instanceof HTMLElement) {
+			focusedElement.blur();
+		}
+	}, []);
+
+	const openWalletManager = useCallback((): void => {
+		releaseFocusedElement();
+		setIsWalletManagerOpen(true);
+	}, [releaseFocusedElement]);
+
+	const openSearch = useCallback((): void => {
+		releaseFocusedElement();
+		setIsSearchOpen(true);
+	}, [releaseFocusedElement]);
+
+	const openEditRates = useCallback(
+		(categoryId: string): void => {
+			releaseFocusedElement();
+			setEditingCategory(categoryId);
+		},
+		[releaseFocusedElement],
+	);
+
+	const openDeleteCategory = useCallback(
+		(categoryId: CategoryId): void => {
+			releaseFocusedElement();
+			setDeletingCategory(categoryId);
+		},
+		[releaseFocusedElement],
+	);
+
 	const handleSaveRates = (
 		id: string,
 		rates: Record<string, number | undefined>,
@@ -183,35 +223,40 @@ export default function WalletRewardsPage() {
 		setEditingCategory(null);
 	};
 
-	// Initialize DND Sensors (requires holding for 150ms on mobile so scrolling still works)
-	const sensors = useSensors(
-		useSensor(MouseSensor, {
-			activationConstraint: {
-				distance: 8, // Requires moving the mouse 8px before drag starts (prevents accidental drags on click)
-			},
-		}),
-		useSensor(TouchSensor, {
-			activationConstraint: {
-				delay: 150, // User must hold their finger down for 250ms to "pick up" the card
-				tolerance: 8, // Allows the user's finger to wiggle up to 8px while holding without canceling the drag
-			},
-		}),
-		useSensor(KeyboardSensor, {
-			coordinateGetter: sortableKeyboardCoordinates,
-		}),
-	);
-
-	const handleDragEnd = (event: DragEndEvent) => {
-		const { active, over } = event;
-
-		if (over && active.id !== over.id) {
-			const oldIndex = activeCategoryIds.indexOf(active.id as CategoryId);
-			const newIndex = activeCategoryIds.indexOf(over.id as CategoryId);
-
-			// This MUST update the store, which the persist middleware then saves
-			const newOrder = arrayMove(activeCategoryIds, oldIndex, newIndex);
-			reorderActiveCategories(newOrder);
+	const handleDragEnd = (event: Parameters<typeof move>[1]): void => {
+		if (isReordering) {
+			return;
 		}
+
+		const previousOrder = sortableCategoryIds;
+		const nextOrder = move(previousOrder, event) as CategoryId[];
+
+		if (
+			nextOrder.length !== previousOrder.length ||
+			nextOrder.every((id, index) => id === previousOrder[index])
+		) {
+			return;
+		}
+
+		setPendingCategoryOrder(nextOrder);
+		setReorderError(null);
+		setIsReordering(true);
+
+		void reorderActiveCategories(nextOrder)
+			.then(() => {
+				setPendingCategoryOrder(null);
+			})
+			.catch((error: unknown) => {
+				setPendingCategoryOrder(null);
+				setReorderError(
+					error instanceof Error
+						? error.message
+						: "The category order could not be saved.",
+				);
+			})
+			.finally(() => {
+				setIsReordering(false);
+			});
 	};
 
 	useEffect(() => {
@@ -223,41 +268,30 @@ export default function WalletRewardsPage() {
 	}, []); // Empty array ensures this only runs once on mount
 
 	useEffect(() => {
-		// Push the state update to the next tick to avoid React's synchronous render warning
-		const timer = setTimeout(() => {
-			if (window.innerWidth < 768) {
-				setViewMode("list");
-			}
-		}, 0);
-
-		return () => clearTimeout(timer);
-	}, []);
-
-	useEffect(() => {
 		const handleKeyDown = (e: KeyboardEvent) => {
 			if ((e.metaKey || e.ctrlKey) && e.key === "k") {
 				e.preventDefault();
-				setIsSearchOpen(true);
+				openSearch();
 			}
 		};
 		window.addEventListener("keydown", handleKeyDown);
 		return () => window.removeEventListener("keydown", handleKeyDown);
-	}, []);
+	}, [openSearch]);
 
 	if (!hasHydrated)
 		return <div className="min-h-screen bg-white dark:bg-[#050505]" />;
 
 	return (
-		<div className="p-4 md:p-8 max-w-7xl mx-auto space-y-6 md:space-y-12 min-h-screen text-gray-900 dark:text-white bg-white dark:bg-[#050505] relative transition-colors duration-300">
+		<div className="relative isolate min-h-screen w-full max-w-none space-y-5 bg-white px-3 py-4 text-gray-900 transition-colors duration-300 dark:bg-[#050505] dark:text-white sm:space-y-6 sm:px-4 sm:py-6 md:space-y-8 md:px-5 lg:space-y-10 lg:px-6 xl:px-7 2xl:px-8">
 			<WalletHeader
 				userWalletCount={userWallet.length}
 				unifiedCategories={unifiedCategories}
 				activeCategoryIds={activeCategoryIds}
-				onOpenSearch={() => setIsSearchOpen(true)}
-				onOpenWallet={() => setIsWalletManagerOpen(true)}
+				onOpenSearch={openSearch}
+				onOpenWallet={openWalletManager}
 				onAddCategory={(id) => addActiveCategory(id)}
 			/>
-			<div className="flex w-full justify-end">
+			<div className="flex w-full items-center justify-end overflow-x-auto pb-1">
 				<ViewToggle
 					viewMode={viewMode}
 					setViewMode={setViewMode}
@@ -265,158 +299,157 @@ export default function WalletRewardsPage() {
 				/>
 			</div>
 
-			<DndContext
-				sensors={sensors}
-				collisionDetection={closestCenter}
-				onDragEnd={handleDragEnd}
-				// Dynamically apply the vertical lock only if we are in Stack view
-				modifiers={viewMode === "list" ? [restrictToVerticalAxis] : []}
-			>
+			{reorderError && (
+				<div className="flex items-start justify-between gap-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300">
+					<span>{reorderError}</span>
+					<button
+						type="button"
+						onClick={() => setReorderError(null)}
+						aria-label="Dismiss reorder error"
+					>
+						<X size={16} />
+					</button>
+				</div>
+			)}
+
+			<DragDropProvider onDragEnd={handleDragEnd}>
 				{viewMode === "grid" ? (
-					<SortableContext
-						items={optimizedCategories.map((i) => i.category.id)}
-						strategy={rectSortingStrategy}
-					>
-						<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-							{optimizedCategories.map((item, index) => (
-								<SortableItem key={item.category.id} id={item.category.id}>
-									<BentoCard
-										item={item}
-										priority={index < 3}
-										isHidden={hiddenCategories.includes(item.category.id)}
-										onToggleHide={(id) =>
-											setHiddenCategories((prev) =>
-												prev.includes(id)
-													? prev.filter((c) => c !== id)
-													: [...prev, id],
-											)
-										}
-										onEdit={setEditingCategory}
-										onDelete={setDeletingCategory}
-									/>
-								</SortableItem>
-							))}
-						</div>
-					</SortableContext>
+					<div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,19rem),1fr))] gap-4 sm:gap-5 lg:gap-6">
+						{optimizedCategories.map((item, index) => (
+							<WalletSortableItem
+								key={item.category.id}
+								id={item.category.id}
+								index={index}
+								disabled={isReordering}
+							>
+								<BentoCard
+									item={item}
+									priority={index < 4}
+									isHidden={hiddenCategories.includes(item.category.id)}
+									onToggleHide={(id) =>
+										setHiddenCategories((previous) =>
+											previous.includes(id)
+												? previous.filter((categoryId) => categoryId !== id)
+												: [...previous, id],
+										)
+									}
+									onEdit={openEditRates}
+									onDelete={openDeleteCategory}
+								/>
+							</WalletSortableItem>
+						))}
+					</div>
 				) : (
-					// The New Apple Wallet Stack Layout (Now wrapped with DND Context)
-					<SortableContext
-						items={optimizedCategories.map((i) => i.category.id)}
-						strategy={verticalListSortingStrategy}
-					>
-						<div className="flex flex-col max-w-md mx-auto -space-y-20 md:-space-y-32 pb-40">
-							{optimizedCategories.map((item, index) => {
-								const Icon = item.category.icon as React.ElementType;
-								const isActive = activeStackId === item.category.id;
+					<div className="mx-auto flex w-full max-w-[34rem] flex-col pb-28 sm:pb-36 md:pb-44 [&>*+*]:-mt-14 sm:[&>*+*]:-mt-20 md:[&>*+*]:-mt-24 lg:[&>*+*]:-mt-28">
+						{optimizedCategories.map((item, index) => {
+							const Icon = item.category.icon as React.ElementType;
+							const isActive = activeStackId === item.category.id;
 
-								return (
-									<SortableItem
-										key={item.category.id}
-										id={item.category.id}
-										className="relative transition-all duration-500 ease-out flex flex-col"
-										// Dynamically pop the active card to the absolute front
-										style={{ zIndex: isActive ? 100 : index }}
+							return (
+								<WalletSortableItem
+									key={item.category.id}
+									id={item.category.id}
+									index={index}
+									disabled={isReordering}
+									className="relative flex w-full flex-col"
+									style={{ zIndex: isActive ? 100 : index }}
+								>
+									<div
+										onClick={() =>
+											setActiveStackId(isActive ? null : item.category.id)
+										}
+										className={`relative z-10 aspect-[1.58/1] w-full cursor-grab overflow-hidden rounded-xl border-t border-white/20 drop-shadow-2xl transition-transform duration-300 active:cursor-grabbing sm:rounded-2xl sm:duration-500 ${
+											isActive
+												? "-translate-y-2 scale-[1.02] shadow-2xl shadow-black/40 sm:-translate-y-4 sm:scale-105"
+												: "md:hover:-translate-y-6 lg:hover:-translate-y-8"
+										}`}
 									>
-										{/* 1. The Physical Card */}
-										<div
-											onClick={() =>
-												setActiveStackId(isActive ? null : item.category.id)
-											}
-											className={`relative z-10 w-full aspect-[1.58/1] rounded-2xl overflow-hidden border-t border-white/20 transition-all duration-500 cursor-pointer drop-shadow-2xl ${
-												isActive
-													? "-translate-y-4 scale-105 shadow-2xl shadow-black/40"
-													: "hover:-translate-y-8 hover:pb-8"
-											}`}
-										>
-											{item.topCard?.card.image_url ? (
-												<Image
-													src={item.topCard.card.image_url}
-													alt="card"
-													fill
-													sizes="(max-width: 768px) 90vw, 448px"
-													className="object-cover"
-													priority={index === 0}
-												/>
-											) : (
-												<div
-													className={`w-full h-full bg-linear-to-br ${item.category.accent}`}
-												/>
-											)}
+										{item.topCard?.card.image_url ? (
+											<Image
+												src={item.topCard.card.image_url}
+												alt={`${item.topCard.card.name} card`}
+												fill
+												loading="eager"
+												fetchPriority={index === 0 ? "high" : "auto"}
+												sizes="(max-width: 640px) calc(100vw - 24px), (max-width: 1024px) 34rem, 544px"
+												className="object-cover"
+											/>
+										) : (
+											<div
+												className={`h-full w-full bg-linear-to-br ${item.category.accent}`}
+											/>
+										)}
 
-											{/* The iOS Glass Badge */}
-											<div className="absolute top-4 right-4 flex items-center gap-2.5 px-3 py-1.5 rounded-full bg-white/50 dark:bg-white/10 backdrop-blur-2xl backdrop-saturate-150 border border-white/60 dark:border-white/20 shadow-xl shadow-black/10">
-												<div className="flex items-center gap-1.5 text-gray-900 dark:text-white/90">
-													<Icon size={12} className={item.category.accent} />
-													<span className="text-[10px] uppercase font-bold tracking-widest mt-px">
-														{item.category.name}
-													</span>
-												</div>
-												<div className="w-px h-3 bg-gray-900/10 dark:bg-white/10" />
-												<span
-													className={`text-sm font-black drop-shadow-sm ${item.category.accent}`}
-												>
-													{item.topCard?.rate}x
+										<div className="absolute right-2.5 top-2.5 flex max-w-[calc(100%-1.25rem)] items-center gap-1.5 rounded-full border border-white/60 bg-white/50 px-2.5 py-1 shadow-xl shadow-black/10 backdrop-blur-2xl backdrop-saturate-150 dark:border-white/20 dark:bg-white/10 sm:right-4 sm:top-4 sm:gap-2.5 sm:px-3 sm:py-1.5">
+											<div className="flex min-w-0 items-center gap-1.5 text-gray-900 dark:text-white/90">
+												<Icon size={12} className={item.category.accent} />
+												<span className="mt-px truncate text-[9px] font-bold uppercase tracking-wider sm:text-[10px] sm:tracking-widest">
+													{item.category.name}
 												</span>
 											</div>
+											<div className="h-3 w-px bg-gray-900/10 dark:bg-white/10" />
+											<span
+												className={`shrink-0 text-xs font-black drop-shadow-sm sm:text-sm ${item.category.accent}`}
+											>
+												{item.topCard?.rate}x
+											</span>
 										</div>
+									</div>
 
-										{/* 2. The Hidden Control Panel */}
-										<div
-											className={`relative -z-10 transition-all duration-500 ease-in-out overflow-hidden mx-4 rounded-b-2xl bg-white dark:bg-[#111] border border-gray-200 dark:border-white/10 shadow-xl ${
-												isActive
-													? "max-h-48 opacity-100 -mt-4 pt-8 pb-4 px-4 translate-y-0 mb-8"
-													: "max-h-0 opacity-0 -mt-16 pt-0 pb-0 px-4 -translate-y-8 mb-0 border-t-0"
-											}`}
-										>
-											{/* Backup Card Info */}
-											{item.backupCard && (
-												<div className="flex items-center justify-between mb-4 pb-4 border-b border-gray-100 dark:border-white/5">
-													<div className="flex items-center gap-1.5 text-gray-500">
-														<CheckCircle2 size={12} />
-														<span className="text-[10px] uppercase font-black tracking-widest">
-															Backup
-														</span>
-													</div>
-													<p className="text-xs font-bold text-gray-900 dark:text-white">
-														{item.backupCard.card.name}
-														<span className="text-gray-400 dark:text-white/40 ml-1 font-medium">
-															({item.backupCard.rate}x)
-														</span>
-													</p>
+									<div
+										className={`relative -z-10 mx-2 overflow-hidden rounded-b-xl border border-gray-200 bg-white shadow-xl transition-all duration-300 ease-in-out dark:border-white/10 dark:bg-[#111] sm:mx-4 sm:rounded-b-2xl sm:duration-500 ${
+											isActive
+												? "-mt-3 mb-5 max-h-64 translate-y-0 px-3 pb-3 pt-7 sm:-mt-4 sm:mb-8 sm:px-4 sm:pb-4 sm:pt-8"
+												: "-mt-12 mb-0 max-h-0 -translate-y-6 border-t-0 px-3 pb-0 pt-0 sm:-mt-16 sm:-translate-y-8 sm:px-4"
+										}`}
+									>
+										{item.backupCard && (
+											<div className="mb-3 flex flex-col gap-1.5 border-b border-gray-100 pb-3 sm:mb-4 sm:flex-row sm:items-center sm:justify-between sm:pb-4 dark:border-white/5">
+												<div className="flex items-center gap-1.5 text-gray-500">
+													<CheckCircle2 size={12} />
+													<span className="text-[10px] font-black uppercase tracking-widest">
+														Backup
+													</span>
 												</div>
-											)}
-
-											{/* Action Buttons */}
-											<div className="flex gap-2">
-												<button
-													type="button"
-													onClick={(e) => {
-														e.stopPropagation(); // Prevents the card from closing when clicked
-														setEditingCategory(item.category.id);
-													}}
-													className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-gray-100 dark:bg-white/5 hover:bg-gray-200 dark:hover:bg-white/10 rounded-xl text-xs font-bold text-gray-900 dark:text-white transition-colors"
-												>
-													<SquarePen size={14} /> Edit Rates
-												</button>
-												<button
-													type="button"
-													onClick={(e) => {
-														e.stopPropagation(); // Prevents the card from closing when clicked
-														setDeletingCategory(item.category.id);
-													}}
-													className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-red-50 dark:bg-red-500/10 hover:bg-red-100 dark:hover:bg-red-500/20 rounded-xl text-xs font-bold text-red-600 dark:text-red-500 transition-colors"
-												>
-													<Trash2 size={14} /> Remove
-												</button>
+												<p className="min-w-0 truncate text-xs font-bold text-gray-900 dark:text-white">
+													{item.backupCard.card.name}
+													<span className="ml-1 font-medium text-gray-400 dark:text-white/40">
+														({item.backupCard.rate}x)
+													</span>
+												</p>
 											</div>
+										)}
+
+										<div className="flex flex-col gap-2 sm:flex-row">
+											<button
+												type="button"
+												onClick={(event) => {
+													event.stopPropagation();
+													openEditRates(item.category.id);
+												}}
+												className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-gray-100 px-3 py-2 text-xs font-bold text-gray-900 transition-colors hover:bg-gray-200 dark:bg-white/5 dark:text-white dark:hover:bg-white/10"
+											>
+												<SquarePen size={14} /> Edit Rates
+											</button>
+											<button
+												type="button"
+												onClick={(event) => {
+													event.stopPropagation();
+													openDeleteCategory(item.category.id);
+												}}
+												className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-red-50 px-3 py-2 text-xs font-bold text-red-600 transition-colors hover:bg-red-100 dark:bg-red-500/10 dark:text-red-500 dark:hover:bg-red-500/20"
+											>
+												<Trash2 size={14} /> Remove
+											</button>
 										</div>
-									</SortableItem>
-								);
-							})}
-						</div>
-					</SortableContext>
+									</div>
+								</WalletSortableItem>
+							);
+						})}
+					</div>
 				)}
-			</DndContext>
+			</DragDropProvider>
+
 			<WalletManagerModal
 				isOpen={isWalletManagerOpen}
 				onClose={setIsWalletManagerOpen}
@@ -464,6 +497,42 @@ export default function WalletRewardsPage() {
 					setDeletingCategory(null);
 				}}
 			/>
+		</div>
+	);
+}
+
+interface WalletSortableItemProps {
+	id: CategoryId;
+	index: number;
+	disabled?: boolean;
+	children: ReactNode;
+	className?: string;
+	style?: CSSProperties;
+}
+
+function WalletSortableItem({
+	id,
+	index,
+	disabled = false,
+	children,
+	className = "",
+	style,
+}: WalletSortableItemProps) {
+	const [element, setElement] = useState<Element | null>(null);
+	useSortable({
+		id,
+		index,
+		element,
+		disabled,
+	});
+
+	return (
+		<div
+			ref={setElement}
+			style={style}
+			className={`relative min-w-0 touch-pan-y select-none ${className}`}
+		>
+			{children}
 		</div>
 	);
 }
