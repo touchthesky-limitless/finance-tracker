@@ -18,7 +18,7 @@ import {
 const supabase = createClient();
 
 const TRANSACTION_COLUMNS =
-	"id, user_id, date, merchant, merchant_id, description, amount, category, account_id, account, needs_review, needs_subcat, tags, is_hidden, created_at";
+	"id, user_id, date, merchant, merchant_id, description, note, amount, category, account_id, account, needs_review, needs_subcat, tags, is_hidden, created_at";
 const CUSTOM_CATEGORY_COLUMNS =
 	"id, user_id, name, parent_name, icon_name, color_key, created_at, is_system";
 const DATABASE_BATCH_SIZE = 100;
@@ -108,6 +108,8 @@ export type TransactionUpdate = Partial<
 		| "needs_review"
 		| "needs_subcat"
 		| "tags"
+		| "note"
+		| "is_hidden"
 	>
 >;
 
@@ -196,6 +198,7 @@ interface BudgetState {
 	setTransactions: (transactions: Transaction[]) => void;
 	clearData: () => void;
 
+	createTransaction: (transaction: Transaction) => Promise<Transaction>;
 	addTransactions: (transactions: Transaction[]) => Promise<void>;
 	fetchTransactions: (force?: boolean) => Promise<void>;
 	updateTransaction: (id: string, updates: TransactionUpdate) => Promise<void>;
@@ -700,6 +703,80 @@ export const useBudgetStore = create<BudgetState>()(
 			setTransactions: (transactions) => set({ transactions }),
 			setLoading: (isLoading) => set({ isLoading }),
 
+			createTransaction: async (transaction) => {
+				const userId = await getUserId();
+
+				if (!userId) {
+					throw new Error("You must be signed in to add a transaction.");
+				}
+
+				const accountName = transaction.account.trim();
+				const merchantName = transaction.merchant.trim();
+
+				if (!accountName) {
+					throw new Error("Select an account.");
+				}
+
+				if (!merchantName) {
+					throw new Error("Enter or select a merchant.");
+				}
+
+				let accountId = transaction.account_id;
+
+				if (!accountId) {
+					accountId = await getOrCreateAccountId(userId, accountName);
+				}
+
+				let merchantId = transaction.merchant_id;
+
+				if (!merchantId) {
+					const merchantIds = await getOrCreateMerchantIds(userId, [
+						merchantName,
+					]);
+					merchantId = merchantIds.get(normalize(merchantName)) ?? null;
+				}
+
+				const row = {
+					user_id: userId,
+					date: transaction.date,
+					merchant: merchantName,
+					merchant_id: merchantId,
+					description: transaction.description?.trim() ?? "",
+					note: transaction.note?.trim() ?? "",
+					amount: transaction.amount,
+					category: transaction.category || "Uncategorized",
+					account: accountName,
+					account_id: accountId,
+					needs_review: transaction.needs_review ?? true,
+					needs_subcat: transaction.needs_subcat ?? true,
+					tags: transaction.tags ?? [],
+					is_hidden: transaction.is_hidden ?? false,
+				};
+
+				const { data, error } = await supabase
+					.from("transactions")
+					.insert(row)
+					.select(TRANSACTION_COLUMNS)
+					.single();
+
+				if (error) {
+					throw error;
+				}
+
+				const createdTransaction = data as Transaction;
+
+				set((state) => ({
+					transactions: mergeTransactionsById(
+						[createdTransaction],
+						state.transactions,
+					),
+				}));
+
+				await Promise.all([get().fetchAccounts(true), get().fetchMerchants()]);
+
+				return createdTransaction;
+			},
+
 			addTransactions: async (newTransactions) => {
 				if (newTransactions.length === 0) {
 					return;
@@ -775,6 +852,7 @@ export const useBudgetStore = create<BudgetState>()(
 						needs_review: processed.needs_review ?? true,
 						needs_subcat: processed.needs_subcat ?? true,
 						tags: processed.tags ?? [],
+						note: processed.note ?? "",
 						is_hidden: processed.is_hidden ?? false,
 					};
 				});

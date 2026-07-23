@@ -9,7 +9,6 @@ import {
 	ChevronRight,
 	Columns3,
 	CreditCard,
-	Plus,
 } from "lucide-react";
 import {
 	CartesianGrid,
@@ -23,13 +22,14 @@ import {
 import type { SortingState, VisibilityState } from "@tanstack/react-table";
 
 import { DataTable } from "@/components/Transactions/DataTable";
-import EditTransactionModal from "@/components/Budget/EditTransactionModal";
 import {
 	type Account,
 	type Transaction,
 	useBudgetStore,
 } from "@/store/useBudgetStore";
 import { formatCurrency } from "@/utils/formatters";
+import { useCallback } from "react";
+import { TRANSACTION_RETURN_URL_KEY } from "@/lib/transactions/navigation";
 
 type AccountWithDetails = Account & {
 	institution?: string | null;
@@ -178,6 +178,25 @@ export default function AccountDetailsPage() {
 	const params = useParams<{ accountId: string }>();
 	const router = useRouter();
 
+	const openTransaction = useCallback(
+		(transaction: Transaction) => {
+			if (typeof window !== "undefined") {
+				const returnUrl = [
+					window.location.pathname,
+					window.location.search,
+					window.location.hash,
+				].join("");
+
+				window.sessionStorage.setItem(TRANSACTION_RETURN_URL_KEY, returnUrl);
+			}
+
+			router.push(`/transactions/${encodeURIComponent(transaction.id)}`, {
+				scroll: false,
+			});
+		},
+		[router],
+	);
+
 	const accountId = params.accountId
 		? decodeURIComponent(params.accountId)
 		: "";
@@ -198,19 +217,9 @@ export default function AccountDetailsPage() {
 		return state.fetchAccounts;
 	});
 
-	const updateTransaction = useBudgetStore((state) => {
-		return state.updateTransaction;
-	});
-
-	const setToast = useBudgetStore((state) => {
-		return state.setToast;
-	});
-
 	const [timeframe, setTimeframe] = useState<Timeframe>("all");
 	const [isEditMode, setIsEditMode] = useState(false);
 	const [selectedIds, setSelectedIds] = useState<string[]>([]);
-	const [selectedTransaction, setSelectedTransaction] =
-		useState<Transaction | null>(null);
 
 	const [sorting] = useState<SortingState>([{ id: "date", desc: true }]);
 
@@ -276,21 +285,6 @@ export default function AccountDetailsPage() {
 			return current.includes(transactionId)
 				? current.filter((id) => id !== transactionId)
 				: [...current, transactionId];
-		});
-	};
-
-	const handleAddTransaction = () => {
-		setSelectedTransaction({
-			id: crypto.randomUUID(),
-			date: new Date().toISOString().slice(0, 10),
-			merchant: "",
-			description: "",
-			amount: 0,
-			category: "Uncategorized",
-			account: accountName,
-			account_id: accountId || null,
-			needs_review: true,
-			needs_subcat: true,
 		});
 	};
 
@@ -458,15 +452,6 @@ export default function AccountDetailsPage() {
 								{isEditMode ? "Done" : "Edit multiple"}
 							</button>
 
-							<button
-								type="button"
-								onClick={handleAddTransaction}
-								className="flex h-10 items-center gap-2 rounded-xl bg-[#ff6538] px-4 text-sm font-semibold text-white transition hover:bg-[#ff744e]"
-							>
-								<Plus size={16} />
-								Add transaction
-							</button>
-
 							<div className="mx-1 h-6 w-px bg-white/10" />
 
 							<button
@@ -484,7 +469,7 @@ export default function AccountDetailsPage() {
 							transactions={accountTransactions}
 							selectedIds={selectedIds}
 							onSelectRow={handleSelectRow}
-							onRowClick={setSelectedTransaction}
+							onRowClick={openTransaction}
 							columnVisibility={columnVisibility}
 							isEditMode={isEditMode}
 							currentView="all"
@@ -539,23 +524,6 @@ export default function AccountDetailsPage() {
 					</div>
 				</aside>
 			</div>
-
-			{selectedTransaction && (
-				<EditTransactionModal
-					key={selectedTransaction.id}
-					transaction={selectedTransaction}
-					isOpen
-					onClose={() => {
-						setSelectedTransaction(null);
-					}}
-					onUpdate={(id, updates) => {
-						void updateTransaction(id, updates);
-					}}
-					onRuleSaved={(count, snapshot) => {
-						setToast({ count, snapshot });
-					}}
-				/>
-			)}
 		</div>
 	);
 }

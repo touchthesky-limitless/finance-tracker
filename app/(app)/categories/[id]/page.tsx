@@ -30,9 +30,9 @@ interface ChartData {
 	isActive: boolean;
 }
 
-const EditTransactionModal = dynamic(
+const AddTransactionModal = dynamic(
 	() => {
-		return import("@/components/Budget/EditTransactionModal");
+		return import("@/components/Budget/AddTransactionModal");
 	},
 	{ ssr: false },
 );
@@ -360,7 +360,7 @@ export default function CategoryBreakdownPage() {
 				</div>
 			</div>
 			{selectedTransaction && (
-				<EditTransactionModal
+				<AddTransactionModal
 					key={selectedTransaction.id}
 					transaction={selectedTransaction}
 					isOpen={!!selectedTransaction}

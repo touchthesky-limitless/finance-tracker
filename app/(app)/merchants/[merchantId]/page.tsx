@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { ChevronRight, Pencil } from "lucide-react";
 import {
@@ -15,7 +15,7 @@ import {
 } from "recharts";
 import type { SortingState } from "@tanstack/react-table";
 
-import EditTransactionModal from "@/components/Budget/EditTransactionModal";
+// import AddTransactionModal from "@/components/Budget/AddTransactionModal";
 import { DataTable } from "@/components/Transactions/DataTable";
 import { useUnifiedCategories } from "@/hooks/useUnifiedCategories";
 import {
@@ -232,8 +232,8 @@ export default function MerchantBreakdownPage() {
 		return state.updateTransaction;
 	});
 
-	const [selectedTransaction, setSelectedTransaction] =
-		useState<Transaction | null>(null);
+	// const [selectedTransaction, setSelectedTransaction] =
+	// 	useState<Transaction | null>(null);
 	const [selectedIds, setSelectedIds] = useState<string[]>([]);
 	const [sorting] = useState<SortingState>([{ id: "date", desc: true }]);
 
@@ -271,6 +271,13 @@ export default function MerchantBreakdownPage() {
 	);
 	const summaryStats = buildSummaryStats(visibleTransactions);
 	const merchantInitial = merchantName.charAt(0).toUpperCase() || "?";
+
+	const openTransaction = useCallback(
+		(transaction: Transaction) => {
+			router.push(`/transactions/${encodeURIComponent(transaction.id)}`);
+		},
+		[router],
+	);
 
 	return (
 		<div className="flex h-screen flex-col bg-gray-50 font-sans text-gray-900 transition-colors duration-200 dark:bg-[#121212] dark:text-gray-200">
@@ -445,7 +452,7 @@ export default function MerchantBreakdownPage() {
 						<div className="relative min-h-0 flex-1">
 							{visibleTransactions.length > 0 ? (
 								<DataTable
-									transactions={visibleTransactions}
+									transactions={merchantTransactions}
 									selectedIds={selectedIds}
 									merchantItems={merchantItems}
 									onSelectRow={(id, event) => {
@@ -459,7 +466,7 @@ export default function MerchantBreakdownPage() {
 												: [...previous, id];
 										});
 									}}
-									onRowClick={setSelectedTransaction}
+									onRowClick={openTransaction}
 									columnVisibility={{
 										select: false,
 										amount: true,
@@ -535,8 +542,8 @@ export default function MerchantBreakdownPage() {
 				</div>
 			</div>
 
-			{selectedTransaction && (
-				<EditTransactionModal
+			{/* {selectedTransaction && (
+				<AddTransactionModal
 					key={selectedTransaction.id}
 					transaction={selectedTransaction}
 					isOpen
@@ -548,7 +555,7 @@ export default function MerchantBreakdownPage() {
 						setSelectedTransaction(null);
 					}}
 				/>
-			)}
+			)} */}
 		</div>
 	);
 }

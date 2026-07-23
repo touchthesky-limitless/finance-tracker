@@ -37,7 +37,6 @@ export const FEATURE_LOCKS = {
 
 export type FeatureKey = keyof typeof FEATURE_LOCKS;
 
-// Add this helper to config/navigation.ts
 const createItem = (
 	name: string,
 	href: string,
