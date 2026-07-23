@@ -10,8 +10,10 @@ import { createJSONStorage, persist } from "zustand/middleware";
 import type { TransactionRule } from "@/lib/rules/ruleEngine";
 import { applyTransactionRule } from "@/lib/rules/ruleEngine";
 import {
+	deleteAllTransactionRules,
 	deleteTransactionRule,
 	fetchTransactionRules,
+	reorderTransactionRules,
 	saveTransactionRule,
 } from "@/lib/rules/ruleRepository";
 
@@ -217,6 +219,8 @@ interface BudgetState {
 	}>;
 
 	deleteRule: (ruleId: string) => Promise<void>;
+	deleteAllRules: () => Promise<void>;
+	reorderRules: (ruleIds: string[]) => Promise<void>;
 
 	addCustomTag: (tag: string) => void;
 	fetchCustomCategories: () => Promise<void>;
@@ -711,14 +715,9 @@ export const useBudgetStore = create<BudgetState>()(
 				}
 
 				const accountName = transaction.account.trim();
-				const merchantName = transaction.merchant.trim();
 
 				if (!accountName) {
 					throw new Error("Select an account.");
-				}
-
-				if (!merchantName) {
-					throw new Error("Enter or select a merchant.");
 				}
 
 				let accountId = transaction.account_id;
@@ -727,22 +726,12 @@ export const useBudgetStore = create<BudgetState>()(
 					accountId = await getOrCreateAccountId(userId, accountName);
 				}
 
-				let merchantId = transaction.merchant_id;
-
-				if (!merchantId) {
-					const merchantIds = await getOrCreateMerchantIds(userId, [
-						merchantName,
-					]);
-					merchantId = merchantIds.get(normalize(merchantName)) ?? null;
-				}
-
 				const row = {
 					user_id: userId,
 					date: transaction.date,
-					merchant: merchantName,
-					merchant_id: merchantId,
+					merchant: transaction.merchant.trim(),
+					merchant_id: transaction.merchant_id ?? null,
 					description: transaction.description?.trim() ?? "",
-					note: transaction.note?.trim() ?? "",
 					amount: transaction.amount,
 					category: transaction.category || "Uncategorized",
 					account: accountName,
@@ -750,7 +739,7 @@ export const useBudgetStore = create<BudgetState>()(
 					needs_review: transaction.needs_review ?? true,
 					needs_subcat: transaction.needs_subcat ?? true,
 					tags: transaction.tags ?? [],
-					is_hidden: transaction.is_hidden ?? false,
+					note: transaction.note?.trim() ?? "",
 				};
 
 				const { data, error } = await supabase
@@ -772,7 +761,7 @@ export const useBudgetStore = create<BudgetState>()(
 					),
 				}));
 
-				await Promise.all([get().fetchAccounts(true), get().fetchMerchants()]);
+				await get().fetchAccounts(true);
 
 				return createdTransaction;
 			},
@@ -1146,19 +1135,45 @@ export const useBudgetStore = create<BudgetState>()(
 			},
 
 			saveRule: async (rule, applyToExisting = false) => {
+				const currentRules = get().rules;
+				const existingRule = currentRules.find((item) => {
+					return item.id === rule.id;
+				});
+				const nextSortOrder =
+					existingRule?.sortOrder ??
+					currentRules.reduce((highestOrder, item, index) => {
+						return Math.max(
+							highestOrder,
+							item.sortOrder ?? index,
+						);
+					}, -1) + 1;
+
 				const result = await saveTransactionRule(
-					rule,
+					{
+						...rule,
+						sortOrder: nextSortOrder,
+					},
 					get().transactions,
 					applyToExisting,
 				);
 
-				set((state) => ({
-					rules: [
-						result.rule,
-						...state.rules.filter((item) => item.id !== result.rule.id),
-					],
-					transactions: result.updatedTransactions,
-				}));
+				set((state) => {
+					const existingIndex = state.rules.findIndex((item) => {
+						return item.id === result.rule.id;
+					});
+					const nextRules = [...state.rules];
+
+					if (existingIndex >= 0) {
+						nextRules[existingIndex] = result.rule;
+					} else {
+						nextRules.push(result.rule);
+					}
+
+					return {
+						rules: nextRules,
+						transactions: result.updatedTransactions,
+					};
+				});
 
 				return {
 					count: applyToExisting ? result.matchingTransactions.length : 0,
@@ -1172,6 +1187,57 @@ export const useBudgetStore = create<BudgetState>()(
 				set((state) => ({
 					rules: state.rules.filter((rule) => rule.id !== ruleId),
 				}));
+			},
+
+			deleteAllRules: async () => {
+				const previousRules = get().rules;
+				set({ rules: [] });
+
+				try {
+					await deleteAllTransactionRules();
+				} catch (error) {
+					set({ rules: previousRules });
+					throw error;
+				}
+			},
+
+			reorderRules: async (ruleIds) => {
+				const previousRules = get().rules;
+				const ruleById = new Map(
+					previousRules.map((rule) => {
+						return [rule.id, rule] as const;
+					}),
+				);
+				const uniqueIds = Array.from(new Set(ruleIds)).filter((ruleId) => {
+					return ruleById.has(ruleId);
+				});
+				const missingIds = previousRules
+					.map((rule) => rule.id)
+					.filter((ruleId) => {
+						return !uniqueIds.includes(ruleId);
+					});
+				const orderedIds = [...uniqueIds, ...missingIds];
+				const orderedRules = orderedIds.flatMap((ruleId, index) => {
+					const rule = ruleById.get(ruleId);
+
+					return rule
+						? [
+							{
+								...rule,
+								sortOrder: index,
+							},
+						]
+						: [];
+				});
+
+				set({ rules: orderedRules });
+
+				try {
+					await reorderTransactionRules(orderedIds);
+				} catch (error) {
+					set({ rules: previousRules });
+					throw error;
+				}
 			},
 
 			addCustomTag: (tag) => {

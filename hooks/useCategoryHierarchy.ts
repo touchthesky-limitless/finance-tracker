@@ -1,52 +1,57 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import {
 	CATEGORY_HIERARCHY,
 	getCategoryTheme,
 	type UnifiedCategory,
 } from "@/constants";
-
+import {
+	CATEGORY_PREFERENCES_CHANGED_EVENT,
+	CATEGORY_PREFERENCES_STORAGE_KEY,
+	GROUP_PREFERENCES_STORAGE_KEY,
+	getCategoryGroupPreferenceKey,
+	readCategoryPreferences,
+	readGroupPreferences,
+	type CategorySectionId,
+} from "@/lib/categories/categoryPreferences";
 import { useUnifiedCategories } from "@/hooks/useUnifiedCategories";
 
-const STATIC_PARENT_NAMES = Object.keys(CATEGORY_HIERARCHY);
-
-const DEFAULT_PARENT = STATIC_PARENT_NAMES[0] ?? "Food & drink";
-
-function normalizeName(value: string | null | undefined): string {
+function normalize(value: string | null | undefined): string {
 	return value?.trim().toLowerCase() ?? "";
 }
 
-function createCategoryKey(
-	parentName: string | null | undefined,
-	categoryName: string,
-): string {
-	return `${normalizeName(parentName)}::${normalizeName(categoryName)}`;
-}
+function getDefaultSectionId(groupName: string): CategorySectionId {
+	const normalizedName = normalize(groupName);
 
-function findStaticParent(categoryName: string): string {
-	const normalizedCategory = normalizeName(categoryName);
-
-	for (
-		let parentIndex = 0;
-		parentIndex < STATIC_PARENT_NAMES.length;
-		parentIndex++
-	) {
-		const parent = STATIC_PARENT_NAMES[parentIndex];
-
-		if (normalizeName(parent) === normalizedCategory) {
-			return parent;
-		}
-
-		const children = CATEGORY_HIERARCHY[parent];
-
-		for (let childIndex = 0; childIndex < children.length; childIndex++) {
-			if (normalizeName(children[childIndex]) === normalizedCategory) {
-				return parent;
-			}
-		}
+	if (normalizedName === "income") {
+		return "income";
 	}
 
-	return DEFAULT_PARENT;
+	if (normalizedName.includes("transfer")) {
+		return "transfers";
+	}
+
+	return "expenses";
+}
+
+function getSectionRank(sectionId: CategorySectionId): number {
+	if (sectionId === "income") {
+		return 0;
+	}
+
+	if (sectionId === "expenses") {
+		return 1;
+	}
+
+	return 2;
+}
+
+function getCategoryIdentity(category: UnifiedCategory): string {
+	if (category.id) {
+		return `id:${category.id}`;
+	}
+
+	return `name:${normalize(category.parentName)}:${normalize(category.name)}`;
 }
 
 export function useCategoryHierarchy(
@@ -54,348 +59,352 @@ export function useCategoryHierarchy(
 	deferredQuery: string,
 ) {
 	const { allUnifiedCategories } = useUnifiedCategories("Expense", "All");
+	const [preferenceVersion, setPreferenceVersion] = useState(0);
+
+	useEffect(() => {
+		const refreshPreferences = (): void => {
+			setPreferenceVersion((current) => current + 1);
+		};
+
+		const handleStorage = (event: StorageEvent): void => {
+			if (
+				event.key === GROUP_PREFERENCES_STORAGE_KEY ||
+				event.key === CATEGORY_PREFERENCES_STORAGE_KEY
+			) {
+				refreshPreferences();
+			}
+		};
+
+		window.addEventListener(
+			CATEGORY_PREFERENCES_CHANGED_EVENT,
+			refreshPreferences,
+		);
+		window.addEventListener("storage", handleStorage);
+
+		return () => {
+			window.removeEventListener(
+				CATEGORY_PREFERENCES_CHANGED_EVENT,
+				refreshPreferences,
+			);
+			window.removeEventListener("storage", handleStorage);
+		};
+	}, []);
+
+	const groupPreferences = useMemo(() => {
+		void preferenceVersion;
+		return readGroupPreferences();
+	}, [preferenceVersion]);
+
+	const categoryPreferences = useMemo(() => {
+		void preferenceVersion;
+		return readCategoryPreferences();
+	}, [preferenceVersion]);
 
 	const [selectedParent, setSelectedParent] = useState<string>(() => {
-		return findStaticParent(currentCategory);
+		const parents = Object.keys(CATEGORY_HIERARCHY);
+
+		for (const parent of parents) {
+			const children = CATEGORY_HIERARCHY[parent];
+
+			if (
+				children.includes(currentCategory) ||
+				currentCategory.startsWith(parent)
+			) {
+				return parent;
+			}
+		}
+
+		return parents[0] ?? "Income";
 	});
 
-	/*
-	 * Build reusable indexes once.
-	 *
-	 * categoryByName:
-	 * Used to locate the currently selected category.
-	 *
-	 * systemByName:
-	 * Fallback system-category lookup.
-	 *
-	 * systemByParentAndName:
-	 * Safest lookup because it distinguishes categories with
-	 * identical names under different parents.
-	 */
-	const categoryIndexes = useMemo(() => {
-		const categoryByName = new Map<string, UnifiedCategory>();
+	const selectedCategoryData = useMemo(() => {
+		const category = allUnifiedCategories.find((item) => {
+			return item.name === currentCategory;
+		});
 
-		const systemByName = new Map<string, UnifiedCategory>();
+		if (!category) {
+			return undefined;
+		}
 
-		const systemByParentAndName = new Map<string, UnifiedCategory>();
+		const preferredParent = category.id
+			? categoryPreferences[category.id]?.parentName?.trim()
+			: undefined;
+		const effectiveParent = preferredParent || category.parentName;
 
-		for (let index = 0; index < allUnifiedCategories.length; index++) {
-			const category = allUnifiedCategories[index];
+		if (!effectiveParent || effectiveParent === category.parentName) {
+			return category;
+		}
 
-			const normalizedCategoryName = normalizeName(category.name);
+		return {
+			...category,
+			parentName: effectiveParent,
+			theme: getCategoryTheme(effectiveParent),
+		};
+	}, [allUnifiedCategories, categoryPreferences, currentCategory]);
 
-			if (!normalizedCategoryName) {
-				continue;
+	const dynamicHierarchy = useMemo(() => {
+		const base: Record<string, UnifiedCategory[]> = {};
+		const rootCategoryByName = new Map<string, UnifiedCategory>();
+		const categoryByKey = new Map<string, UnifiedCategory>();
+		const parentNames: string[] = [];
+		const seenParentNames = new Set<string>();
+
+		for (const category of allUnifiedCategories) {
+			if (!category.parentName) {
+				rootCategoryByName.set(normalize(category.name), category);
 			}
 
-			const existingCategory = categoryByName.get(normalizedCategoryName);
-
-			/*
-			 * Prefer a system category if duplicate data somehow
-			 * reaches this hook.
-			 */
-			if (
-				!existingCategory ||
-				(existingCategory.isCustom && !category.isCustom)
-			) {
-				categoryByName.set(normalizedCategoryName, category);
-			}
-
-			if (category.isCustom) {
-				continue;
-			}
-
-			if (!systemByName.has(normalizedCategoryName)) {
-				systemByName.set(normalizedCategoryName, category);
-			}
-
-			systemByParentAndName.set(
-				createCategoryKey(category.parentName, category.name),
+			categoryByKey.set(
+				`${normalize(category.name)}|${normalize(category.parentName)}`,
 				category,
 			);
 		}
 
-		return {
-			categoryByName,
-			systemByName,
-			systemByParentAndName,
-		};
-	}, [allUnifiedCategories]);
-
-	const selectedCategoryData = useMemo(() => {
-		return categoryIndexes.categoryByName.get(normalizeName(currentCategory));
-	}, [categoryIndexes, currentCategory]);
-
-	const dynamicHierarchy = useMemo(() => {
-		const hierarchy: Record<string, UnifiedCategory[]> = {};
-
-		const canonicalParentNames = new Map<string, string>();
-
-		const categoryNamesByParent = new Map<string, Set<string>>();
-
-		/*
-		 * Build the static hierarchy first.
-		 */
-		for (
-			let parentIndex = 0;
-			parentIndex < STATIC_PARENT_NAMES.length;
-			parentIndex++
-		) {
-			const parent = STATIC_PARENT_NAMES[parentIndex];
-
-			canonicalParentNames.set(normalizeName(parent), parent);
-
-			const subcategoryNames = CATEGORY_HIERARCHY[parent];
-
-			const mappedCategories: UnifiedCategory[] = [];
-
-			const existingNames = new Set<string>();
-
-			for (
-				let childIndex = 0;
-				childIndex < subcategoryNames.length;
-				childIndex++
-			) {
-				const subcategoryName = subcategoryNames[childIndex];
-
-				const normalizedSubcategory = normalizeName(subcategoryName);
-
-				const category =
-					categoryIndexes.systemByParentAndName.get(
-						createCategoryKey(parent, subcategoryName),
-					) ?? categoryIndexes.systemByName.get(normalizedSubcategory);
-
-				if (category) {
-					mappedCategories.push({
-						...category,
-						name: subcategoryName,
-						parentName: parent,
-						isCustom: false,
-					});
-				} else {
-					mappedCategories.push({
-						name: subcategoryName,
-						parentName: parent,
-						icon: subcategoryName,
-						theme: getCategoryTheme(parent),
-						isCustom: false,
-					});
-				}
-
-				existingNames.add(normalizedSubcategory);
-			}
-
-			hierarchy[parent] = mappedCategories;
-
-			categoryNamesByParent.set(parent, existingNames);
+		for (const parentName of Object.keys(CATEGORY_HIERARCHY)) {
+			parentNames.push(parentName);
+			seenParentNames.add(normalize(parentName));
 		}
 
-		/*
-		 * Append user-created categories.
-		 */
-		for (let index = 0; index < allUnifiedCategories.length; index++) {
-			const category = allUnifiedCategories[index];
-
-			if (!category.isCustom) {
+		for (const category of allUnifiedCategories) {
+			if (category.parentName || seenParentNames.has(normalize(category.name))) {
 				continue;
 			}
 
-			const categoryName = category.name.trim();
+			parentNames.push(category.name);
+			seenParentNames.add(normalize(category.name));
+		}
 
-			if (!categoryName) {
-				continue;
+		const parentMetadata = parentNames.map((parentName, fallbackIndex) => {
+			const rootCategory = rootCategoryByName.get(normalize(parentName));
+			const preferenceKey = getCategoryGroupPreferenceKey(
+				parentName,
+				rootCategory?.id,
+				rootCategory ? !rootCategory.isCustom : true,
+			);
+			const preference = groupPreferences[preferenceKey];
+
+			return {
+				parentName,
+				fallbackIndex,
+				hidden: preference?.hidden === true,
+				sectionId:
+					preference?.sectionId ?? getDefaultSectionId(parentName),
+				order:
+					typeof preference?.order === "number"
+						? preference.order
+						: null,
+			};
+		});
+
+		parentMetadata.sort((first, second) => {
+			const sectionDifference =
+				getSectionRank(first.sectionId) - getSectionRank(second.sectionId);
+
+			if (sectionDifference !== 0) {
+				return sectionDifference;
 			}
 
-			const normalizedCategoryName = normalizeName(categoryName);
-
-			const rawParentName = category.parentName?.trim();
-
-			/*
-			 * Preserve the previous behavior for standalone
-			 * categories without a parent: expose them as an
-			 * empty parent group.
-			 */
-			if (!rawParentName) {
-				if (!hierarchy[categoryName]) {
-					hierarchy[categoryName] = [];
-
-					categoryNamesByParent.set(categoryName, new Set());
+			if (first.order !== null || second.order !== null) {
+				if (first.order === null) {
+					return 1;
 				}
 
+				if (second.order === null) {
+					return -1;
+				}
+
+				if (first.order !== second.order) {
+					return first.order - second.order;
+				}
+			}
+
+			return first.fallbackIndex - second.fallbackIndex;
+		});
+
+		const visibleParentNames = new Set<string>();
+
+		for (const metadata of parentMetadata) {
+			if (metadata.hidden) {
 				continue;
 			}
 
-			/*
-			 * Convert variations such as "food & Drink" to
-			 * the canonical static parent name.
-			 */
-			const canonicalParent =
-				canonicalParentNames.get(normalizeName(rawParentName)) ?? rawParentName;
+			base[metadata.parentName] = [];
+			visibleParentNames.add(metadata.parentName);
+		}
 
-			if (!hierarchy[canonicalParent]) {
-				hierarchy[canonicalParent] = [];
+		const insertedByParent = new Map<string, Set<string>>();
 
-				categoryNamesByParent.set(canonicalParent, new Set());
+		const appendCategory = (
+			category: UnifiedCategory,
+			defaultParentName: string,
+		): void => {
+			const preferredParent = category.id
+				? categoryPreferences[category.id]?.parentName?.trim()
+				: undefined;
+			const parentName = preferredParent || defaultParentName;
 
-				canonicalParentNames.set(
-					normalizeName(canonicalParent),
-					canonicalParent,
-				);
+			if (!visibleParentNames.has(parentName)) {
+				return;
 			}
 
-			const existingNames = categoryNamesByParent.get(canonicalParent);
+			const identity = getCategoryIdentity(category);
+			const inserted = insertedByParent.get(parentName) ?? new Set<string>();
 
-			if (existingNames?.has(normalizedCategoryName)) {
-				continue;
+			if (inserted.has(identity)) {
+				return;
 			}
 
-			hierarchy[canonicalParent].push({
+			inserted.add(identity);
+			insertedByParent.set(parentName, inserted);
+			base[parentName].push({
 				...category,
-				name: categoryName,
-				parentName: canonicalParent,
+				parentName,
+				theme: getCategoryTheme(parentName),
+			});
+		};
+
+		for (const [parentName, subcategoryNames] of Object.entries(
+			CATEGORY_HIERARCHY,
+		)) {
+			for (const subcategoryName of subcategoryNames) {
+				const foundCategory = categoryByKey.get(
+					`${normalize(subcategoryName)}|${normalize(parentName)}`,
+				);
+				const category: UnifiedCategory = foundCategory
+					? {
+							...foundCategory,
+							name: subcategoryName,
+							parentName,
+							isCustom: false,
+						}
+					: {
+							name: subcategoryName,
+							parentName,
+							icon: subcategoryName,
+							theme: getCategoryTheme(parentName),
+							isCustom: false,
+						};
+
+				appendCategory(category, parentName);
+			}
+		}
+
+		for (const category of allUnifiedCategories) {
+			if (!category.isCustom || !category.parentName) {
+				continue;
+			}
+
+			appendCategory(category, category.parentName);
+		}
+
+		for (const parentName of Object.keys(base)) {
+			const fallbackOrder = new Map<string, number>();
+
+			base[parentName].forEach((category, index) => {
+				fallbackOrder.set(getCategoryIdentity(category), index);
 			});
 
-			existingNames?.add(normalizedCategoryName);
-		}
+			base[parentName].sort((first, second) => {
+				const firstOrder = first.id
+					? categoryPreferences[first.id]?.order
+					: undefined;
+				const secondOrder = second.id
+					? categoryPreferences[second.id]?.order
+					: undefined;
 
-		return hierarchy;
-	}, [allUnifiedCategories, categoryIndexes]);
+				if (firstOrder !== undefined || secondOrder !== undefined) {
+					if (firstOrder === undefined) {
+						return 1;
+					}
 
-	/*
-	 * Determine which parent owns currentCategory.
-	 *
-	 * This supports:
-	 * - static categories
-	 * - custom categories
-	 * - a parent name passed as currentCategory
-	 * - categories loaded asynchronously
-	 */
-	const resolvedCurrentParent = useMemo(() => {
-		const normalizedCurrentCategory = normalizeName(currentCategory);
+					if (secondOrder === undefined) {
+						return -1;
+					}
 
-		const parentNames = Object.keys(dynamicHierarchy);
-
-		const parentByNormalizedName = new Map<string, string>();
-
-		for (let index = 0; index < parentNames.length; index++) {
-			const parent = parentNames[index];
-
-			parentByNormalizedName.set(normalizeName(parent), parent);
-		}
-
-		const matchingParent = parentByNormalizedName.get(
-			normalizedCurrentCategory,
-		);
-
-		if (matchingParent) {
-			return matchingParent;
-		}
-
-		const categoryParentName = selectedCategoryData?.parentName;
-
-		if (categoryParentName) {
-			const canonicalParent = parentByNormalizedName.get(
-				normalizeName(categoryParentName),
-			);
-
-			if (canonicalParent) {
-				return canonicalParent;
-			}
-		}
-
-		for (let parentIndex = 0; parentIndex < parentNames.length; parentIndex++) {
-			const parent = parentNames[parentIndex];
-
-			const children = dynamicHierarchy[parent];
-
-			for (let childIndex = 0; childIndex < children.length; childIndex++) {
-				if (
-					normalizeName(children[childIndex].name) === normalizedCurrentCategory
-				) {
-					return parent;
+					if (firstOrder !== secondOrder) {
+						return firstOrder - secondOrder;
+					}
 				}
-			}
+
+				return (
+					(fallbackOrder.get(getCategoryIdentity(first)) ?? 0) -
+					(fallbackOrder.get(getCategoryIdentity(second)) ?? 0)
+				);
+			});
 		}
 
-		return parentNames[0] ?? DEFAULT_PARENT;
-	}, [currentCategory, dynamicHierarchy, selectedCategoryData]);
+		return base;
+	}, [allUnifiedCategories, categoryPreferences, groupPreferences]);
 
-	/*
-	 * Synchronize the tab when:
-	 * - currentCategory changes
-	 * - a custom category finishes loading and reveals its parent
-	 *
-	 * The ref prevents manually selected tabs from being immediately
-	 * reset while currentCategory remains unchanged.
-	 */
-	const lastAutomaticSelection = useRef<{
-		category: string;
-		parent: string;
-	} | null>(null);
+	// useEffect(() => {
+	// 	const preferredParent = selectedCategoryData?.parentName;
 
-	useEffect(() => {
-		const nextSelection = {
-			category: normalizeName(currentCategory),
-			parent: resolvedCurrentParent,
-		};
+	// 	if (preferredParent && dynamicHierarchy[preferredParent]) {
+	// 		setSelectedParent(preferredParent);
+	// 		return;
+	// 	}
 
-		const previousSelection = lastAutomaticSelection.current;
+	// 	if (!dynamicHierarchy[selectedParent]) {
+	// 		setSelectedParent(Object.keys(dynamicHierarchy)[0] ?? "Income");
+	// 	}
+	// }, [dynamicHierarchy, selectedCategoryData?.parentName, selectedParent]);
 
-		if (
-			previousSelection?.category === nextSelection.category &&
-			previousSelection.parent === nextSelection.parent
-		) {
-			return;
-		}
+const preferredParent = selectedCategoryData?.parentName;
 
-		lastAutomaticSelection.current = nextSelection;
-
-		setSelectedParent(resolvedCurrentParent);
-	}, [currentCategory, resolvedCurrentParent]);
-
-	const normalizedQuery = useMemo(() => {
-		return normalizeName(deferredQuery);
-	}, [deferredQuery]);
+if (preferredParent && dynamicHierarchy[preferredParent]) {
+    // Only update if it actually differs to prevent infinite loops
+    if (selectedParent !== preferredParent) {
+        setSelectedParent(preferredParent);
+    }
+} else if (!dynamicHierarchy[selectedParent]) {
+    const fallbackParent = Object.keys(dynamicHierarchy)[0] ?? "Income";
+    if (selectedParent !== fallbackParent) {
+        setSelectedParent(fallbackParent);
+    }
+}
 
 	const visibleParents = useMemo(() => {
-		const parentNames = Object.keys(dynamicHierarchy);
+		const query = deferredQuery.toLowerCase().trim();
+		const parents = Object.keys(dynamicHierarchy);
 
-		if (!normalizedQuery) {
-			return parentNames;
+		if (!query) {
+			return parents;
 		}
 
-		return parentNames.filter((parent) => {
-			if (normalizeName(parent).includes(normalizedQuery)) {
+		return parents.filter((parent) => {
+			if (parent.toLowerCase().includes(query)) {
 				return true;
 			}
 
-			const children = dynamicHierarchy[parent];
-
-			for (let index = 0; index < children.length; index++) {
-				if (normalizeName(children[index].name).includes(normalizedQuery)) {
-					return true;
-				}
-			}
-
-			return false;
+			return dynamicHierarchy[parent].some((category) => {
+				return category.name.toLowerCase().includes(query);
+			});
 		});
-	}, [dynamicHierarchy, normalizedQuery]);
+	}, [deferredQuery, dynamicHierarchy]);
 
 	const activeParent = useMemo(() => {
-		if (visibleParents.includes(selectedParent)) {
+		const query = deferredQuery.toLowerCase().trim();
+
+		if (!query) {
 			return selectedParent;
 		}
 
-		if (visibleParents.length > 0) {
-			return visibleParents[0];
-		}
-
-		if (dynamicHierarchy[selectedParent]) {
+		if (selectedParent.toLowerCase().includes(query)) {
 			return selectedParent;
 		}
 
-		return Object.keys(dynamicHierarchy)[0] ?? DEFAULT_PARENT;
-	}, [dynamicHierarchy, selectedParent, visibleParents]);
+		const children = dynamicHierarchy[selectedParent];
+
+		if (
+			children?.some((category) => {
+				return category.name.toLowerCase().includes(query);
+			})
+		) {
+			return selectedParent;
+		}
+
+		return visibleParents[0] ?? selectedParent;
+	}, [deferredQuery, dynamicHierarchy, selectedParent, visibleParents]);
 
 	return {
 		selectedCategoryData,

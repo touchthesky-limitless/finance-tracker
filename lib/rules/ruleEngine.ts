@@ -1,14 +1,3 @@
-/* This contains the actual matching logic:
-
-* Original statement
-* Merchant name
-* Amount and direction
-* Categories
-* Accounts
-
-* It also calculates transaction updates and preview changes.
- */
-
 import type { Transaction } from "@/store/useBudgetStore";
 
 export type RuleTextOperator =
@@ -67,6 +56,7 @@ export interface TransactionRule {
 	actions: TransactionRuleActions;
 	createdAt?: string;
 	updatedAt?: string;
+	sortOrder?: number;
 }
 
 export interface RuleTransactionUpdate {
@@ -275,10 +265,7 @@ export function describeRuleChanges(
 	const updates = getRuleTransactionUpdates(transaction, rule);
 	const changes: RulePreviewChange[] = [];
 
-	if (
-		updates.merchant !== undefined &&
-		updates.merchant !== transaction.merchant
-	) {
+	if (updates.merchant !== undefined && updates.merchant !== transaction.merchant) {
 		changes.push({
 			field: "Merchant",
 			before: transaction.merchant || "—",
@@ -286,10 +273,7 @@ export function describeRuleChanges(
 		});
 	}
 
-	if (
-		updates.category !== undefined &&
-		updates.category !== transaction.category
-	) {
+	if (updates.category !== undefined && updates.category !== transaction.category) {
 		changes.push({
 			field: "Category",
 			before: transaction.category || "—",

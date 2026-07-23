@@ -1,4 +1,7 @@
+"use client";
+
 import {
+	useCallback,
 	useDeferredValue,
 	useMemo,
 	useRef,
@@ -25,7 +28,10 @@ import { useCategoryHierarchy } from "@/hooks/useCategoryHierarchy";
 
 interface CategorySelectorProps {
 	currentCategory: string;
-	onSelect: (category: string, parent: string) => void;
+	onSelect: (
+		category: string,
+		parent: string,
+	) => void;
 	placeholder?: string;
 	showChevron?: boolean;
 	hideChevronUntilHover?: boolean;
@@ -40,11 +46,15 @@ export function CategorySelector({
 	showChevron = false,
 	hideChevronUntilHover = false,
 }: CategorySelectorProps) {
-	const [isOpen, setIsOpen] = useState(false);
-	const [catQuery, setCatQuery] = useState("");
+	const [isOpen, setIsOpen] =
+		useState(false);
+	const [catQuery, setCatQuery] =
+		useState("");
 
-	const inputRef = useRef<HTMLInputElement>(null);
-	const deferredQuery = useDeferredValue(catQuery);
+	const inputRef =
+		useRef<HTMLInputElement>(null);
+	const deferredQuery =
+		useDeferredValue(catQuery);
 
 	const {
 		selectedCategoryData,
@@ -52,14 +62,27 @@ export function CategorySelector({
 		visibleParents,
 		activeParent,
 		setSelectedParent,
-	} = useCategoryHierarchy(currentCategory, deferredQuery);
+	} = useCategoryHierarchy(
+		currentCategory,
+		deferredQuery,
+	);
 
-	const displayIcon = selectedCategoryData?.icon || currentCategory;
+	/*
+	 * This may be a normal icon name or an encoded emoji,
+	 * for example "emoji:🍔".
+	 *
+	 * CategoryTrigger must render displayIcon with CategoryGlyph.
+	 */
+	const displayIcon =
+		selectedCategoryData?.icon ||
+		currentCategory;
+
 	const displayColorClass =
-		selectedCategoryData?.theme?.text ?? "text-gray-400";
+		selectedCategoryData?.theme?.text ??
+		"text-gray-400";
 
 	const {
-		refs: { setReference, setFloating },
+		refs,
 		floatingStyles,
 		context,
 	} = useFloating({
@@ -68,87 +91,179 @@ export function CategorySelector({
 		onOpenChange(nextOpen) {
 			setIsOpen(nextOpen);
 
-			if (nextOpen) {
-				setSelectedParent(findParentCategory(currentCategory));
-				setCatQuery("");
-
-				window.requestAnimationFrame(() => {
-					inputRef.current?.focus();
-				});
+			if (!nextOpen) {
+				return;
 			}
+
+			setSelectedParent(
+				selectedCategoryData?.parentName ||
+					findParentCategory(currentCategory),
+			);
+			setCatQuery("");
+
+			window.requestAnimationFrame(
+				() => {
+					inputRef.current?.focus();
+				},
+			);
 		},
 
-		whileElementsMounted(reference, floating, update) {
-			return autoUpdate(reference, floating, update, {
-				animationFrame: false,
-				elementResize: true,
-			});
+		whileElementsMounted(
+			reference,
+			floating,
+			update,
+		) {
+			return autoUpdate(
+				reference,
+				floating,
+				update,
+				{
+					animationFrame: false,
+					elementResize: true,
+				},
+			);
 		},
 
 		middleware: [
 			offset(8),
 			flip(),
-			shift({ padding: 16 }),
+			shift({
+				padding: 16,
+			}),
 			size({
-				apply({ rects, elements }) {
-					Object.assign(elements.floating.style, {
-						minWidth: `${Math.max(rects.reference.width, 360)}px`,
-						maxWidth: "calc(100vw - 32px)",
-					});
+				apply({
+					rects,
+					elements,
+				}) {
+					Object.assign(
+						elements.floating.style,
+						{
+							minWidth: `${Math.max(
+								rects.reference.width,
+								360,
+							)}px`,
+							maxWidth:
+								"calc(100vw - 32px)",
+						},
+					);
 				},
 			}),
 		],
 	});
 
+	const setReferenceElement = useCallback(
+		(element: HTMLButtonElement | null) => {
+			refs.setReference(element);
+		},
+		[refs],
+	);
+
+	const setFloatingElement = useCallback(
+		(element: HTMLElement | null) => {
+			refs.setFloating(element);
+		},
+		[refs],
+	);
+
 	const click = useClick(context);
 
-	const dismiss = useDismiss(context, {
-		outsidePress: true,
-		escapeKey: true,
-	});
+	const dismiss = useDismiss(
+		context,
+		{
+			outsidePress: true,
+			escapeKey: true,
+		},
+	);
 
-	const { getReferenceProps, getFloatingProps } = useInteractions([
+	const {
+		getReferenceProps,
+		getFloatingProps,
+	} = useInteractions([
 		click,
 		dismiss,
 	]);
 
 	const bestMatch = useMemo(() => {
-		return searchCategories(catQuery);
+		return searchCategories(
+			catQuery,
+		);
 	}, [catQuery]);
 
 	return (
 		<div className="group relative">
 			<CategoryTrigger
-				ref={setReference}
+				ref={setReferenceElement}
 				{...getReferenceProps()}
 				variant={variant}
 				isOpen={isOpen}
-				currentCategory={currentCategory}
-				displayIcon={displayIcon}
-				displayColorClass={displayColorClass}
-				placeholder={placeholder}
-				showChevron={showChevron}
-				hideChevronUntilHover={hideChevronUntilHover}
+				currentCategory={
+					currentCategory
+				}
+				displayIcon={
+					displayIcon
+				}
+				displayColorClass={
+					displayColorClass
+				}
+				placeholder={
+					placeholder
+				}
+				showChevron={
+					showChevron
+				}
+				hideChevronUntilHover={
+					hideChevronUntilHover
+				}
 			/>
 
 			{isOpen && (
 				<FloatingPortal>
 					<CategoryDropdownMenu
-						setFloating={setFloating}
-						floatingStyles={floatingStyles}
-						getFloatingProps={getFloatingProps}
-						catQuery={catQuery}
-						setCatQuery={setCatQuery}
-						inputRef={inputRef}
-						bestMatch={bestMatch}
-						deferredQuery={deferredQuery}
-						currentCategory={currentCategory}
-						onSelect={onSelect}
-						setIsOpen={setIsOpen}
-						activeParent={activeParent}
-						setSelectedParent={setSelectedParent}
-						visibleParents={visibleParents}
-						dynamicHierarchy={dynamicHierarchy}
+						setFloating={
+							setFloatingElement
+						}
+						floatingStyles={
+							floatingStyles
+						}
+						getFloatingProps={
+							getFloatingProps
+						}
+						catQuery={
+							catQuery
+						}
+						setCatQuery={
+							setCatQuery
+						}
+						inputRef={
+							inputRef
+						}
+						bestMatch={
+							bestMatch
+						}
+						deferredQuery={
+							deferredQuery
+						}
+						currentCategory={
+							currentCategory
+						}
+						onSelect={
+							onSelect
+						}
+						setIsOpen={
+							setIsOpen
+						}
+						activeParent={
+							activeParent
+						}
+						setSelectedParent={
+							setSelectedParent
+						}
+						visibleParents={
+							visibleParents
+						}
+						dynamicHierarchy={
+							dynamicHierarchy
+						}
 					/>
 				</FloatingPortal>
 			)}

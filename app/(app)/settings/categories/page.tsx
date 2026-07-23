@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { type DragEvent, useEffect, useMemo, useState } from "react";
 import {
 	AlertCircle,
 	Check,
@@ -23,6 +23,17 @@ import {
 import { SettingsContentCard } from "@/components/Settings/SettingsShell";
 import { CATEGORY_HIERARCHY, getCategoryTheme } from "@/constants";
 import { type CustomCategory, useBudgetStore } from "@/store/useBudgetStore";
+import {
+	type CategoryPreference,
+	type CategorySectionId,
+	type GroupBudgetMode,
+	type GroupPreference,
+	getCategoryGroupPreferenceKey,
+	readCategoryPreferences,
+	readGroupPreferences,
+	writeCategoryPreferences,
+	writeGroupPreferences,
+} from "@/lib/categories/categoryPreferences";
 
 type EditorMode =
 	| "create-group"
@@ -30,19 +41,16 @@ type EditorMode =
 	| "create-category"
 	| "edit-category";
 
-type CategorySectionId = "income" | "expenses" | "transfers";
-type GroupBudgetMode = "group" | "category";
-
-interface GroupPreference {
-	name?: string;
-	budgetMode?: GroupBudgetMode;
-	sectionId?: CategorySectionId;
-	hidden?: boolean;
-}
-
-interface CategoryPreference {
-	excludedFromBudget?: boolean;
-}
+type DragState =
+	| {
+			type: "group";
+			groupKey: string;
+			sectionId: CategorySectionId;
+	  }
+	| {
+			type: "category";
+			categoryId: string;
+	  };
 
 interface CategoryGroup {
 	key: string;
@@ -50,6 +58,7 @@ interface CategoryGroup {
 	displayName: string;
 	budgetMode: GroupBudgetMode;
 	sectionId: CategorySectionId;
+	order: number | null;
 	record?: CustomCategory;
 	children: CustomCategory[];
 }
@@ -62,10 +71,14 @@ interface EditorState {
 	group?: CategoryGroup;
 }
 
+interface DeleteConfirmation {
+	title: string;
+	description: string;
+	confirmLabel: string;
+}
+
 const DEFAULT_ICON = encodeEmojiIcon("❓");
 const DEFAULT_COLOR = "slate";
-const GROUP_PREFERENCES_STORAGE_KEY = "finance-category-group-preferences-v1";
-const CATEGORY_PREFERENCES_STORAGE_KEY = "finance-category-preferences-v1";
 
 const CATEGORY_SECTIONS: ReadonlyArray<{
 	id: CategorySectionId;
@@ -75,98 +88,6 @@ const CATEGORY_SECTIONS: ReadonlyArray<{
 	{ id: "expenses", title: "Expenses" },
 	{ id: "transfers", title: "Transfers" },
 ];
-
-function readGroupPreferences(): Record<string, GroupPreference> {
-	if (typeof window === "undefined") {
-		return {};
-	}
-
-	try {
-		const storedValue = window.localStorage.getItem(
-			GROUP_PREFERENCES_STORAGE_KEY,
-		);
-
-		if (!storedValue) {
-			return {};
-		}
-
-		const parsedValue = JSON.parse(storedValue) as unknown;
-
-		if (!parsedValue || typeof parsedValue !== "object") {
-			return {};
-		}
-
-		return parsedValue as Record<string, GroupPreference>;
-	} catch (error) {
-		console.error("Failed to read category group preferences:", error);
-		return {};
-	}
-}
-
-function writeGroupPreferences(
-	preferences: Record<string, GroupPreference>,
-): void {
-	if (typeof window === "undefined") {
-		return;
-	}
-
-	try {
-		window.localStorage.setItem(
-			GROUP_PREFERENCES_STORAGE_KEY,
-			JSON.stringify(preferences),
-		);
-	} catch (error) {
-		console.error("Failed to save category group preferences:", error);
-	}
-}
-
-function readCategoryPreferences(): Record<string, CategoryPreference> {
-	if (typeof window === "undefined") {
-		return {};
-	}
-
-	try {
-		const storedValue = window.localStorage.getItem(
-			CATEGORY_PREFERENCES_STORAGE_KEY,
-		);
-
-		if (!storedValue) {
-			return {};
-		}
-
-		const parsedValue = JSON.parse(storedValue) as unknown;
-
-		if (!parsedValue || typeof parsedValue !== "object") {
-			return {};
-		}
-
-		return parsedValue as Record<string, CategoryPreference>;
-	} catch (error) {
-		console.error("Failed to read category preferences:", error);
-		return {};
-	}
-}
-
-function writeCategoryPreferences(
-	preferences: Record<string, CategoryPreference>,
-): void {
-	if (typeof window === "undefined") {
-		return;
-	}
-
-	try {
-		window.localStorage.setItem(
-			CATEGORY_PREFERENCES_STORAGE_KEY,
-			JSON.stringify(preferences),
-		);
-	} catch (error) {
-		console.error("Failed to save category preferences:", error);
-	}
-}
-
-function getGroupKey(name: string, record?: CustomCategory): string {
-	return record?.id ? `category:${record.id}` : `system:${name}`;
-}
 
 function normalize(value: string): string {
 	return value.trim().toLowerCase();
@@ -184,6 +105,79 @@ function getDefaultSectionId(groupName: string): CategorySectionId {
 	}
 
 	return "expenses";
+}
+
+function moveItem<T>(items: T[], fromIndex: number, toIndex: number): T[] {
+	if (
+		fromIndex < 0 ||
+		toIndex < 0 ||
+		fromIndex >= items.length ||
+		toIndex >= items.length ||
+		fromIndex === toIndex
+	) {
+		return items;
+	}
+
+	const nextItems = [...items];
+	const [movedItem] = nextItems.splice(fromIndex, 1);
+	nextItems.splice(toIndex, 0, movedItem);
+	return nextItems;
+}
+
+let activeDragPreview: HTMLElement | null = null;
+
+function removeOpaqueDragPreview(): void {
+	activeDragPreview?.remove();
+	activeDragPreview = null;
+}
+
+function beginOpaqueDragPreview(event: DragEvent<HTMLElement>): void {
+	removeOpaqueDragPreview();
+
+	const source = event.currentTarget;
+	const bounds = source.getBoundingClientRect();
+	const preview = source.cloneNode(true) as HTMLElement;
+	const previewWidth = Math.min(bounds.width, 760);
+
+	preview.setAttribute("aria-hidden", "true");
+	Object.assign(preview.style, {
+		position: "fixed",
+		left: "0",
+		top: "0",
+		width: `${previewWidth}px`,
+		maxHeight: "260px",
+		overflow: "hidden",
+		opacity: "1",
+		filter: "none",
+		transform: `translate3d(${event.clientX + 14}px, ${event.clientY + 14}px, 0)`,
+		pointerEvents: "none",
+		zIndex: "9999",
+		boxShadow: "0 18px 50px rgba(0, 0, 0, 0.22)",
+	});
+
+	document.body.appendChild(preview);
+	activeDragPreview = preview;
+
+	const transparentImage = document.createElement("canvas");
+	transparentImage.width = 1;
+	transparentImage.height = 1;
+	transparentImage.style.position = "fixed";
+	transparentImage.style.left = "-100px";
+	transparentImage.style.top = "-100px";
+	document.body.appendChild(transparentImage);
+	event.dataTransfer.setDragImage(transparentImage, 0, 0);
+
+	window.requestAnimationFrame(() => {
+		transparentImage.remove();
+	});
+}
+
+function updateOpaqueDragPreview(event: DragEvent<HTMLElement>): void {
+	if (!activeDragPreview || event.clientX === 0 || event.clientY === 0) {
+		return;
+	}
+
+	activeDragPreview.style.transform = `translate3d(${event.clientX + 14}px, ${event.clientY + 14}px, 0)`;
 }
 
 export default function SettingsCategoriesPage() {
@@ -214,6 +208,10 @@ export default function SettingsCategoriesPage() {
 	const [budgetMode, setBudgetMode] = useState<GroupBudgetMode>("category");
 	const [isSaving, setIsSaving] = useState(false);
 	const [errorMessage, setErrorMessage] = useState<string | null>(null);
+	const [dragState, setDragState] = useState<DragState | null>(null);
+	const [dragOverKey, setDragOverKey] = useState<string | null>(null);
+	const [deleteConfirmation, setDeleteConfirmation] =
+		useState<DeleteConfirmation | null>(null);
 
 	useEffect(() => {
 		void fetchCustomCategories();
@@ -230,12 +228,16 @@ export default function SettingsCategoriesPage() {
 				continue;
 			}
 
-			if (!category.parent_name?.trim()) {
+			const preferredParent = categoryPreferences[
+				category.id
+			]?.parentName?.trim();
+			const parentName = preferredParent || category.parent_name?.trim();
+
+			if (!parentName) {
 				parentByName.set(categoryName, category);
 				continue;
 			}
 
-			const parentName = category.parent_name.trim();
 			const children = childrenByParent.get(parentName) ?? [];
 			children.push(category);
 			childrenByParent.set(parentName, children);
@@ -266,51 +268,73 @@ export default function SettingsCategoriesPage() {
 		return orderedParentNames
 			.map((parentName) => {
 				const record = parentByName.get(parentName);
-				const key = getGroupKey(parentName, record);
+				const key = getCategoryGroupPreferenceKey(
+					parentName,
+					record?.id,
+					record?.is_system ?? true,
+				);
 				const preference = groupPreferences[key];
+				const children = [...(childrenByParent.get(parentName) ?? [])];
+
+				children.sort((first, second) => {
+					const firstOrder = categoryPreferences[first.id]?.order;
+					const secondOrder = categoryPreferences[second.id]?.order;
+
+					if (typeof firstOrder === "number" || typeof secondOrder === "number") {
+						if (typeof firstOrder !== "number") {
+							return 1;
+						}
+
+						if (typeof secondOrder !== "number") {
+							return -1;
+						}
+
+						if (firstOrder !== secondOrder) {
+							return firstOrder - secondOrder;
+						}
+					}
+
+					const firstIndex = CATEGORY_HIERARCHY[parentName]?.indexOf(
+						first.name,
+					);
+					const secondIndex = CATEGORY_HIERARCHY[parentName]?.indexOf(
+						second.name,
+					);
+
+					if (firstIndex !== undefined && firstIndex >= 0) {
+						if (secondIndex === undefined || secondIndex < 0) {
+							return -1;
+						}
+
+						return firstIndex - secondIndex;
+					}
+
+					if (secondIndex !== undefined && secondIndex >= 0) {
+						return 1;
+					}
+
+					return first.name.localeCompare(second.name);
+				});
 
 				return {
 					key,
 					name: parentName,
 					displayName: preference?.name?.trim() || parentName,
 					budgetMode: preference?.budgetMode ?? "category",
-					sectionId: preference?.sectionId ?? getDefaultSectionId(parentName),
+					sectionId:
+						preference?.sectionId ?? getDefaultSectionId(parentName),
+					order:
+						typeof preference?.order === "number" ? preference.order : null,
 					record,
-					children: [...(childrenByParent.get(parentName) ?? [])].sort(
-						(first, second) => {
-							const firstIndex = CATEGORY_HIERARCHY[parentName]?.indexOf(
-								first.name,
-							);
-							const secondIndex = CATEGORY_HIERARCHY[parentName]?.indexOf(
-								second.name,
-							);
-
-							if (firstIndex !== undefined && firstIndex >= 0) {
-								if (secondIndex === undefined || secondIndex < 0) {
-									return -1;
-								}
-
-								return firstIndex - secondIndex;
-							}
-
-							if (secondIndex !== undefined && secondIndex >= 0) {
-								return 1;
-							}
-
-							return first.name.localeCompare(second.name);
-						},
-					),
+					children,
 					hidden: preference?.hidden === true,
 				};
 			})
 			.filter((group) => {
-				return (
-					!group.hidden && Boolean(group.record || group.children.length > 0)
-				);
+				return !group.hidden && Boolean(group.record || group.children.length > 0);
 			})
-			// eslint-disable-next-line @typescript-eslint/no-unused-vars
 			.map(({ hidden: _hidden, ...group }) => group);
-	}, [customCategories, groupPreferences]);
+	}, [categoryPreferences, customCategories, groupPreferences]);
 
 	const groupsBySection = useMemo(() => {
 		const result: Record<CategorySectionId, CategoryGroup[]> = {
@@ -321,6 +345,26 @@ export default function SettingsCategoriesPage() {
 
 		for (const group of groups) {
 			result[group.sectionId].push(group);
+		}
+
+		for (const section of CATEGORY_SECTIONS) {
+			result[section.id].sort((first, second) => {
+				if (first.order !== null || second.order !== null) {
+					if (first.order === null) {
+						return 1;
+					}
+
+					if (second.order === null) {
+						return -1;
+					}
+
+					if (first.order !== second.order) {
+						return first.order - second.order;
+					}
+				}
+
+				return groups.indexOf(first) - groups.indexOf(second);
+			});
 		}
 
 		return result;
@@ -374,8 +418,115 @@ export default function SettingsCategoriesPage() {
 		});
 	};
 
+	const saveGroupOrder = (
+		sectionId: CategorySectionId,
+		orderedGroupKeys: string[],
+	) => {
+		setGroupPreferences((current) => {
+			const nextPreferences = { ...current };
+
+			orderedGroupKeys.forEach((groupKey, index) => {
+				nextPreferences[groupKey] = {
+					...(nextPreferences[groupKey] ?? {}),
+					sectionId,
+					order: index,
+				};
+			});
+
+			writeGroupPreferences(nextPreferences);
+			return nextPreferences;
+		});
+	};
+
+	const handleGroupDrop = (
+		draggedGroupKey: string,
+		targetGroupKey: string,
+		sectionId: CategorySectionId,
+	) => {
+		const sectionGroups = groupsBySection[sectionId];
+		const fromIndex = sectionGroups.findIndex((group) => {
+			return group.key === draggedGroupKey;
+		});
+		const toIndex = sectionGroups.findIndex((group) => {
+			return group.key === targetGroupKey;
+		});
+
+		const nextGroups = moveItem(sectionGroups, fromIndex, toIndex);
+		saveGroupOrder(
+			sectionId,
+			nextGroups.map((group) => group.key),
+		);
+	};
+
+	const moveCategoryToGroup = (
+		categoryId: string,
+		targetGroupKey: string,
+		targetCategoryId?: string,
+	) => {
+		const sourceGroup = groups.find((group) => {
+			return group.children.some((category) => category.id === categoryId);
+		});
+		const targetGroup = groups.find((group) => group.key === targetGroupKey);
+
+		if (!sourceGroup || !targetGroup) {
+			return;
+		}
+
+		const sourceIds = sourceGroup.children
+			.map((category) => category.id)
+			.filter((id) => id !== categoryId);
+		const targetIds =
+			sourceGroup.key === targetGroup.key
+				? [...sourceIds]
+				: targetGroup.children
+						.map((category) => category.id)
+						.filter((id) => id !== categoryId);
+
+		let insertIndex = targetIds.length;
+
+		if (targetCategoryId) {
+			const requestedIndex = targetIds.indexOf(targetCategoryId);
+			if (requestedIndex >= 0) {
+				insertIndex = requestedIndex;
+			}
+		}
+
+		targetIds.splice(insertIndex, 0, categoryId);
+
+		setCategoryPreferences((current) => {
+			const nextPreferences = { ...current };
+
+			if (sourceGroup.key !== targetGroup.key) {
+				sourceIds.forEach((id, index) => {
+					nextPreferences[id] = {
+						...(nextPreferences[id] ?? {}),
+						order: index,
+					};
+				});
+			}
+
+			targetIds.forEach((id, index) => {
+				nextPreferences[id] = {
+					...(nextPreferences[id] ?? {}),
+					parentName: targetGroup.name,
+					order: index,
+				};
+			});
+
+			writeCategoryPreferences(nextPreferences);
+			return nextPreferences;
+		});
+	};
+
+	const clearDragState = () => {
+		removeOpaqueDragPreview();
+		setDragState(null);
+		setDragOverKey(null);
+	};
+
 	const openEditor = (nextEditor: EditorState) => {
 		setEditor(nextEditor);
+		setDeleteConfirmation(null);
 		setErrorMessage(null);
 
 		if (nextEditor.mode === "edit-group" && nextEditor.group) {
@@ -395,6 +546,9 @@ export default function SettingsCategoriesPage() {
 		}
 
 		const parentName =
+			(nextEditor.category
+				? categoryPreferences[nextEditor.category.id]?.parentName
+				: undefined)?.trim() ||
 			nextEditor.category?.parent_name?.trim() ||
 			nextEditor.parentName?.trim() ||
 			groups[0]?.name ||
@@ -411,8 +565,7 @@ export default function SettingsCategoriesPage() {
 		setSelectedParentName(parentName);
 		setExcludeFromBudget(
 			nextEditor.category
-				? categoryPreferences[nextEditor.category.id]?.excludedFromBudget ===
-						true
+				? categoryPreferences[nextEditor.category.id]?.excludedFromBudget === true
 				: false,
 		);
 		setBudgetMode("category");
@@ -424,6 +577,7 @@ export default function SettingsCategoriesPage() {
 		}
 
 		setEditor(null);
+		setDeleteConfirmation(null);
 		setErrorMessage(null);
 	};
 
@@ -480,12 +634,17 @@ export default function SettingsCategoriesPage() {
 					icon: DEFAULT_ICON,
 					color: DEFAULT_COLOR,
 				});
-				const groupKey = getGroupKey(createdGroup.name, createdGroup);
+				const groupKey = getCategoryGroupPreferenceKey(
+					createdGroup.name,
+					createdGroup.id,
+					createdGroup.is_system,
+				);
 
 				updateGroupPreference(groupKey, () => ({
 					name: cleanName,
 					budgetMode,
 					sectionId: editor.sectionId,
+					order: groupsBySection[editor.sectionId].length,
 				}));
 			} else if (editor.mode === "edit-group" && editor.group) {
 				if (!validateGroupName(cleanName, editor.group.key)) {
@@ -517,9 +676,14 @@ export default function SettingsCategoriesPage() {
 					icon: icon.trim() || DEFAULT_ICON,
 					color: color.trim() || DEFAULT_COLOR,
 				});
+				const selectedGroup = groups.find((group) => {
+					return group.name === selectedParentName;
+				});
 
 				updateCategoryPreference(createdCategory.id, () => ({
 					excludedFromBudget: excludeFromBudget,
+					parentName: selectedParentName,
+					order: selectedGroup?.children.length ?? 0,
 				}));
 			}
 
@@ -533,11 +697,39 @@ export default function SettingsCategoriesPage() {
 		}
 	};
 
+	const requestDelete = () => {
+		if (!editor || isSaving) {
+			return;
+		}
+
+		if (editor.mode === "edit-group" && editor.group) {
+			const isBuiltIn = !editor.group.record || editor.group.record.is_system;
+			setDeleteConfirmation({
+				title: `Delete ${editor.group.displayName}?`,
+				description: isBuiltIn
+					? "This built-in group will be hidden from your category settings. You can restore it later by clearing the saved category preferences."
+					: "This permanently deletes the group and all custom categories currently inside it. This action cannot be undone.",
+				confirmLabel: "Delete group",
+			});
+			return;
+		}
+
+		if (editor.mode === "edit-category" && editor.category) {
+			setDeleteConfirmation({
+				title: `Delete ${editor.category.name}?`,
+				description:
+					"This permanently deletes the custom category. Existing transactions may need to be recategorized. This action cannot be undone.",
+				confirmLabel: "Delete category",
+			});
+		}
+	};
+
 	const handleDelete = async () => {
 		if (!editor || isSaving) {
 			return;
 		}
 
+		setDeleteConfirmation(null);
 		setIsSaving(true);
 		setErrorMessage(null);
 
@@ -559,6 +751,7 @@ export default function SettingsCategoriesPage() {
 
 					for (const category of customChildren) {
 						await deleteCustomCategory(category.id);
+						removeCategoryPreference(category.id);
 					}
 
 					await deleteCustomCategory(editor.group.record.id);
@@ -591,10 +784,10 @@ export default function SettingsCategoriesPage() {
 
 	return (
 		<SettingsContentCard title="Categories">
-			<div className="p-5 sm:p-6">
-				<div className="mb-7 flex items-start gap-3 rounded-xl bg-cyan-50 px-4 py-3 text-sm leading-6 text-cyan-800 dark:bg-cyan-500/10 dark:text-cyan-300">
+			<div className="min-w-0 p-4 sm:p-5 lg:p-6">
+				<div className="mb-7 flex min-w-0 items-start gap-3 rounded-xl bg-cyan-50 px-4 py-3 text-sm leading-6 text-cyan-800 dark:bg-cyan-500/10 dark:text-cyan-300">
 					<Info size={18} className="mt-0.5 shrink-0" />
-					<p>
+					<p className="min-w-0 break-words">
 						Changes you make to your groups and categories here are applied
 						throughout the app. Customize the structure to match how you budget.
 					</p>
@@ -606,7 +799,7 @@ export default function SettingsCategoriesPage() {
 
 						return (
 							<section key={section.id}>
-								<div className="mb-4 flex items-center justify-between gap-4">
+								<div className="mb-4 flex min-w-0 flex-wrap items-center justify-between gap-3">
 									<h2 className="text-xl font-semibold tracking-[-0.01em]">
 										{section.title}
 									</h2>
@@ -628,19 +821,70 @@ export default function SettingsCategoriesPage() {
 								<div className="space-y-4">
 									{sectionGroups.map((group) => {
 										const theme = getCategoryTheme(group.name);
+										const groupDragKey = `group:${group.key}`;
+										const groupBodyDragKey = `group-body:${group.key}`;
 
 										return (
 											<div
 												key={group.key}
-												className="overflow-hidden rounded-2xl bg-[#f4f4f2] dark:bg-white/[0.04]"
+												draggable
+												onDragStart={(event) => {
+													beginOpaqueDragPreview(event);
+													event.dataTransfer.effectAllowed = "move";
+													event.dataTransfer.setData("text/plain", group.key);
+													setDragState({
+														type: "group",
+														groupKey: group.key,
+														sectionId: section.id,
+													});
+												}}
+												onDrag={updateOpaqueDragPreview}
+												onDragEnd={clearDragState}
+												onDragOver={(event) => {
+													if (
+														dragState?.type !== "group" ||
+														dragState.sectionId !== section.id
+													) {
+														return;
+													}
+
+													event.preventDefault();
+													event.dataTransfer.dropEffect = "move";
+													setDragOverKey(groupDragKey);
+												}}
+												onDrop={(event) => {
+													if (
+														dragState?.type !== "group" ||
+														dragState.sectionId !== section.id
+													) {
+														return;
+													}
+
+													event.preventDefault();
+													handleGroupDrop(
+														dragState.groupKey,
+														group.key,
+														section.id,
+													);
+													clearDragState();
+												}}
+												className={`min-w-0 overflow-hidden rounded-2xl bg-[#f4f4f2] opacity-100 transition dark:bg-white/[0.04] ${
+													dragOverKey === groupDragKey
+														? "ring-2 ring-cyan-500/70"
+														: ""
+												}`}
 											>
-												<div className="flex min-h-13 items-center gap-3 border-b border-black/5 px-5 dark:border-white/10">
+												<div className="flex min-h-13 min-w-0 flex-wrap items-center gap-2 border-b border-black/5 px-4 py-3 sm:flex-nowrap sm:gap-3 sm:px-5 dark:border-white/10">
+													<GripVertical
+														size={17}
+														className="shrink-0 cursor-grab text-[#969691] active:cursor-grabbing"
+													/>
 													<CategoryGlyph
 														name={group.record?.icon_name || group.name}
 														size={18}
 														colorClass={theme.text}
 													/>
-													<span className="font-semibold">
+													<span className="min-w-0 flex-1 truncate font-semibold sm:flex-none">
 														{group.displayName}
 													</span>
 
@@ -655,67 +899,168 @@ export default function SettingsCategoriesPage() {
 													</button>
 												</div>
 
-												<div className="space-y-2 p-4">
-													{group.children.map((category) => (
-														<div
-															key={category.id}
-															className="flex min-h-12 items-center gap-3 rounded-xl border border-black/[0.03] bg-white px-3 shadow-sm dark:border-white/[0.06] dark:bg-[#222220]"
-														>
-															<GripVertical
-																size={16}
-																className="shrink-0 text-[#969691]"
-															/>
-															<CategoryGlyph
-																name={category.icon_name || category.name}
-																size={17}
-																colorClass={theme.text}
-															/>
-															<span className="min-w-0 flex-1 truncate text-[15px]">
-																{category.name}
-															</span>
+												<div
+													onDragOver={(event) => {
+														if (dragState?.type !== "category") {
+															return;
+														}
 
-															{!category.is_system && (
-																<>
-																	<span className="text-xs font-medium text-[#6e6e69] dark:text-[#aaa9a4]">
-																		Custom
-																	</span>
-																	{categoryPreferences[category.id]
-																		?.excludedFromBudget && (
-																		<span className="rounded-md bg-amber-100 px-2 py-1 text-[11px] font-semibold text-amber-800 dark:bg-amber-500/15 dark:text-amber-300">
-																			Excluded
-																		</span>
-																	)}
-																	<button
-																		type="button"
-																		onClick={() => {
-																			openEditor({
-																				mode: "edit-category",
-																				category,
+														event.preventDefault();
+														event.stopPropagation();
+														event.dataTransfer.dropEffect = "move";
+														setDragOverKey(groupBodyDragKey);
+													}}
+													onDrop={(event) => {
+														if (dragState?.type !== "category") {
+															return;
+														}
+
+														event.preventDefault();
+														event.stopPropagation();
+														moveCategoryToGroup(
+															dragState.categoryId,
+															group.key,
+														);
+														clearDragState();
+													}}
+													className={`min-w-0 p-3 transition sm:p-4 ${
+														dragOverKey === groupBodyDragKey
+															? "bg-cyan-500/[0.08]"
+															: ""
+													}`}
+												>
+													{group.children.length === 0 ? (
+														<div className="flex min-h-[190px] min-w-0 flex-col items-center justify-center rounded-xl border border-dashed border-black/[0.06] bg-white/45 px-4 py-8 text-center sm:min-h-[230px] sm:px-6 sm:py-10 dark:border-white/10 dark:bg-black/10">
+															<h3 className="text-lg font-semibold text-[#2f2f2c] dark:text-white">
+																No categories in this group
+															</h3>
+															<p className="mt-3 max-w-full text-sm leading-6 text-[#85837f] sm:text-base dark:text-[#aaa9a4]">
+																Drag categories into this group or create new ones
+															</p>
+															<button
+																type="button"
+																onClick={() => {
+																	openEditor({
+																		mode: "create-category",
+																		parentName: group.name,
+																	});
+																}}
+																className="mt-8 rounded-xl bg-[#ff5a35] px-6 py-3 text-base font-semibold text-white shadow-sm transition hover:bg-[#e94c28]"
+															>
+																Create category
+															</button>
+														</div>
+													) : (
+														<div className="space-y-2">
+															{group.children.map((category) => {
+																const categoryDragKey = `category:${category.id}`;
+
+																return (
+																	<div
+																		key={category.id}
+																		draggable
+																		onDragStart={(event) => {
+																			event.stopPropagation();
+																			beginOpaqueDragPreview(event);
+																			event.dataTransfer.effectAllowed = "move";
+																			event.dataTransfer.setData(
+																				"text/plain",
+																				category.id,
+																			);
+																			setDragState({
+																				type: "category",
+																				categoryId: category.id,
 																			});
 																		}}
-																		className="grid size-8 place-items-center rounded-lg text-[#777671] hover:bg-black/[0.05] hover:text-[#222220] dark:hover:bg-white/10 dark:hover:text-white"
-																		aria-label={`Edit ${category.name}`}
-																	>
-																		<Pencil size={15} />
-																	</button>
-																</>
-															)}
-														</div>
-													))}
+																		onDrag={updateOpaqueDragPreview}
+																		onDragEnd={clearDragState}
+																		onDragOver={(event) => {
+																			if (dragState?.type !== "category") {
+																				return;
+																			}
 
-													<button
-														type="button"
-														onClick={() => {
-															openEditor({
-																mode: "create-category",
-																parentName: group.name,
-															});
-														}}
-														className="flex min-h-10 w-full items-center gap-2 rounded-lg px-1 text-left text-sm font-medium text-[#777671] hover:text-cyan-700 dark:text-[#aaa9a4] dark:hover:text-cyan-300"
-													>
-														<Plus size={15} />
-														Create Category
-													</button>
+																			event.preventDefault();
+																			event.stopPropagation();
+																			setDragOverKey(categoryDragKey);
+																		}}
+																		onDrop={(event) => {
+																			if (dragState?.type !== "category") {
+																				return;
+																			}
+
+																			event.preventDefault();
+																			event.stopPropagation();
+																			moveCategoryToGroup(
+																				dragState.categoryId,
+																				group.key,
+																				category.id,
+																			);
+																			clearDragState();
+																		}}
+																		className={`flex min-h-12 min-w-0 cursor-grab items-center gap-2 rounded-xl border bg-white px-3 opacity-100 shadow-sm transition active:cursor-grabbing sm:gap-3 dark:bg-[#222220] ${
+																			dragOverKey === categoryDragKey
+																				? "border-cyan-500 ring-2 ring-cyan-500/20"
+																				: "border-black/[0.03] dark:border-white/[0.06]"
+																		}`}
+																	>
+																		<GripVertical
+																			size={16}
+																			className="shrink-0 text-[#969691]"
+																		/>
+																		<CategoryGlyph
+																			name={category.icon_name || category.name}
+																			size={17}
+																			colorClass={theme.text}
+																		/>
+																		<span className="min-w-0 flex-1 truncate text-[15px]">
+																			{category.name}
+																		</span>
+
+																		{!category.is_system && (
+																			<>
+																				<span className="hidden text-xs font-medium text-[#6e6e69] sm:inline dark:text-[#aaa9a4]">
+																					Custom
+																				</span>
+																				{categoryPreferences[category.id]
+																					?.excludedFromBudget && (
+																					<span className="hidden rounded-md bg-amber-100 px-2 py-1 text-[11px] font-semibold text-amber-800 md:inline dark:bg-amber-500/15 dark:text-amber-300">
+																						Excluded
+																					</span>
+																				)}
+																				<button
+																					type="button"
+																					onClick={() => {
+																						openEditor({
+																							mode: "edit-category",
+																							category,
+																						});
+																					}}
+																					className="grid size-8 place-items-center rounded-lg text-[#777671] hover:bg-black/[0.05] hover:text-[#222220] dark:hover:bg-white/10 dark:hover:text-white"
+																					aria-label={`Edit ${category.name}`}
+																				>
+																					<Pencil size={15} />
+																				</button>
+																			</>
+																		)}
+																	</div>
+																);
+															})}
+
+															<button
+																type="button"
+																onClick={() => {
+																	openEditor({
+																		mode: "create-category",
+																		parentName: group.name,
+																	});
+																}}
+																className="flex min-h-10 w-full items-center gap-2 rounded-lg px-1 text-left text-sm font-medium text-[#777671] hover:text-cyan-700 dark:text-[#aaa9a4] dark:hover:text-cyan-300"
+															>
+																<Plus size={15} />
+																Create Category
+															</button>
+														</div>
+													)}
 												</div>
 											</div>
 										);
@@ -746,7 +1091,7 @@ export default function SettingsCategoriesPage() {
 						onNameChange={setName}
 						onBudgetModeChange={setBudgetMode}
 						onClose={closeEditor}
-						onDelete={() => void handleDelete()}
+						onDelete={requestDelete}
 						onSave={() => void handleSave()}
 					/>
 				) : (
@@ -776,10 +1121,25 @@ export default function SettingsCategoriesPage() {
 						}}
 						onExcludeFromBudgetChange={setExcludeFromBudget}
 						onClose={closeEditor}
-						onDelete={() => void handleDelete()}
+						onDelete={requestDelete}
 						onSave={() => void handleSave()}
 					/>
 				))}
+
+			{deleteConfirmation && (
+				<DeleteConfirmModal
+					title={deleteConfirmation.title}
+					description={deleteConfirmation.description}
+					confirmLabel={deleteConfirmation.confirmLabel}
+					isDeleting={isSaving}
+					onCancel={() => {
+						if (!isSaving) {
+							setDeleteConfirmation(null);
+						}
+					}}
+					onConfirm={() => void handleDelete()}
+				/>
+			)}
 		</SettingsContentCard>
 	);
 }
@@ -856,10 +1216,7 @@ function GroupEditorModal({
 
 					<div>
 						<span className="mb-4 block text-[23px] font-semibold">Budget</span>
-						<BudgetModeSelect
-							value={budgetMode}
-							onChange={onBudgetModeChange}
-						/>
+						<BudgetModeSelect value={budgetMode} onChange={onBudgetModeChange} />
 						<p className="mt-4 text-[23px] leading-8 text-[#7d7b77] dark:text-[#aaa9a4]">
 							{budgetMode === "group"
 								? "Budget with a single number for all categories within this group."
@@ -1328,6 +1685,82 @@ function GroupOptionSection({
 					</button>
 				);
 			})}
+		</div>
+	);
+}
+
+
+function DeleteConfirmModal({
+	title,
+	description,
+	confirmLabel,
+	isDeleting,
+	onCancel,
+	onConfirm,
+}: {
+	title: string;
+	description: string;
+	confirmLabel: string;
+	isDeleting: boolean;
+	onCancel: () => void;
+	onConfirm: () => void;
+}) {
+	return (
+		<div className="fixed inset-0 z-[360] grid place-items-center bg-black/55 p-4 backdrop-blur-[2px]">
+			<button
+				type="button"
+				aria-label="Close delete confirmation"
+				className="absolute inset-0"
+				onClick={onCancel}
+			/>
+
+			<section
+				role="alertdialog"
+				aria-modal="true"
+				aria-labelledby="delete-confirm-title"
+				aria-describedby="delete-confirm-description"
+				className="relative w-full max-w-[520px] overflow-hidden rounded-[20px] border border-black/10 bg-white text-[#282826] shadow-[0_28px_90px_rgba(0,0,0,0.34)] dark:border-white/10 dark:bg-[#242422] dark:text-white"
+			>
+				<div className="flex items-start gap-4 px-7 pb-5 pt-7">
+					<div className="grid size-11 shrink-0 place-items-center rounded-full bg-red-100 text-red-600 dark:bg-red-500/15 dark:text-red-300">
+						<Trash2 size={21} />
+					</div>
+					<div className="min-w-0">
+						<h2
+							id="delete-confirm-title"
+							className="text-xl font-semibold tracking-[-0.01em]"
+						>
+							{title}
+						</h2>
+						<p
+							id="delete-confirm-description"
+							className="mt-2 text-sm leading-6 text-[#686661] dark:text-[#b8b6b1]"
+						>
+							{description}
+						</p>
+					</div>
+				</div>
+
+				<footer className="flex items-center justify-end gap-3 border-t border-black/[0.06] px-7 py-5 dark:border-white/10">
+					<button
+						type="button"
+						onClick={onCancel}
+						disabled={isDeleting}
+						className="h-11 rounded-xl border border-[#dedbd7] bg-white px-5 text-sm font-semibold shadow-sm transition hover:bg-[#f7f6f4] disabled:opacity-50 dark:border-white/15 dark:bg-[#242422] dark:hover:bg-white/5"
+					>
+						Cancel
+					</button>
+					<button
+						type="button"
+						onClick={onConfirm}
+						disabled={isDeleting}
+						className="inline-flex h-11 min-w-32 items-center justify-center gap-2 rounded-xl bg-red-600 px-5 text-sm font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-red-400"
+					>
+						{isDeleting && <Loader2 size={17} className="animate-spin" />}
+						{confirmLabel}
+					</button>
+				</footer>
+			</section>
 		</div>
 	);
 }

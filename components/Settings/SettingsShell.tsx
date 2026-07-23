@@ -43,13 +43,19 @@ export function SettingsShell({ children }: SettingsShellProps) {
 	const pathname = usePathname();
 
 	return (
-		<div className="min-h-dvh bg-[#f7f7f5] text-[#222220] dark:bg-[#121212] dark:text-[#efefed]">
-			<div className="mx-auto w-full max-w-[1500px] px-4 pb-8 pt-4 sm:px-6 lg:px-8">
-				<h1 className="mb-5 text-[22px] font-semibold tracking-tight">Settings</h1>
+		<div className="min-h-dvh overflow-x-hidden bg-[#f7f7f5] text-[#222220] dark:bg-[#121212] dark:text-[#efefed]">
+			<div className="mr-auto w-full min-w-0 max-w-[1800px] px-3 pb-8 pt-4 sm:px-5 lg:px-6">
+				<h1 className="mb-5 text-[22px] font-semibold tracking-tight">
+					Settings
+				</h1>
 
-				<div className="grid items-start gap-4 lg:grid-cols-[280px_minmax(0,1fr)]">
-					<aside className="space-y-4 lg:sticky lg:top-4">
-						<SettingsNavCard title="Account" items={ACCOUNT_ITEMS} pathname={pathname} />
+				<div className="grid w-full min-w-0 items-start gap-4 xl:grid-cols-[minmax(220px,280px)_minmax(0,1fr)]">
+					<aside className="w-full min-w-0 space-y-4 xl:sticky xl:top-4">
+						<SettingsNavCard
+							title="Account"
+							items={ACCOUNT_ITEMS}
+							pathname={pathname}
+						/>
 						<SettingsNavCard
 							title="Household"
 							items={HOUSEHOLD_ITEMS}
@@ -57,7 +63,7 @@ export function SettingsShell({ children }: SettingsShellProps) {
 						/>
 					</aside>
 
-					<main className="min-w-0">{children}</main>
+					<main className="w-full min-w-0 max-w-full overflow-x-hidden">{children}</main>
 				</div>
 			</div>
 		</div>
@@ -126,8 +132,8 @@ export function SettingsContentCard({
 	children: ReactNode;
 }) {
 	return (
-		<section className="overflow-hidden rounded-2xl border border-black/5 bg-white shadow-sm dark:border-white/10 dark:bg-[#1b1b1a]">
-			<header className="flex min-h-16 items-center justify-between gap-4 border-b border-black/5 px-6 py-4 dark:border-white/10">
+		<section className="w-full min-w-0 max-w-full overflow-hidden rounded-2xl border border-black/5 bg-white shadow-sm dark:border-white/10 dark:bg-[#1b1b1a]">
+			<header className="flex min-h-16 min-w-0 flex-wrap items-center justify-between gap-3 border-b border-black/5 px-4 py-4 sm:px-6 dark:border-white/10">
 				<h2 className="text-xl font-semibold">{title}</h2>
 				{actions}
 			</header>

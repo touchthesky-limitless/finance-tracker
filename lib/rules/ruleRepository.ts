@@ -1,12 +1,3 @@
-/* This handles:
-
-*Fetching rules from Supabase
-*Creating and updating rules
-*Deleting rules
-*Optionally applying a rule to existing transactions
-*Updating matching transactions in controlled batches
- */
-
 import { createClient } from "@/lib/supabase";
 import type { Transaction } from "@/store/useBudgetStore";
 import {
@@ -24,6 +15,7 @@ interface RuleRow {
 	name: string;
 	criteria: TransactionRule["criteria"];
 	actions: TransactionRule["actions"];
+	sort_order: number;
 	created_at: string | null;
 	updated_at: string | null;
 }
@@ -58,6 +50,7 @@ function fromRow(row: RuleRow): TransactionRule {
 		name: row.name,
 		criteria: row.criteria ?? {},
 		actions: row.actions ?? {},
+		sortOrder: row.sort_order,
 		createdAt: row.created_at ?? undefined,
 		updatedAt: row.updated_at ?? undefined,
 	};
@@ -75,9 +68,12 @@ export async function fetchTransactionRules(): Promise<TransactionRule[]> {
 	const userId = await getUserId();
 	const { data, error } = await supabase
 		.from("rules")
-		.select("id, name, criteria, actions, created_at, updated_at")
+		.select(
+			"id, name, criteria, actions, sort_order, created_at, updated_at",
+		)
 		.eq("user_id", userId)
-		.order("updated_at", { ascending: false });
+		.order("sort_order", { ascending: true })
+		.order("created_at", { ascending: true });
 
 	if (error) {
 		throw error;
@@ -103,11 +99,14 @@ export async function saveTransactionRule(
 				name: rule.name.trim() || "Untitled rule",
 				criteria: rule.criteria,
 				actions: rule.actions,
+				sort_order: rule.sortOrder ?? 0,
 				updated_at: now,
 			},
 			{ onConflict: "id" },
 		)
-		.select("id, name, criteria, actions, created_at, updated_at")
+		.select(
+			"id, name, criteria, actions, sort_order, created_at, updated_at",
+		)
 		.single();
 
 	if (error) {
@@ -181,6 +180,30 @@ export async function saveTransactionRule(
 	};
 }
 
+export async function reorderTransactionRules(
+	ruleIds: string[],
+): Promise<void> {
+	if (ruleIds.length === 0) {
+		return;
+	}
+
+	const userId = await getUserId();
+	const updates = ruleIds.map((ruleId, sortOrder) => {
+		return supabase
+			.from("rules")
+			.update({ sort_order: sortOrder })
+			.eq("user_id", userId)
+			.eq("id", ruleId);
+	});
+
+	const responses = await Promise.all(updates);
+	const failedResponse = responses.find((response) => response.error);
+
+	if (failedResponse?.error) {
+		throw failedResponse.error;
+	}
+}
+
 export async function deleteTransactionRule(ruleId: string): Promise<void> {
 	const userId = await getUserId();
 	const { error } = await supabase
@@ -188,6 +211,18 @@ export async function deleteTransactionRule(ruleId: string): Promise<void> {
 		.delete()
 		.eq("user_id", userId)
 		.eq("id", ruleId);
+
+	if (error) {
+		throw error;
+	}
+}
+
+export async function deleteAllTransactionRules(): Promise<void> {
+	const userId = await getUserId();
+	const { error } = await supabase
+		.from("rules")
+		.delete()
+		.eq("user_id", userId);
 
 	if (error) {
 		throw error;
