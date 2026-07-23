@@ -5,9 +5,10 @@ import { SortingState, VisibilityState } from "@tanstack/react-table";
 
 interface TableToolbarProps {
 	isEditMode: boolean;
-	setIsEditMode: (val: boolean) => void;
+	setIsEditMode: (value: boolean) => void;
 	selectedIds: string[];
-	setSelectedIds: (ids: string[]) => void;
+	setSelectedIds: React.Dispatch<React.SetStateAction<string[]>>;
+	visibleTransactionIds: string[];
 	currentView: "all" | "review";
 	setCurrentView: (view: "all" | "review") => void;
 	filteredLength: number;
@@ -15,6 +16,7 @@ interface TableToolbarProps {
 	setSorting: (sorting: SortingState) => void;
 	columnVisibility: VisibilityState;
 	setColumnVisibility: React.Dispatch<React.SetStateAction<VisibilityState>>;
+	onEditMultiple: () => void;
 }
 
 export function TableToolbar({
@@ -22,6 +24,7 @@ export function TableToolbar({
 	setIsEditMode,
 	selectedIds,
 	setSelectedIds,
+	visibleTransactionIds,
 	currentView,
 	setCurrentView,
 	filteredLength,
@@ -29,6 +32,7 @@ export function TableToolbar({
 	setSorting,
 	columnVisibility,
 	setColumnVisibility,
+	onEditMultiple,
 }: TableToolbarProps) {
 	const sortOptions = [
 		{ label: "Date (new to old)", id: "date", desc: true },
@@ -51,14 +55,68 @@ export function TableToolbar({
 	);
 	const isViewModified = currentView !== "all";
 
+	const allVisibleTransactionsSelected =
+		visibleTransactionIds.length > 0 &&
+		visibleTransactionIds.every((transactionId) => {
+			return selectedIds.includes(transactionId);
+		});
+
+	const handleToggleSelectAll = () => {
+		if (visibleTransactionIds.length === 0) {
+			return;
+		}
+
+		const visibleIdSet = new Set(visibleTransactionIds);
+
+		setSelectedIds((current) => {
+			if (allVisibleTransactionsSelected) {
+				return current.filter((transactionId) => {
+					return !visibleIdSet.has(transactionId);
+				});
+			}
+
+			return Array.from(new Set([...current, ...visibleTransactionIds]));
+		});
+	};
+
+	const hasVisibleSelection = visibleTransactionIds.some((transactionId) => {
+		return selectedIds.includes(transactionId);
+	});
+
 	return (
 		<div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-white/5 relative z-50">
 			<div className="flex items-center gap-4">
 				{isEditMode ? (
 					<div className="flex items-center gap-3">
-						<div className="w-6 h-6 rounded bg-[#FF5A35] flex items-center justify-center text-white">
-							<Minus size={16} strokeWidth={3} />
-						</div>
+						<button
+							type="button"
+							onClick={handleToggleSelectAll}
+							disabled={visibleTransactionIds.length === 0}
+							aria-label={
+								allVisibleTransactionsSelected
+									? "Deselect all visible transactions"
+									: "Select all visible transactions"
+							}
+							title={
+								allVisibleTransactionsSelected ? "Deselect all" : "Select all"
+							}
+							className={`
+		flex h-6 w-6 items-center justify-center
+		rounded border transition-colors
+		focus-visible:outline-none
+		focus-visible:ring-2
+		focus-visible:ring-[#FF5A35]/40
+		disabled:cursor-not-allowed
+		disabled:opacity-40
+		${
+			hasVisibleSelection
+				? "border-[#FF5A35] bg-[#FF5A35] text-white hover:bg-[#E04825]"
+				: "border-gray-400 bg-white text-transparent hover:border-[#FF5A35] dark:border-gray-500 dark:bg-transparent"
+		}
+	`}
+						>
+							{hasVisibleSelection && <Minus size={16} strokeWidth={3} />}
+						</button>
 						<span className="text-gray-900 dark:text-white font-bold text-[15px]">
 							{selectedIds.length} transaction
 							{selectedIds.length !== 1 ? "s" : ""} selected{" "}
@@ -124,8 +182,14 @@ export function TableToolbar({
 						>
 							Cancel
 						</button>
-						<button className="px-4 h-9 rounded-lg bg-[#FF5A35] hover:bg-[#E04825] text-[14px] font-bold text-white transition-colors">
-							Edit {selectedIds.length}
+						<button
+							type="button"
+							onClick={onEditMultiple}
+							disabled={selectedIds.length === 0}
+							className="px-4 h-9 rounded-lg bg-[#FF5A35] hover:bg-[#E04825] text-[14px] font-bold text-white transition-colors disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:bg-[#FF5A35]"
+						>
+							Edit {selectedIds.length} transaction
+							{selectedIds.length === 1 ? "" : "s"}
 						</button>
 					</>
 				) : (

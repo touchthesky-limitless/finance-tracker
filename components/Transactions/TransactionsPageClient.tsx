@@ -41,6 +41,7 @@ import { MerchantRuleToast } from "@/components/Transactions/MerchantRuleToast";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { TRANSACTION_RETURN_URL_KEY } from "@/lib/transactions/navigation";
 import { useTransactionToastStore } from "@/store/useTransactionToastStore";
+import BulkEditTransactionsDrawer from "@/components/Transactions/BulkEditTransactionsDrawer";
 
 const DEFAULT_SORTING: SortingState = [
 	{
@@ -240,6 +241,8 @@ export default function TransactionsPageClient({
 
 	const [isMounted, setIsMounted] = useState(false);
 
+	const [isBulkEditOpen, setIsBulkEditOpen] = useState(false);
+
 	const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(
 		() => {
 			return readLocalStorage<VisibilityState>("sort_cols", {});
@@ -276,6 +279,14 @@ export default function TransactionsPageClient({
 	const [sorting, setSorting] = useState<SortingState>(() => {
 		return readLocalStorage<SortingState>("custom_sort", DEFAULT_SORTING);
 	});
+
+	const selectedTransactions = useMemo(() => {
+		const selectedIdSet = new Set(selectedIds);
+
+		return transactions.filter((transaction) => {
+			return selectedIdSet.has(transaction.id);
+		});
+	}, [selectedIds, transactions]);
 
 	const merchantFilterOptions = useMemo<TransactionFilterOption[]>(() => {
 		return merchantItems.map((merchant) => {
@@ -326,6 +337,14 @@ export default function TransactionsPageClient({
 			scroll: false,
 		});
 	}, [getTransactionUrl, router]);
+
+	const handleOpenBulkEdit = useCallback(() => {
+		if (selectedIds.length === 0) {
+			return;
+		}
+
+		setIsBulkEditOpen(true);
+	}, [selectedIds.length]);
 
 	// Mount guard
 	useEffect(() => {
@@ -936,6 +955,9 @@ export default function TransactionsPageClient({
 						setIsEditMode={setIsEditMode}
 						selectedIds={selectedIds}
 						setSelectedIds={setSelectedIds}
+						visibleTransactionIds={filteredTransactions.map((transaction) => {
+							return transaction.id;
+						})}
 						currentView={currentView}
 						setCurrentView={setCurrentView}
 						filteredLength={filteredTransactions.length}
@@ -943,6 +965,7 @@ export default function TransactionsPageClient({
 						setSorting={setSorting}
 						columnVisibility={columnVisibility}
 						setColumnVisibility={setColumnVisibility}
+						onEditMultiple={handleOpenBulkEdit}
 					/>
 
 					<div className="flex-1 overflow-hidden relative">
@@ -1127,6 +1150,28 @@ export default function TransactionsPageClient({
 					}}
 					onClose={() => {
 						setToast(null);
+					}}
+				/>
+			)}
+
+			{isBulkEditOpen && (
+				<BulkEditTransactionsDrawer
+					key={selectedIds.slice().sort().join(":")}
+					transactions={selectedTransactions}
+					isOpen
+					onClose={() => {
+						setIsBulkEditOpen(false);
+					}}
+					onSaved={() => {
+						setIsBulkEditOpen(false);
+						setSelectedIds([]);
+						setIsEditMode(false);
+					}}
+					onDeleted={(count) => {
+						reportDeletedTransactions(count);
+						setIsBulkEditOpen(false);
+						setSelectedIds([]);
+						setIsEditMode(false);
 					}}
 				/>
 			)}
