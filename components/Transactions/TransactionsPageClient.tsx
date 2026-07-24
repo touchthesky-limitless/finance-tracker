@@ -5,6 +5,7 @@ import {
 	useEffect,
 	useMemo,
 	useState,
+	useSyncExternalStore,
 	type MouseEvent as ReactMouseEvent,
 } from "react";
 import dynamic from "next/dynamic";
@@ -19,6 +20,7 @@ import {
 } from "@/store/useBudgetStore";
 import { DataTable } from "@/components/Transactions/DataTable";
 import { UndoToast } from "@/components/ui/UndoToast";
+import { Shimmer } from "@/components/ui/Shimmer";
 import CsvUploader from "@/components/CsvUploader";
 import {
 	TopToolbar,
@@ -75,6 +77,18 @@ const RuleModal = dynamic(
 		),
 	{ ssr: false },
 );
+
+function subscribeToClient(): () => void {
+	return () => {};
+}
+
+function getClientSnapshot(): boolean {
+	return true;
+}
+
+function getServerSnapshot(): boolean {
+	return false;
+}
 
 function readLocalStorage<T>(key: string, fallback: T): T {
 	if (typeof window === "undefined") {
@@ -146,6 +160,71 @@ function createBlankTransaction(): Transaction {
 	};
 }
 
+function TransactionsPageSkeleton() {
+	return (
+		<div
+			role="status"
+			aria-label="Loading transactions page"
+			aria-live="polite"
+			className="flex h-screen flex-col bg-gray-50 font-sans text-gray-900 dark:bg-[#121212] dark:text-gray-200"
+		>
+			<span className="sr-only">Loading transactions…</span>
+
+			<header
+				aria-hidden="true"
+				className="flex h-20 shrink-0 items-center gap-4 border-b border-gray-200 bg-white px-6 dark:border-white/5 dark:bg-[#191919]"
+			>
+				<Shimmer className="h-10 w-36 rounded-xl" />
+				<Shimmer className="ml-auto h-10 w-[min(38vw,420px)] rounded-xl" />
+				<Shimmer className="h-10 w-28 rounded-xl" />
+				<Shimmer className="size-10 rounded-xl" />
+			</header>
+
+			<div
+				aria-hidden="true"
+				className="flex min-h-0 flex-1 gap-6 overflow-hidden p-6"
+			>
+				<div className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-white/5 dark:bg-[#191919]">
+					<div className="flex h-16 shrink-0 items-center gap-3 border-b border-gray-200 px-5 dark:border-white/5">
+						<Shimmer className="h-9 w-28 rounded-xl" />
+						<Shimmer className="h-9 w-24 rounded-xl" />
+						<Shimmer className="ml-auto h-9 w-36 rounded-xl" />
+					</div>
+
+					<div className="min-h-0 flex-1 overflow-hidden">
+						<div className="flex h-12 items-center justify-between border-b border-gray-200 bg-[#f9fafb] px-6 dark:border-white/5 dark:bg-[#232323]">
+							<Shimmer className="h-4 w-36 rounded-md" />
+							<Shimmer className="h-4 w-24 rounded-md" />
+						</div>
+
+						{Array.from({ length: 8 }, (_, rowIndex) => (
+							<div
+								key={rowIndex}
+								className="flex h-14 items-center gap-5 border-b border-gray-100 px-6 dark:border-white/5"
+							>
+								<Shimmer className="size-8 shrink-0 rounded-full" />
+								<Shimmer
+									className={`h-4 rounded-md ${
+										rowIndex % 2 === 0 ? "w-44" : "w-32"
+									}`}
+								/>
+								<Shimmer className="ml-auto h-4 w-24 rounded-md" />
+							</div>
+						))}
+					</div>
+				</div>
+
+				<aside className="hidden w-80 shrink-0 space-y-4 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm xl:block dark:border-white/5 dark:bg-[#191919]">
+					<Shimmer className="h-6 w-28 rounded-md" />
+					<Shimmer className="h-24 w-full rounded-2xl" />
+					<Shimmer className="h-24 w-full rounded-2xl" />
+					<Shimmer className="h-24 w-full rounded-2xl" />
+				</aside>
+			</div>
+		</div>
+	);
+}
+
 interface TransactionsPageClientProps {
 	initialTransactionId?: string;
 }
@@ -153,6 +232,11 @@ interface TransactionsPageClientProps {
 export default function TransactionsPageClient({
 	initialTransactionId,
 }: TransactionsPageClientProps) {
+	const isClient = useSyncExternalStore(
+		subscribeToClient,
+		getClientSnapshot,
+		getServerSnapshot,
+	);
 	const router = useRouter();
 	const pathname = usePathname();
 	const searchParams = useSearchParams();
@@ -239,7 +323,7 @@ export default function TransactionsPageClient({
 
 	const [showUploader, setShowUploader] = useState(false);
 
-	const [isMounted, setIsMounted] = useState(false);
+	const [isInitialDataLoading, setIsInitialDataLoading] = useState(true);
 
 	const [isBulkEditOpen, setIsBulkEditOpen] = useState(false);
 
@@ -346,19 +430,31 @@ export default function TransactionsPageClient({
 		setIsBulkEditOpen(true);
 	}, [selectedIds.length]);
 
-	// Mount guard
+	// Load the reference data used by transaction rows and filters.
 	useEffect(() => {
-		// eslint-disable-next-line react-hooks/set-state-in-effect
-		setIsMounted(true);
-	}, []);
+		let active = true;
 
-	// Load system and user-created subcategories
-	useEffect(() => {
-		void Promise.all([
-			fetchCustomCategories(),
-			fetchAccounts(),
-			fetchMerchants(),
-		]);
+		const loadReferenceData = async (): Promise<void> => {
+			try {
+				await Promise.all([
+					fetchCustomCategories(),
+					fetchAccounts(),
+					fetchMerchants(),
+				]);
+			} catch (error) {
+				console.error("Failed to load transaction reference data:", error);
+			} finally {
+				if (active) {
+					setIsInitialDataLoading(false);
+				}
+			}
+		};
+
+		void loadReferenceData();
+
+		return () => {
+			active = false;
+		};
 	}, [fetchAccounts, fetchCustomCategories, fetchMerchants]);
 
 	const openDuplicateTransaction = useCallback((transaction: Transaction) => {
@@ -377,21 +473,13 @@ export default function TransactionsPageClient({
 
 	// Persist sorting
 	useEffect(() => {
-		if (!isMounted) {
-			return;
-		}
-
 		writeLocalStorage("custom_sort", sorting);
-	}, [sorting, isMounted]);
+	}, [sorting]);
 
 	// Persist column visibility
 	useEffect(() => {
-		if (!isMounted) {
-			return;
-		}
-
 		writeLocalStorage("sort_cols", columnVisibility);
-	}, [columnVisibility, isMounted]);
+	}, [columnVisibility]);
 
 	// Escape exits edit mode
 	useEffect(() => {
@@ -926,8 +1014,8 @@ export default function TransactionsPageClient({
 		setTransactionFilters(EMPTY_TRANSACTION_FILTERS);
 	}, []);
 
-	if (!isMounted) {
-		return <div className="h-screen bg-gray-50 dark:bg-[#121212]" />;
+	if (!isClient) {
+		return <TransactionsPageSkeleton />;
 	}
 
 	return (
@@ -970,6 +1058,7 @@ export default function TransactionsPageClient({
 
 					<div className="flex-1 overflow-hidden relative">
 						<DataTable
+							isLoading={isInitialDataLoading}
 							transactions={filteredTransactions}
 							selectedIds={selectedIds}
 							merchantItems={merchantItems}

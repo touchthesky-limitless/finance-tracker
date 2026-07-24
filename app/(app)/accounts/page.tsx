@@ -1,10 +1,12 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useSyncExternalStore } from "react";
 import { Plus, RefreshCw, SlidersHorizontal } from "lucide-react";
+
 import AccountGroup from "@/components/Accounts/AccountGroup";
-import SummarySidebar from "@/components/Accounts/SummarySidebar";
 import AccountsChart from "@/components/Accounts/AccountsChart";
+import SummarySidebar from "@/components/Accounts/SummarySidebar";
+import { Shimmer } from "@/components/ui/Shimmer";
 import { useBudgetStore } from "@/store/useBudgetStore";
 
 interface Account {
@@ -21,75 +23,183 @@ interface GroupedAccountData {
 	accounts: Account[];
 }
 
+function subscribeToClient(): () => void {
+	return () => {};
+}
+
+function getClientSnapshot(): boolean {
+	return true;
+}
+
+function getServerSnapshot(): boolean {
+	return false;
+}
+
+function AccountGroupsSkeleton() {
+	return (
+		<div
+			role="status"
+			aria-label="Loading accounts"
+			aria-live="polite"
+			className="space-y-6"
+		>
+			<span className="sr-only">Loading accounts…</span>
+
+			{Array.from({ length: 2 }, (_, groupIndex) => (
+				<div
+					key={groupIndex}
+					aria-hidden="true"
+					className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-white/10 dark:bg-[#1c1c1c]"
+				>
+					<div className="flex items-center justify-between border-b border-gray-200 px-5 py-4 dark:border-white/10">
+						<div className="space-y-2">
+							<Shimmer className="h-5 w-32 rounded-md" />
+							<Shimmer className="h-3 w-20 rounded-md" />
+						</div>
+
+						<Shimmer className="h-6 w-24 rounded-md" />
+					</div>
+
+					<div className="divide-y divide-gray-100 dark:divide-white/5">
+						{Array.from({ length: groupIndex === 0 ? 3 : 2 }, (_, rowIndex) => (
+							<div
+								key={rowIndex}
+								className="flex min-h-16 items-center gap-3 px-5 py-3"
+							>
+								<Shimmer className="size-9 shrink-0 rounded-xl" />
+
+								<div className="min-w-0 flex-1 space-y-2">
+									<Shimmer
+										className={`h-4 rounded-md ${
+											rowIndex % 2 === 0 ? "w-36" : "w-28"
+										}`}
+									/>
+									<Shimmer className="h-3 w-24 rounded-md" />
+								</div>
+
+								<Shimmer className="h-5 w-24 rounded-md" />
+							</div>
+						))}
+					</div>
+				</div>
+			))}
+		</div>
+	);
+}
+
+function SummarySidebarSkeleton() {
+	return (
+		<div
+			role="status"
+			aria-label="Loading account summary"
+			aria-live="polite"
+			className="space-y-4 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-[#1c1c1c]"
+		>
+			<span className="sr-only">Loading account summary…</span>
+
+			<div aria-hidden="true" className="space-y-5">
+				<Shimmer className="h-6 w-32 rounded-md" />
+
+				{Array.from({ length: 3 }, (_, index) => (
+					<div
+						key={index}
+						className="rounded-xl border border-gray-100 p-4 dark:border-white/5"
+					>
+						<Shimmer className="h-3 w-24 rounded-md" />
+						<Shimmer className="mt-3 h-7 w-32 rounded-lg" />
+					</div>
+				))}
+			</div>
+		</div>
+	);
+}
+
 export default function AccountsPage() {
+	const isClient = useSyncExternalStore(
+		subscribeToClient,
+		getClientSnapshot,
+		getServerSnapshot,
+	);
+
 	const transactions = useBudgetStore((state) => state.transactions);
 
 	const groupedAccounts = useMemo(() => {
-		// Map to store unique accounts: AccountName -> Summary
-		const accountMap = new Map();
+		const accountMap = new Map<string, Account>();
 
-		transactions.forEach((t) => {
-			// Initialize account if it doesn't exist
-			if (!accountMap.has(t.account)) {
-				accountMap.set(t.account, {
-					id: t.account,
-					name: t.account,
+		transactions.forEach((transaction) => {
+			if (!accountMap.has(transaction.account)) {
+				accountMap.set(transaction.account, {
+					id: transaction.account,
+					name: transaction.account,
 					balance: 0,
-					lastUpdated: t.date, // Uses the most recent transaction date
+					lastUpdated: transaction.date,
 				});
 			}
 
-			// Aggregate the balance
-			const acc = accountMap.get(t.account);
-			acc.balance += t.amount;
+			const account = accountMap.get(transaction.account);
 
-			// Keep the latest date
-			if (new Date(t.date) > new Date(acc.lastUpdated)) {
-				acc.lastUpdated = t.date;
+			if (!account) {
+				return;
+			}
+
+			account.balance += transaction.amount;
+
+			if (new Date(transaction.date) > new Date(account.lastUpdated)) {
+				account.lastUpdated = transaction.date;
 			}
 		});
 
-		// Structure for AccountGroup (assuming one group "All Accounts")
+		const accounts = Array.from(accountMap.values());
+
 		return [
 			{
 				title: "All Accounts",
-				total: Array.from(accountMap.values()).reduce(
-					(sum, acc) => sum + acc.balance,
-					0,
-				),
-				change: 0, // Calculate this if you have historical data
-				accounts: Array.from(accountMap.values()),
+				total: accounts.reduce((sum, account) => sum + account.balance, 0),
+				change: 0,
+				accounts,
 			},
 		];
 	}, [transactions]);
 
 	return (
-		// Added min-h-screen and explicit background colors (bg-gray-50 and dark:bg-[#121212])
-		<div className="min-h-screen p-4 md:p-8 w-full bg-gray-50 dark:bg-[#121212] text-gray-900 dark:text-[#e0e0e0] transition-colors">
-			<div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
+		<div className="min-h-screen w-full bg-gray-50 p-4 text-gray-900 transition-colors md:p-8 dark:bg-[#121212] dark:text-[#e0e0e0]">
+			<div className="mb-8 flex flex-col justify-between gap-4 md:flex-row md:items-center">
 				<h1 className="text-2xl font-bold">Accounts</h1>
+
 				<div className="flex flex-wrap items-center gap-2">
-					<button className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-[#2a2a2a] hover:bg-gray-100 dark:hover:bg-[#333] text-gray-700 dark:text-gray-200 rounded-lg text-sm transition-colors border border-gray-200 dark:border-[#3a3a3a]">
-						<SlidersHorizontal size={16} />{" "}
+					<button
+						type="button"
+						className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 transition-colors hover:bg-gray-100 dark:border-[#3a3a3a] dark:bg-[#2a2a2a] dark:text-gray-200 dark:hover:bg-[#333]"
+					>
+						<SlidersHorizontal size={16} />
 						<span className="hidden sm:inline">Filters</span>
 					</button>
 
-					<button className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-[#2a2a2a] hover:bg-gray-100 dark:hover:bg-[#333] text-gray-700 dark:text-gray-200 rounded-lg text-sm transition-colors border border-gray-200 dark:border-[#3a3a3a]">
-						<RefreshCw size={16} />{" "}
+					<button
+						type="button"
+						className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 transition-colors hover:bg-gray-100 dark:border-[#3a3a3a] dark:bg-[#2a2a2a] dark:text-gray-200 dark:hover:bg-[#333]"
+					>
+						<RefreshCw size={16} />
 						<span className="hidden sm:inline">Refresh all</span>
 					</button>
 
-					<button className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-orange-600 hover:bg-orange-700 rounded-lg text-sm transition-colors text-white font-medium">
-						<Plus size={16} /> Add account
+					<button
+						type="button"
+						className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-orange-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-orange-700 sm:flex-none"
+					>
+						<Plus size={16} />
+						Add account
 					</button>
 				</div>
 			</div>
 
-			<AccountsChart />
+			<AccountsChart isLoading={!isClient} />
 
-			<div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8 mt-8">
-				<div className="lg:col-span-2 space-y-6">
-					{groupedAccounts.length > 0 ? (
+			<div className="mt-8 grid grid-cols-1 gap-6 md:gap-8 lg:grid-cols-3">
+				<div className="space-y-6 lg:col-span-2">
+					{!isClient ? (
+						<AccountGroupsSkeleton />
+					) : groupedAccounts[0]?.accounts.length ? (
 						groupedAccounts.map((group: GroupedAccountData) => (
 							<AccountGroup key={group.title} {...group} />
 						))
@@ -100,9 +210,8 @@ export default function AccountsPage() {
 					)}
 				</div>
 
-				{/* Note: Make sure SummarySidebar also has light mode classes! */}
 				<div className="lg:block">
-					<SummarySidebar />
+					{isClient ? <SummarySidebar /> : <SummarySidebarSkeleton />}
 				</div>
 			</div>
 		</div>

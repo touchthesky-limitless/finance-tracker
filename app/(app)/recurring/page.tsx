@@ -14,11 +14,94 @@ import {
 import { useBudgetStore } from "@/store/useBudgetStore";
 import { RecurringGrid } from "@/components/RecurringGrid";
 import { RecurringCalendar } from "@/components/RecurringCalendar";
+import { Shimmer } from "@/components/ui/Shimmer";
+
+function RecurringPageSkeleton() {
+	return (
+		<div
+			role="status"
+			aria-label="Loading recurring bills"
+			aria-live="polite"
+			className="mx-auto min-h-screen max-w-7xl space-y-8 p-4 text-gray-900 md:space-y-10 md:p-8 dark:text-white"
+		>
+			<span className="sr-only">Loading recurring bills…</span>
+
+			<div
+				aria-hidden="true"
+				className="flex flex-col justify-between gap-4 lg:flex-row lg:items-end lg:gap-6"
+			>
+				<div className="space-y-3">
+					<Shimmer className="h-9 w-72 max-w-[80vw] rounded-lg" />
+					<Shimmer className="h-10 w-24 rounded-xl" />
+				</div>
+
+				<Shimmer className="h-10 w-48 rounded-2xl" />
+			</div>
+
+			<div
+				aria-hidden="true"
+				className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"
+			>
+				{Array.from({ length: 6 }, (_, index) => (
+					<div
+						key={index}
+						className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-[#111]"
+					>
+						<div className="flex items-start justify-between gap-3">
+							<div className="flex min-w-0 items-center gap-3">
+								<Shimmer className="size-10 shrink-0 rounded-xl" />
+								<div className="min-w-0 space-y-2">
+									<Shimmer
+										className={`h-4 rounded-md ${
+											index % 2 === 0 ? "w-32" : "w-24"
+										}`}
+									/>
+									<Shimmer className="h-3 w-20 rounded-md" />
+								</div>
+							</div>
+
+							<Shimmer className="h-5 w-20 rounded-md" />
+						</div>
+
+						<Shimmer className="mt-6 h-3 w-full rounded-md" />
+						<Shimmer className="mt-3 h-3 w-3/4 rounded-md" />
+						<Shimmer className="mt-6 h-9 w-full rounded-xl" />
+					</div>
+				))}
+			</div>
+
+			<div aria-hidden="true" className="space-y-4">
+				<div className="flex items-center gap-2">
+					<Shimmer className="size-2 rounded-full" />
+					<Shimmer className="h-3 w-56 rounded-md" />
+				</div>
+
+				<div className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-3">
+					{Array.from({ length: 3 }, (_, index) => (
+						<div
+							key={index}
+							className="flex items-center gap-3 rounded-2xl border border-orange-500/10 p-4"
+						>
+							<Shimmer className="size-9 shrink-0 rounded-xl" />
+							<div className="min-w-0 flex-1 space-y-2">
+								<Shimmer className="h-4 w-32 rounded-md" />
+								<Shimmer className="h-3 w-24 rounded-md" />
+							</div>
+							<Shimmer className="h-5 w-20 rounded-md" />
+							<Shimmer className="h-8 w-20 rounded-lg" />
+						</div>
+					))}
+				</div>
+			</div>
+		</div>
+	);
+}
 
 export default function RecurringPage() {
 	const { predictedBills, potentialSubscriptions } = useBudgetData("all");
 	const { allUnifiedCategories } = useUnifiedCategories("Expense", "All");
 	const confirmRecurring = useBudgetStore((state) => state.confirmRecurring);
+	const hasHydrated = useBudgetStore((state) => state.hasHydrated);
 
 	const [view, setView] = useState<"grid" | "calendar">("grid");
 	const [viewDate, setViewDate] = useState(new Date());
@@ -46,6 +129,10 @@ export default function RecurringPage() {
 
 	const monthName = viewDate.toLocaleString("default", { month: "long" });
 	const year = viewDate.getFullYear();
+
+	if (!hasHydrated) {
+		return <RecurringPageSkeleton />;
+	}
 
 	// Potential Subscriptions Logic
 	const potentialSubElements = [];

@@ -22,6 +22,73 @@ import { DragDropProvider } from "@dnd-kit/react";
 import { useSortable } from "@dnd-kit/react/sortable";
 import { move } from "@dnd-kit/helpers";
 import ViewToggle from "@/components/ViewToggle";
+import { Shimmer } from "@/components/ui/Shimmer";
+
+function WalletPageSkeleton() {
+	return (
+		<div
+			role="status"
+			aria-label="Loading wallet rewards"
+			aria-live="polite"
+			className="relative isolate min-h-screen w-full max-w-none space-y-5 bg-white px-3 py-4 text-gray-900 sm:space-y-6 sm:px-4 sm:py-6 md:space-y-8 md:px-5 lg:space-y-10 lg:px-6 xl:px-7 2xl:px-8 dark:bg-[#050505] dark:text-white"
+		>
+			<span className="sr-only">Loading wallet rewards…</span>
+
+			<div
+				aria-hidden="true"
+				className="flex flex-col justify-between gap-4 lg:flex-row lg:items-end"
+			>
+				<div className="space-y-3">
+					<Shimmer className="h-8 w-52 rounded-lg sm:w-64" />
+					<Shimmer className="h-4 w-72 max-w-[80vw] rounded-md" />
+				</div>
+
+				<div className="flex items-center gap-3">
+					<Shimmer className="h-10 w-32 rounded-xl" />
+					<Shimmer className="h-10 w-28 rounded-xl" />
+				</div>
+			</div>
+
+			<div aria-hidden="true" className="flex justify-end">
+				<Shimmer className="h-10 w-24 rounded-xl" />
+			</div>
+
+			<div
+				aria-hidden="true"
+				className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,19rem),1fr))] gap-4 sm:gap-5 lg:gap-6"
+			>
+				{Array.from({ length: 8 }, (_, index) => (
+					<div
+						key={index}
+						className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-white/10 dark:bg-[#111]"
+					>
+						<Shimmer className="aspect-[1.58/1] w-full rounded-none" />
+
+						<div className="space-y-4 p-4">
+							<div className="flex items-center justify-between gap-3">
+								<div className="flex min-w-0 items-center gap-3">
+									<Shimmer className="size-9 shrink-0 rounded-xl" />
+									<div className="min-w-0 space-y-2">
+										<Shimmer
+											className={`h-4 rounded-md ${
+												index % 2 === 0 ? "w-32" : "w-24"
+											}`}
+										/>
+										<Shimmer className="h-3 w-20 rounded-md" />
+									</div>
+								</div>
+
+								<Shimmer className="h-6 w-12 rounded-md" />
+							</div>
+
+							<Shimmer className="h-9 w-full rounded-xl" />
+						</div>
+					</div>
+				))}
+			</div>
+		</div>
+	);
+}
 
 export default function WalletRewardsPage() {
 	const {
@@ -44,16 +111,38 @@ export default function WalletRewardsPage() {
 		reorderActiveCategories,
 	} = useBudgetStore();
 
+	const [isInitialLoading, setIsInitialLoading] = useState(true);
+
 	useEffect(() => {
-		fetchGlobalCards();
-		fetchCustomCategories();
-		fetchPreferredCards();
-		fetchActiveCategories();
+		let active = true;
+
+		const loadWalletData = async (): Promise<void> => {
+			try {
+				await Promise.all([
+					fetchGlobalCards(),
+					fetchCustomCategories(),
+					fetchPreferredCards(),
+					fetchActiveCategories(),
+				]);
+			} catch (error) {
+				console.error("Failed to load wallet data:", error);
+			} finally {
+				if (active) {
+					setIsInitialLoading(false);
+				}
+			}
+		};
+
+		void loadWalletData();
+
+		return () => {
+			active = false;
+		};
 	}, [
-		fetchGlobalCards,
-		fetchCustomCategories,
-		fetchPreferredCards,
 		fetchActiveCategories,
+		fetchCustomCategories,
+		fetchGlobalCards,
+		fetchPreferredCards,
 	]);
 
 	// UI State
@@ -260,14 +349,6 @@ export default function WalletRewardsPage() {
 	};
 
 	useEffect(() => {
-		// Only fetch if we don't have categories yet
-		if (activeCategoryIds.length === 0) {
-			fetchActiveCategories();
-		}
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, []); // Empty array ensures this only runs once on mount
-
-	useEffect(() => {
 		const handleKeyDown = (e: KeyboardEvent) => {
 			if ((e.metaKey || e.ctrlKey) && e.key === "k") {
 				e.preventDefault();
@@ -278,8 +359,9 @@ export default function WalletRewardsPage() {
 		return () => window.removeEventListener("keydown", handleKeyDown);
 	}, [openSearch]);
 
-	if (!hasHydrated)
-		return <div className="min-h-screen bg-white dark:bg-[#050505]" />;
+	if (!hasHydrated || isInitialLoading) {
+		return <WalletPageSkeleton />;
+	}
 
 	return (
 		<div className="relative isolate min-h-screen w-full max-w-none space-y-5 bg-white px-3 py-4 text-gray-900 transition-colors duration-300 dark:bg-[#050505] dark:text-white sm:space-y-6 sm:px-4 sm:py-6 md:space-y-8 md:px-5 lg:space-y-10 lg:px-6 xl:px-7 2xl:px-8">

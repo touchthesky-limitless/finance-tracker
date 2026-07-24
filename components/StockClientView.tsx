@@ -1,23 +1,111 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { Search, ArrowUpDown } from "lucide-react";
 import FinancialCard from "@/components/FinancialCard";
 import MarketStatus from "@/components/MarketStatus";
 import { StockData } from "@/lib/types";
 import { MarketInfo } from "@/app/(app)/stocks/page";
 import ViewToggle from "@/components/ViewToggle";
+import { Shimmer } from "@/components/ui/Shimmer";
 
 interface StockClientViewProps {
 	stocks: (StockData | null)[];
 	marketInfo: MarketInfo;
+	isLoading?: boolean;
+}
+
+function subscribeToClient(): () => void {
+	return () => {};
+}
+
+function getClientSnapshot(): boolean {
+	return true;
+}
+
+function getServerSnapshot(): boolean {
+	return false;
+}
+
+function StocksPageSkeleton() {
+	return (
+		<div
+			role="status"
+			aria-label="Loading market pulse"
+			aria-live="polite"
+			className="mx-auto max-w-7xl px-4 py-8"
+		>
+			<span className="sr-only">Loading market pulse…</span>
+
+			<header
+				aria-hidden="true"
+				className="mb-8 flex items-end justify-between gap-4"
+			>
+				<div className="space-y-3">
+					<Shimmer className="h-9 w-48 rounded-lg" />
+					<Shimmer className="h-4 w-72 max-w-[70vw] rounded-md" />
+					<Shimmer className="h-6 w-40 rounded-lg" />
+				</div>
+
+				<Shimmer className="h-10 w-24 rounded-xl" />
+			</header>
+
+			<div
+				aria-hidden="true"
+				className="mb-6 flex items-center justify-between gap-2 md:gap-4"
+			>
+				<Shimmer className="h-10 min-w-0 flex-1 rounded-xl md:max-w-xs" />
+				<Shimmer className="h-10 w-40 shrink-0 rounded-xl" />
+			</div>
+
+			<div
+				aria-hidden="true"
+				className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-4"
+			>
+				{Array.from({ length: 8 }, (_, index) => (
+					<div
+						key={index}
+						className="min-h-48 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-[#111]"
+					>
+						<div className="flex items-start justify-between gap-3">
+							<div className="space-y-2">
+								<Shimmer className="h-5 w-16 rounded-md" />
+								<Shimmer
+									className={`h-3 rounded-md ${
+										index % 2 === 0 ? "w-28" : "w-20"
+									}`}
+								/>
+							</div>
+							<Shimmer className="size-9 rounded-xl" />
+						</div>
+
+						<Shimmer className="mt-8 h-8 w-28 rounded-lg" />
+						<Shimmer className="mt-3 h-4 w-20 rounded-md" />
+						<Shimmer className="mt-6 h-10 w-full rounded-xl" />
+					</div>
+				))}
+			</div>
+		</div>
+	);
 }
 
 export default function StockClientView({
 	stocks,
 	marketInfo,
+	isLoading = false,
 }: StockClientViewProps) {
-	const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+	const isClient = useSyncExternalStore(
+		subscribeToClient,
+		getClientSnapshot,
+		getServerSnapshot,
+	);
+	const [viewMode, setViewMode] = useState<"grid" | "list">(() => {
+		if (typeof window === "undefined") {
+			return "grid";
+		}
+
+		return window.matchMedia("(max-width: 767px)").matches ? "list" : "grid";
+	});
 
 	// Search and Sort State
 	const [searchQuery, setSearchQuery] = useState("");
@@ -76,8 +164,9 @@ export default function StockClientView({
 		setSortOrder((prev) => (prev === "asc" ? "desc" : "asc"));
 	};
 
-	// Prevent rendering until the view is determined to avoid layout shift
-	if (viewMode === null) return null;
+	if (isLoading || !isClient) {
+		return <StocksPageSkeleton />;
+	}
 
 	return (
 		<div className="max-w-7xl mx-auto px-4 py-8">

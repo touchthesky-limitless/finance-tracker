@@ -20,6 +20,7 @@ import {
 
 import { CategoryIcon } from "@/components/CategoryIcon";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { Shimmer } from "@/components/ui/Shimmer";
 import { SettingsContentCard } from "@/components/Settings/SettingsShell";
 import {
 	CATEGORY_HIERARCHY,
@@ -119,7 +120,6 @@ export default function SettingsRulesPage() {
 		let active = true;
 
 		const load = async () => {
-			setIsLoading(true);
 			await Promise.all([
 				fetchTransactions(),
 				fetchAccounts(),
@@ -352,10 +352,7 @@ export default function SettingsRulesPage() {
 
 				<div className="mt-4 min-w-0 space-y-4">
 					{isLoading ? (
-						<div className="flex min-h-40 items-center justify-center gap-2 text-sm text-[#777671]">
-							<Loader2 size={17} className="animate-spin" />
-							Loading rules…
-						</div>
+						<RulesPageSkeleton />
 					) : filteredRules.length === 0 ? (
 						<div className="rounded-2xl border border-dashed border-gray-300 px-4 py-10 text-center sm:px-6 sm:py-14 dark:border-white/15">
 							<p className="font-semibold">
@@ -467,6 +464,64 @@ export default function SettingsRulesPage() {
 				/>
 			)}
 		</SettingsContentCard>
+	);
+}
+
+
+function RulesPageSkeleton() {
+	return (
+		<div
+			role="status"
+			aria-label="Loading rules"
+			aria-live="polite"
+			className="space-y-4"
+		>
+			<span className="sr-only">Loading rules…</span>
+
+			{Array.from({ length: 2 }, (_, cardIndex) => (
+				<div
+					key={cardIndex}
+					aria-hidden="true"
+					className="grid min-h-[260px] min-w-0 grid-cols-[minmax(0,1fr)_44px_minmax(0,1fr)] overflow-hidden rounded-2xl border border-gray-200 bg-white sm:min-h-[320px] sm:grid-cols-[minmax(0,1fr)_64px_minmax(0,1fr)] xl:min-h-[230px] xl:grid-cols-[minmax(0,1fr)_42px_minmax(0,1fr)] dark:border-white/10 dark:bg-[#222220]"
+				>
+					<div className="min-w-0 p-3 sm:p-6 xl:p-7">
+						<div className="flex items-center gap-2 sm:gap-3">
+							<Shimmer className="size-8 shrink-0 rounded-lg" />
+							<Shimmer className="h-6 w-10 rounded-md sm:w-14" />
+						</div>
+
+						<div className="mt-4 space-y-4">
+							<RuleSkeletonLine widthClass="w-full" />
+							<RuleSkeletonLine widthClass="w-4/5" />
+							<RuleSkeletonLine widthClass="w-3/5" />
+						</div>
+					</div>
+
+					<div className="flex min-h-full items-center justify-center border-x border-gray-200 bg-[#fafaf8] dark:border-white/10 dark:bg-black/15">
+						<Shimmer className="size-6 rounded-full" />
+					</div>
+
+					<div className="min-w-0 p-3 sm:p-6 xl:p-7">
+						<Shimmer className="h-6 w-16 rounded-md sm:w-20" />
+
+						<div className="mt-4 space-y-4">
+							<RuleSkeletonLine widthClass="w-full" />
+							<RuleSkeletonLine widthClass="w-3/4" />
+							<RuleSkeletonLine widthClass="w-5/6" />
+						</div>
+					</div>
+				</div>
+			))}
+		</div>
+	);
+}
+
+function RuleSkeletonLine({ widthClass }: { widthClass: string }) {
+	return (
+		<div className="space-y-2">
+			<Shimmer className={`h-4 max-w-full rounded-md ${widthClass}`} />
+			<Shimmer className="h-3 w-1/2 rounded-md" />
+		</div>
 	);
 }
 

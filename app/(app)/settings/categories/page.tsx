@@ -39,6 +39,7 @@ import {
 	type GroupPreference,
 	getCategoryGroupPreferenceKey,
 } from "@/lib/categories/categoryPreferences";
+import { Shimmer } from "@/components/ui/Shimmer";
 
 type EditorMode =
 	| "create-group"
@@ -190,6 +191,7 @@ export default function SettingsCategoriesPage() {
 	const [excludeFromBudget, setExcludeFromBudget] = useState(false);
 	const [budgetMode, setBudgetMode] = useState<GroupBudgetMode>("category");
 	const [isSaving, setIsSaving] = useState(false);
+	const [isInitialLoading, setIsInitialLoading] = useState(true);
 	const [errorMessage, setErrorMessage] = useState<string | null>(null);
 	const [isReordering, setIsReordering] = useState(false);
 	const [confirmation, setConfirmation] = useState<ConfirmationState | null>(
@@ -197,7 +199,25 @@ export default function SettingsCategoriesPage() {
 	);
 
 	useEffect(() => {
-		void fetchCustomCategories();
+		let active = true;
+
+		const loadCategories = async (): Promise<void> => {
+			try {
+				await fetchCustomCategories();
+			} catch (error) {
+				console.error("Failed to load categories:", error);
+			} finally {
+				if (active) {
+					setIsInitialLoading(false);
+				}
+			}
+		};
+
+		void loadCategories();
+
+		return () => {
+			active = false;
+		};
 	}, [fetchCustomCategories]);
 
 	const groups = useMemo<CategoryGroup[]>(() => {
@@ -921,183 +941,187 @@ export default function SettingsCategoriesPage() {
 					</p>
 				</div>
 
-				<DragDropProvider
-					onDragStart={(event) => {
-						const source = event.operation.source;
+				{isInitialLoading ? (
+					<CategoriesPageSkeleton />
+				) : (
+					<DragDropProvider
+						onDragStart={(event) => {
+							const source = event.operation.source;
 
-						if (source?.type !== "group" && source?.type !== "category") {
-							return;
-						}
+							if (source?.type !== "group" && source?.type !== "category") {
+								return;
+							}
 
-						activeDragTypeRef.current = source.type;
-						groupSnapshotRef.current = groupOrderRef.current;
-						categorySnapshotRef.current = categoryOrderRef.current;
-						setErrorMessage(null);
-					}}
-					onDragEnd={(event) => {
-						const source = event.operation.source;
-						const dragType = activeDragTypeRef.current;
-						activeDragTypeRef.current = null;
+							activeDragTypeRef.current = source.type;
+							groupSnapshotRef.current = groupOrderRef.current;
+							categorySnapshotRef.current = categoryOrderRef.current;
+							setErrorMessage(null);
+						}}
+						onDragEnd={(event) => {
+							const source = event.operation.source;
+							const dragType = activeDragTypeRef.current;
+							activeDragTypeRef.current = null;
 
-						if (!source || !dragType) {
-							return;
-						}
+							if (!source || !dragType) {
+								return;
+							}
 
-						const initialGroup = getSortableGroup(source);
-						const currentGroup = getCurrentSortableGroup(source);
+							const initialGroup = getSortableGroup(source);
+							const currentGroup = getCurrentSortableGroup(source);
 
-						if (!initialGroup) {
-							return;
-						}
+							if (!initialGroup) {
+								return;
+							}
 
-						const restoreSnapshots = (): void => {
-							groupOrderRef.current = groupSnapshotRef.current;
-							categoryOrderRef.current = categorySnapshotRef.current;
-							setGroupOrder(groupSnapshotRef.current);
-							setCategoryOrder(categorySnapshotRef.current);
-						};
-
-						if (
-							event.canceled ||
-							(currentGroup !== null && initialGroup !== currentGroup)
-						) {
-							restoreSnapshots();
-							return;
-						}
-
-						if (dragType === "group") {
-							const sectionId = initialGroup;
+							const restoreSnapshots = (): void => {
+								groupOrderRef.current = groupSnapshotRef.current;
+								categoryOrderRef.current = categorySnapshotRef.current;
+								setGroupOrder(groupSnapshotRef.current);
+								setCategoryOrder(categorySnapshotRef.current);
+							};
 
 							if (
-								typeof sectionId !== "string" ||
-								!CATEGORY_SECTIONS.some((section) => section.id === sectionId)
+								event.canceled ||
+								(currentGroup !== null && initialGroup !== currentGroup)
 							) {
 								restoreSnapshots();
 								return;
 							}
 
-							const typedSectionId = sectionId as CategorySectionId;
-							const currentIds = groupOrderRef.current[typedSectionId];
+							if (dragType === "group") {
+								const sectionId = initialGroup;
+
+								if (
+									typeof sectionId !== "string" ||
+									!CATEGORY_SECTIONS.some((section) => section.id === sectionId)
+								) {
+									restoreSnapshots();
+									return;
+								}
+
+								const typedSectionId = sectionId as CategorySectionId;
+								const currentIds = groupOrderRef.current[typedSectionId];
+								const nextIds = move(currentIds, event);
+
+								if (arraysEqual(currentIds, nextIds)) {
+									return;
+								}
+
+								const nextGroupOrder = {
+									...groupOrderRef.current,
+									[typedSectionId]: nextIds,
+								};
+								groupOrderRef.current = nextGroupOrder;
+								setGroupOrder(nextGroupOrder);
+								setIsReordering(true);
+
+								void saveGroupOrder(
+									typedSectionId,
+									nextIds.map(getGroupKeyFromDragId),
+								)
+									.catch((error: unknown) => {
+										restoreSnapshots();
+										reportPreferenceError(error);
+									})
+									.finally(() => setIsReordering(false));
+								return;
+							}
+
+							const groupKey = initialGroup;
+
+							if (typeof groupKey !== "string") {
+								restoreSnapshots();
+								return;
+							}
+
+							const currentIds = categoryOrderRef.current[groupKey] ?? [];
 							const nextIds = move(currentIds, event);
 
 							if (arraysEqual(currentIds, nextIds)) {
 								return;
 							}
 
-							const nextGroupOrder = {
-								...groupOrderRef.current,
-								[typedSectionId]: nextIds,
+							const previousOrder = categorySnapshotRef.current;
+							const nextOrder = {
+								...categoryOrderRef.current,
+								[groupKey]: nextIds,
 							};
-							groupOrderRef.current = nextGroupOrder;
-							setGroupOrder(nextGroupOrder);
+							categoryOrderRef.current = nextOrder;
+							setCategoryOrder(nextOrder);
 							setIsReordering(true);
 
-							void saveGroupOrder(
-								typedSectionId,
-								nextIds.map(getGroupKeyFromDragId),
-							)
+							void persistCategoryOrder(nextOrder, [groupKey])
 								.catch((error: unknown) => {
-									restoreSnapshots();
+									categoryOrderRef.current = previousOrder;
+									setCategoryOrder(previousOrder);
 									reportPreferenceError(error);
 								})
 								.finally(() => setIsReordering(false));
-							return;
-						}
+						}}
+					>
+						<div className="space-y-9">
+							{CATEGORY_SECTIONS.map((section) => {
+								const sectionGroups = displayGroupsBySection[section.id];
 
-						const groupKey = initialGroup;
+								return (
+									<section key={section.id}>
+										<div className="mb-4 flex min-w-0 flex-wrap items-center justify-between gap-3">
+											<h2 className="text-xl font-semibold tracking-[-0.01em]">
+												{section.title}
+											</h2>
 
-						if (typeof groupKey !== "string") {
-							restoreSnapshots();
-							return;
-						}
-
-						const currentIds = categoryOrderRef.current[groupKey] ?? [];
-						const nextIds = move(currentIds, event);
-
-						if (arraysEqual(currentIds, nextIds)) {
-							return;
-						}
-
-						const previousOrder = categorySnapshotRef.current;
-						const nextOrder = {
-							...categoryOrderRef.current,
-							[groupKey]: nextIds,
-						};
-						categoryOrderRef.current = nextOrder;
-						setCategoryOrder(nextOrder);
-						setIsReordering(true);
-
-						void persistCategoryOrder(nextOrder, [groupKey])
-							.catch((error: unknown) => {
-								categoryOrderRef.current = previousOrder;
-								setCategoryOrder(previousOrder);
-								reportPreferenceError(error);
-							})
-							.finally(() => setIsReordering(false));
-					}}
-				>
-					<div className="space-y-9">
-						{CATEGORY_SECTIONS.map((section) => {
-							const sectionGroups = displayGroupsBySection[section.id];
-
-							return (
-								<section key={section.id}>
-									<div className="mb-4 flex min-w-0 flex-wrap items-center justify-between gap-3">
-										<h2 className="text-xl font-semibold tracking-[-0.01em]">
-											{section.title}
-										</h2>
-
-										<button
-											type="button"
-											onClick={() => {
-												openEditor({
-													mode: "create-group",
-													sectionId: section.id,
-												});
-											}}
-											className="text-sm font-semibold text-cyan-600 transition hover:text-cyan-700 dark:text-cyan-400 dark:hover:text-cyan-300"
-										>
-											Create group
-										</button>
-									</div>
-
-									<div className="space-y-4">
-										{sectionGroups.map((group, index) => (
-											<SortableCategoryGroup
-												key={group.key}
-												group={group}
-												index={index}
-												dragDisabled={isReordering}
-												categoryPreferences={categoryPreferences}
-												onEditGroup={() => {
-													openEditor({ mode: "edit-group", group });
-												}}
-												onCreateCategory={() => {
+											<button
+												type="button"
+												onClick={() => {
 													openEditor({
-														mode: "create-category",
-														parentName: group.name,
+														mode: "create-group",
+														sectionId: section.id,
 													});
 												}}
-												onEditCategory={(category) => {
-													openEditor({
-														mode: "edit-category",
-														category,
-													});
-												}}
-											/>
-										))}
+												className="text-sm font-semibold text-cyan-600 transition hover:text-cyan-700 dark:text-cyan-400 dark:hover:text-cyan-300"
+											>
+												Create group
+											</button>
+										</div>
 
-										{sectionGroups.length === 0 && (
-											<div className="rounded-2xl border border-dashed border-black/10 px-5 py-8 text-center text-sm text-[#777671] dark:border-white/10 dark:text-[#aaa9a4]">
-												No groups in {section.title.toLowerCase()} yet.
-											</div>
-										)}
-									</div>
-								</section>
-							);
-						})}
-					</div>
-				</DragDropProvider>
+										<div className="space-y-4">
+											{sectionGroups.map((group, index) => (
+												<SortableCategoryGroup
+													key={group.key}
+													group={group}
+													index={index}
+													dragDisabled={isReordering}
+													categoryPreferences={categoryPreferences}
+													onEditGroup={() => {
+														openEditor({ mode: "edit-group", group });
+													}}
+													onCreateCategory={() => {
+														openEditor({
+															mode: "create-category",
+															parentName: group.name,
+														});
+													}}
+													onEditCategory={(category) => {
+														openEditor({
+															mode: "edit-category",
+															category,
+														});
+													}}
+												/>
+											))}
+
+											{sectionGroups.length === 0 && (
+												<div className="rounded-2xl border border-dashed border-black/10 px-5 py-8 text-center text-sm text-[#777671] dark:border-white/10 dark:text-[#aaa9a4]">
+													No groups in {section.title.toLowerCase()} yet.
+												</div>
+											)}
+										</div>
+									</section>
+								);
+							})}
+						</div>
+					</DragDropProvider>
+				)}
 			</div>
 
 			{editor &&
@@ -1189,6 +1213,86 @@ export default function SettingsCategoriesPage() {
 				/>
 			)}
 		</SettingsContentCard>
+	);
+}
+
+const CATEGORY_SKELETON_GROUPS: Record<CategorySectionId, readonly number[]> = {
+	income: [3],
+	expenses: [4, 3],
+	transfers: [2],
+};
+
+function CategoriesPageSkeleton() {
+	return (
+		<div
+			role="status"
+			aria-label="Loading categories"
+			aria-live="polite"
+			className="space-y-9"
+		>
+			<span className="sr-only">Loading categories…</span>
+
+			{CATEGORY_SECTIONS.map((section) => (
+				<section key={section.id} aria-hidden="true">
+					<div className="mb-4 flex items-center justify-between gap-3">
+						<Shimmer className="h-7 w-24 rounded-lg sm:w-28" />
+						<Shimmer className="h-5 w-24 rounded-md" />
+					</div>
+
+					<div className="space-y-4">
+						{CATEGORY_SKELETON_GROUPS[section.id].map(
+							(rowCount, groupIndex) => (
+								<CategoryGroupSkeleton
+									key={`${section.id}-${groupIndex}`}
+									rowCount={rowCount}
+								/>
+							),
+						)}
+					</div>
+				</section>
+			))}
+		</div>
+	);
+}
+
+function CategoryGroupSkeleton({ rowCount }: { rowCount: number }) {
+	return (
+		<div
+			aria-hidden="true"
+			className="min-w-0 overflow-hidden rounded-2xl bg-[#f4f4f2] dark:bg-[#151513]"
+		>
+			<div className="flex min-h-13 items-center gap-2 border-b border-black/5 px-4 py-3 sm:gap-3 sm:px-5 dark:border-white/10">
+				<Shimmer className="size-8 shrink-0 rounded-lg" />
+				<Shimmer className="size-5 shrink-0 rounded-full" />
+				<Shimmer className="h-4 w-28 rounded-md sm:w-36" />
+				<Shimmer className="ml-auto h-5 w-10 rounded-md" />
+			</div>
+
+			<div className="space-y-2 p-3 sm:p-4">
+				{Array.from({ length: rowCount }, (_, rowIndex) => (
+					<div
+						key={rowIndex}
+						className="flex min-h-12 items-center gap-2 rounded-xl border border-black/[0.03] bg-white px-3 shadow-sm sm:gap-3 dark:border-white/[0.04] dark:bg-[#222220]"
+					>
+						<Shimmer className="size-7 shrink-0 rounded-md" />
+						<Shimmer className="size-5 shrink-0 rounded-full" />
+						<Shimmer
+							className={`h-4 rounded-md ${
+								rowIndex % 2 === 0 ? "w-32 sm:w-44" : "w-24 sm:w-36"
+							}`}
+						/>
+						{rowIndex === 0 && (
+							<Shimmer className="ml-auto hidden h-5 w-14 rounded-md sm:block" />
+						)}
+					</div>
+				))}
+
+				<div className="flex min-h-10 items-center gap-2 px-1">
+					<Shimmer className="size-4 rounded-md" />
+					<Shimmer className="h-4 w-28 rounded-md" />
+				</div>
+			</div>
+		</div>
 	);
 }
 
