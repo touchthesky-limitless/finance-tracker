@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { DragDropProvider } from "@dnd-kit/react";
+import { useEffect, useMemo, useState } from "react";
+import { DragDropProvider, PointerSensor } from "@dnd-kit/react";
 import { move } from "@dnd-kit/helpers";
 import { useSortable } from "@dnd-kit/react/sortable";
+import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import dynamic from "next/dynamic";
 import {
 	ArrowRight,
@@ -13,10 +14,12 @@ import {
 	Plus,
 	Search,
 	Tag,
+	Trash2,
 	X,
 } from "lucide-react";
 
 import { CategoryIcon } from "@/components/CategoryIcon";
+import { DeleteConfirmModal } from "@/components/DeleteConfirmModal";
 import { SettingsContentCard } from "@/components/Settings/SettingsShell";
 import {
 	CATEGORY_HIERARCHY,
@@ -29,6 +32,24 @@ import type {
 	TransactionRule,
 } from "@/lib/rules/ruleEngine";
 import { useBudgetStore } from "@/store/useBudgetStore";
+
+const RULE_POINTER_SENSOR = PointerSensor.configure({
+	preventActivation: (event, source) => {
+		if (!(event.target instanceof Element)) {
+			return false;
+		}
+
+		if (event.target.closest("[data-rule-drag-handle]")) {
+			return false;
+		}
+
+		const interactiveElement = event.target.closest(
+			'button, a, input, select, textarea, [contenteditable="true"]',
+		);
+
+		return interactiveElement !== null && interactiveElement !== source.element;
+	},
+});
 
 const RuleModal = dynamic(
 	() =>
@@ -78,6 +99,7 @@ export default function SettingsRulesPage() {
 	);
 	const saveRule = useBudgetStore((state) => state.saveRule);
 	const deleteRule = useBudgetStore((state) => state.deleteRule);
+	const deleteAllRules = useBudgetStore((state) => state.deleteAllRules);
 	const reorderRules = useBudgetStore((state) => state.reorderRules);
 	const setToast = useBudgetStore((state) => state.setToast);
 
@@ -87,11 +109,11 @@ export default function SettingsRulesPage() {
 	);
 	const [isCreating, setIsCreating] = useState(false);
 	const [isLoading, setIsLoading] = useState(true);
-	const [optimisticRuleIds, setOptimisticRuleIds] = useState<string[]>([]);
+	const [pendingRuleIds, setPendingRuleIds] = useState<string[] | null>(null);
 	const [isReordering, setIsReordering] = useState(false);
+	const [isDeletingAllRules, setIsDeletingAllRules] = useState(false);
+	const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
 	const [reorderError, setReorderError] = useState<string | null>(null);
-
-	const isDraggingRuleRef = useRef(false);
 
 	useEffect(() => {
 		let active = true;
@@ -148,28 +170,24 @@ export default function SettingsRulesPage() {
 		return result;
 	}, [customCategories]);
 
-	useEffect(() => {
-		if (isDraggingRuleRef.current) {
-			return;
+	const orderedRules = useMemo(() => {
+		if (!pendingRuleIds) {
+			return rules;
 		}
 
-		setOptimisticRuleIds(rules.map((rule) => rule.id));
-	}, [rules]);
-
-	const orderedRules = useMemo(() => {
 		const ruleById = new Map(rules.map((rule) => [rule.id, rule]));
-		const ordered = optimisticRuleIds
+		const ordered = pendingRuleIds
 			.map((id) => ruleById.get(id))
 			.filter((rule): rule is TransactionRule => Boolean(rule));
 
 		for (const rule of rules) {
-			if (!optimisticRuleIds.includes(rule.id)) {
+			if (!pendingRuleIds.includes(rule.id)) {
 				ordered.push(rule);
 			}
 		}
 
 		return ordered;
-	}, [optimisticRuleIds, rules]);
+	}, [pendingRuleIds, rules]);
 
 	const filteredRules = useMemo(() => {
 		const normalizedQuery = query.trim().toLowerCase();
@@ -185,24 +203,83 @@ export default function SettingsRulesPage() {
 
 	const modalOpen = isCreating || selectedRule !== null;
 	const dragDisabled =
-		Boolean(query.trim()) || isReordering || orderedRules.length < 2;
+		Boolean(query.trim()) ||
+		isReordering ||
+		isDeletingAllRules ||
+		orderedRules.length < 2;
 
 	const handleRuleEdit = (rule: TransactionRule): void => {
 		setIsCreating(false);
 		setSelectedRule(rule);
 	};
 
+	const handleDeleteAllRules = async (): Promise<void> => {
+		if (rules.length === 0 || isDeletingAllRules) {
+			return;
+		}
+
+		setReorderError(null);
+		setIsDeletingAllRules(true);
+
+		try {
+			await deleteAllRules();
+			setPendingRuleIds(null);
+			setQuery("");
+			setIsCreating(false);
+			setSelectedRule(null);
+			setIsDeleteConfirmOpen(false);
+		} catch (error: unknown) {
+			setReorderError(
+				error instanceof Error
+					? error.message
+					: "All rules could not be deleted.",
+			);
+		} finally {
+			setIsDeletingAllRules(false);
+		}
+	};
+
 	return (
 		<SettingsContentCard
 			title="Rules"
 			actions={
-				<button
-					type="button"
-					className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-black/10 bg-white px-4 text-sm font-semibold shadow-sm hover:bg-black/[0.03] sm:w-auto dark:border-white/10 dark:bg-[#222220] dark:hover:bg-white/5"
-				>
-					Options
-					<ChevronDown size={15} />
-				</button>
+				<DropdownMenu.Root modal={false}>
+					<DropdownMenu.Trigger asChild>
+						<button
+							type="button"
+							className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-black/10 bg-white px-4 text-sm font-semibold shadow-sm outline-none transition hover:bg-black/[0.03] focus-visible:ring-2 focus-visible:ring-cyan-500/30 sm:w-auto dark:border-white/10 dark:bg-[#222220] dark:hover:bg-white/5"
+						>
+							Options
+							<ChevronDown size={15} />
+						</button>
+					</DropdownMenu.Trigger>
+
+					<DropdownMenu.Portal>
+						<DropdownMenu.Content
+							align="end"
+							sideOffset={8}
+							collisionPadding={8}
+							className="z-[1000] min-w-52 rounded-2xl border border-black/10 bg-white p-1.5 shadow-2xl outline-none dark:border-white/10 dark:bg-[#222220]"
+						>
+							<DropdownMenu.Item
+								disabled={rules.length === 0 || isDeletingAllRules}
+								onSelect={() => {
+									setIsDeleteConfirmOpen(true);
+								}}
+								className="flex cursor-pointer select-none items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium text-red-600 outline-none transition data-[disabled]:cursor-not-allowed data-[disabled]:opacity-45 data-[highlighted]:bg-red-50 dark:text-red-400 dark:data-[highlighted]:bg-red-500/10"
+							>
+								{isDeletingAllRules ? (
+									<Loader2 size={16} className="animate-spin" />
+								) : (
+									<Trash2 size={16} />
+								)}
+								{isDeletingAllRules
+									? "Deleting all rules…"
+									: "Delete all rules"}
+							</DropdownMenu.Item>
+						</DropdownMenu.Content>
+					</DropdownMenu.Portal>
+				</DropdownMenu.Root>
 			}
 		>
 			<div className="min-w-0 p-4 sm:p-5 lg:p-6">
@@ -290,15 +367,16 @@ export default function SettingsRulesPage() {
 						</div>
 					) : (
 						<DragDropProvider
+							sensors={(defaults) => [
+								...defaults.filter((sensor) => sensor !== PointerSensor),
+								RULE_POINTER_SENSOR,
+							]}
 							onDragStart={() => {
-								isDraggingRuleRef.current = true;
 								setReorderError(null);
 							}}
 							onDragEnd={(event) => {
-								isDraggingRuleRef.current = false;
-
 								if (event.canceled) {
-									setOptimisticRuleIds(rules.map((rule) => rule.id));
+									setPendingRuleIds(null);
 									return;
 								}
 
@@ -309,12 +387,11 @@ export default function SettingsRulesPage() {
 									return;
 								}
 
-								setOptimisticRuleIds(nextIds);
+								setPendingRuleIds(nextIds);
 								setIsReordering(true);
 
 								void reorderRules(nextIds)
 									.catch((error: unknown) => {
-										setOptimisticRuleIds(currentIds);
 										setReorderError(
 											error instanceof Error
 												? error.message
@@ -322,6 +399,7 @@ export default function SettingsRulesPage() {
 										);
 									})
 									.finally(() => {
+										setPendingRuleIds(null);
 										setIsReordering(false);
 									});
 							}}
@@ -341,6 +419,23 @@ export default function SettingsRulesPage() {
 					)}
 				</div>
 			</div>
+
+			{isDeleteConfirmOpen && (
+				<DeleteConfirmModal
+					title={`Delete all ${rules.length} ${rules.length === 1 ? "rule" : "rules"}?`}
+					description="This permanently deletes every transaction rule. This action cannot be undone."
+					confirmLabel="Delete all rules"
+					isDeleting={isDeletingAllRules}
+					onCancel={() => {
+						if (!isDeletingAllRules) {
+							setIsDeleteConfirmOpen(false);
+						}
+					}}
+					onConfirm={() => {
+						void handleDeleteAllRules();
+					}}
+				/>
+			)}
 
 			{modalOpen && (
 				<RuleModal
@@ -389,22 +484,54 @@ function SortableRuleCard({
 	onEdit,
 }: SortableRuleCardProps) {
 	const [element, setElement] = useState<Element | null>(null);
-	const handleRef = useRef<HTMLButtonElement | null>(null);
 	const { isDragging, isDropTarget } = useSortable({
 		id: rule.id,
 		index,
 		element,
-		handle: handleRef,
 		type: "rule",
 		accept: "rule",
 		disabled: dragDisabled,
 	});
 
+	const gripButton = (
+		<button
+			type="button"
+			data-rule-drag-handle
+			disabled={dragDisabled}
+			onClick={(event) => event.stopPropagation()}
+			aria-label={`Move rule ${rule.name}`}
+			title={
+				dragDisabled
+					? "Clear search to reorder rules"
+					: "Drag anywhere on the card to reorder"
+			}
+			className="grid size-8 shrink-0 cursor-grab touch-none place-items-center rounded-lg text-[#9a9a95] outline-none transition hover:bg-black/[0.04] focus-visible:ring-2 focus-visible:ring-cyan-500/30 active:cursor-grabbing disabled:cursor-default disabled:opacity-60 dark:hover:bg-white/[0.06]"
+		>
+			<GripVertical size={17} />
+		</button>
+	);
+
 	return (
 		<div
 			ref={setElement}
+			role="button"
+			tabIndex={0}
+			onClick={onEdit}
+			onKeyDown={(event) => {
+				if (event.target !== event.currentTarget) {
+					return;
+				}
+
+				if (event.key === "Enter" || event.key === " ") {
+					event.preventDefault();
+					onEdit();
+				}
+			}}
+			aria-label={`Edit rule ${rule.name}`}
 			data-shadow={isDragging || undefined}
-			className={`grid w-full min-w-0 overflow-hidden rounded-2xl border bg-white text-left transition-[border-color,box-shadow] dark:bg-[#222220] xl:grid-cols-[minmax(0,1fr)_42px_minmax(0,1fr)] ${
+			className={`w-full min-w-0 touch-pan-y select-none overflow-hidden rounded-2xl border bg-white text-left outline-none transition-[border-color,box-shadow] focus-visible:ring-2 focus-visible:ring-cyan-500/30 dark:bg-[#222220] ${
+				dragDisabled ? "cursor-pointer" : "cursor-grab active:cursor-grabbing"
+			} ${
 				isDragging
 					? "relative z-20 border-cyan-500 shadow-[0_18px_48px_rgba(0,0,0,0.18)] ring-2 ring-cyan-500/15"
 					: isDropTarget
@@ -412,43 +539,208 @@ function SortableRuleCard({
 						: "border-gray-200 hover:border-gray-300 hover:shadow-sm dark:border-white/10 dark:hover:border-white/20"
 			}`}
 		>
-			<div className="flex min-w-0 gap-2.5 px-3 py-4 sm:gap-3 sm:px-5">
-				<button
-					ref={handleRef}
-					type="button"
-					disabled={dragDisabled}
-					aria-label={`Move rule ${rule.name}`}
-					title={
-						dragDisabled
-							? "Clear search to reorder rules"
-							: "Drag to reorder rule"
-					}
-					className="mt-0.5 grid size-8 shrink-0 cursor-grab touch-none place-items-center rounded-lg text-[#9a9a95] outline-none transition hover:bg-black/[0.04] focus-visible:ring-2 focus-visible:ring-cyan-500/30 active:cursor-grabbing disabled:cursor-default disabled:opacity-60 dark:hover:bg-white/[0.06]"
-				>
-					<GripVertical size={17} />
-				</button>
+			{/* Mobile/tablet layout only. */}
+			<div className="grid min-h-[260px] grid-cols-[minmax(0,1fr)_44px_minmax(0,1fr)] sm:min-h-[320px] sm:grid-cols-[minmax(0,1fr)_64px_minmax(0,1fr)] xl:hidden">
+				<div className="grid min-w-0 grid-cols-[28px_minmax(0,1fr)] gap-2 px-3 py-5 sm:grid-cols-[36px_minmax(0,1fr)] sm:gap-4 sm:px-6 sm:py-7">
+					<div className="flex items-center justify-center">{gripButton}</div>
 
-				<button
-					type="button"
-					onClick={onEdit}
-					className="min-w-0 flex-1 space-y-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/25"
-				>
-					{renderCriteria(rule)}
-				</button>
+					<div className="min-w-0">
+						<h3 className="text-base font-semibold tracking-[-0.01em] sm:text-[22px]">
+							If
+						</h3>
+						<div className="mt-3 space-y-3 sm:mt-4 sm:space-y-4">
+							{renderMobileCriteria(rule)}
+						</div>
+					</div>
+				</div>
+
+				<div className="flex min-h-full items-center justify-center border-x border-gray-200 bg-[#fafaf8] dark:border-white/10 dark:bg-black/15">
+					<ArrowRight size={22} className="text-[#8a8a85]" />
+				</div>
+
+				<div className="min-w-0 px-3 py-5 sm:px-6 sm:py-7">
+					<div className="space-y-5 sm:space-y-6">
+						{renderMobileActions(rule)}
+					</div>
+				</div>
 			</div>
 
-			<div className="hidden items-center justify-center border-x border-gray-200 bg-[#fafaf8] dark:border-white/10 dark:bg-white/[0.025] xl:flex">
-				<ArrowRight size={18} className="text-[#777671]" />
-			</div>
+			{/* Preserve the original desktop card. */}
+			<div className="hidden xl:grid xl:grid-cols-[minmax(0,1fr)_42px_minmax(0,1fr)]">
+				<div className="flex min-w-0 gap-3 px-5 py-4">
+					<div className="mt-0.5">{gripButton}</div>
+					<div className="min-w-0 flex-1 space-y-2">{renderCriteria(rule)}</div>
+				</div>
 
-			<button
-				type="button"
-				onClick={onEdit}
-				className="min-w-0 border-t border-gray-200 px-3 py-4 text-left outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/25 dark:border-white/10 sm:px-5 xl:border-l-0 xl:border-t-0"
-			>
-				<div className="space-y-2">{renderActions(rule)}</div>
-			</button>
+				<div className="flex items-center justify-center border-x border-gray-200 bg-[#fafaf8] dark:border-white/10 dark:bg-white/[0.025]">
+					<ArrowRight size={18} className="text-[#777671]" />
+				</div>
+
+				<div className="min-w-0 px-5 py-4">
+					<div className="space-y-2">{renderActions(rule)}</div>
+				</div>
+			</div>
 		</div>
+	);
+}
+
+function renderMobileCriteria(rule: TransactionRule) {
+	const rows: React.ReactNode[] = [];
+
+	if (rule.criteria.originalStatement) {
+		rows.push(
+			<MobileRuleSentence key="original-statement" label="original statement">
+				<MobilePill>
+					{TEXT_OPERATOR_LABELS[rule.criteria.originalStatement.operator]}
+				</MobilePill>
+				<MobilePill>{rule.criteria.originalStatement.value}</MobilePill>
+			</MobileRuleSentence>,
+		);
+	}
+
+	if (rule.criteria.merchantName) {
+		rows.push(
+			<MobileRuleSentence key="merchant" label="merchant name">
+				<MobilePill>
+					{TEXT_OPERATOR_LABELS[rule.criteria.merchantName.operator]}
+				</MobilePill>
+				<MobilePill>{rule.criteria.merchantName.value}</MobilePill>
+			</MobileRuleSentence>,
+		);
+	}
+
+	if (rule.criteria.amount) {
+		rows.push(
+			<MobileRuleSentence key="amount" label={rule.criteria.amount.direction}>
+				<MobilePill>
+					{AMOUNT_OPERATOR_LABELS[rule.criteria.amount.operator]}
+				</MobilePill>
+				<MobilePill>${rule.criteria.amount.value.toFixed(2)}</MobilePill>
+			</MobileRuleSentence>,
+		);
+	}
+
+	for (const category of rule.criteria.categories ?? []) {
+		rows.push(
+			<MobileRuleSentence key={`category-${category}`} label="category">
+				<MobilePill>{category}</MobilePill>
+			</MobileRuleSentence>,
+		);
+	}
+
+	for (const accountId of rule.criteria.accountIds ?? []) {
+		rows.push(
+			<MobileRuleSentence key={`account-${accountId}`} label="account">
+				<MobilePill>{accountId}</MobilePill>
+			</MobileRuleSentence>,
+		);
+	}
+
+	return rows.length > 0 ? rows : <span className="text-sm">No criteria</span>;
+}
+
+function renderMobileActions(rule: TransactionRule) {
+	const rows: React.ReactNode[] = [];
+
+	if (rule.actions.updateCategory) {
+		const category = rule.actions.updateCategory;
+		const parent = findParentCategory(category);
+
+		rows.push(
+			<MobileRuleAction key="category" label="Recategorize to">
+				<MobilePill>
+					<CategoryIcon
+						name={category}
+						size={15}
+						colorClass={getCategoryTheme(parent).text}
+					/>
+					{category}
+				</MobilePill>
+			</MobileRuleAction>,
+		);
+	}
+
+	if (rule.actions.renameMerchant) {
+		rows.push(
+			<MobileRuleAction key="merchant" label="Rename to">
+				<MobilePill>{rule.actions.renameMerchant.name}</MobilePill>
+			</MobileRuleAction>,
+		);
+	}
+
+	for (const tag of rule.actions.addTags ?? []) {
+		rows.push(
+			<MobileRuleAction key={`tag-${tag}`} label="Add tag">
+				<MobilePill>
+					<Tag size={14} className="text-amber-500" />
+					{tag}
+				</MobilePill>
+			</MobileRuleAction>,
+		);
+	}
+
+	if (rule.actions.hideTransaction) {
+		rows.push(
+			<MobileRuleAction key="hide" label="Hide transaction">
+				<MobilePill>Yes</MobilePill>
+			</MobileRuleAction>,
+		);
+	}
+
+	if (rule.actions.reviewStatus) {
+		rows.push(
+			<MobileRuleAction key="review" label="Review status">
+				<MobilePill>
+					{rule.actions.reviewStatus === "reviewed"
+						? "Reviewed"
+						: "Needs review"}
+				</MobilePill>
+			</MobileRuleAction>,
+		);
+	}
+
+	return rows.length > 0 ? rows : <span className="text-sm">No actions</span>;
+}
+
+function MobileRuleSentence({
+	label,
+	children,
+}: {
+	label: string;
+	children: React.ReactNode;
+}) {
+	return (
+		<div className="flex min-w-0 flex-col items-start gap-2.5 sm:gap-3">
+			<MobilePill>{label}</MobilePill>
+			{children}
+		</div>
+	);
+}
+
+function MobileRuleAction({
+	label,
+	children,
+}: {
+	label: string;
+	children: React.ReactNode;
+}) {
+	return (
+		<div className="min-w-0">
+			<h3 className="text-base font-semibold tracking-[-0.01em] sm:text-[22px]">
+				{label}
+			</h3>
+			<div className="mt-3 flex min-w-0 flex-wrap items-start gap-2 sm:mt-4">
+				{children}
+			</div>
+		</div>
+	);
+}
+
+function MobilePill({ children }: { children: React.ReactNode }) {
+	return (
+		<span className="inline-flex min-w-0 max-w-full flex-wrap items-center gap-1.5 break-words rounded-xl border border-black/[0.08] bg-[#f7f7f5] px-2.5 py-2 text-sm font-medium leading-5 sm:px-3.5 sm:text-lg sm:leading-6 dark:border-white/10 dark:bg-black/20">
+			{children}
+		</span>
 	);
 }
 

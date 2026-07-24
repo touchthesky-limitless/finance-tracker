@@ -1,18 +1,20 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { DragDropProvider, useDroppable } from "@dnd-kit/react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { DragDropProvider } from "@dnd-kit/react";
 import { move } from "@dnd-kit/helpers";
 import { useSortable } from "@dnd-kit/react/sortable";
 import {
 	AlertCircle,
 	Check,
 	ChevronDown,
+	EyeOff,
 	GripVertical,
 	Info,
 	Loader2,
-	Pencil,
 	Plus,
+	Search,
 	Trash2,
 	X,
 } from "lucide-react";
@@ -47,6 +49,7 @@ interface CategoryGroup {
 	budgetMode: GroupBudgetMode;
 	sectionId: CategorySectionId;
 	order: number | null;
+	hidden: boolean;
 	record?: CustomCategory;
 	children: CustomCategory[];
 }
@@ -63,6 +66,7 @@ interface DeleteConfirmation {
 	title: string;
 	description: string;
 	confirmLabel: string;
+	action: "delete" | "disable";
 }
 
 type ActiveDragType = "group" | "category";
@@ -86,6 +90,30 @@ function getCategoryIdFromDragId(id: string): string {
 	return id.startsWith("category:") ? id.slice("category:".length) : id;
 }
 
+function getSortableGroup(source: unknown): string | null {
+	if (!source || typeof source !== "object") {
+		return null;
+	}
+
+	const sortableSource = source as {
+		initialGroup?: unknown;
+		group?: unknown;
+	};
+	const group = sortableSource.initialGroup ?? sortableSource.group;
+
+	return typeof group === "string" ? group : null;
+}
+
+function getCurrentSortableGroup(source: unknown): string | null {
+	if (!source || typeof source !== "object") {
+		return null;
+	}
+
+	const group = (source as { group?: unknown }).group;
+
+	return typeof group === "string" ? group : null;
+}
+
 function arraysEqual(
 	first: readonly string[],
 	second: readonly string[],
@@ -94,34 +122,6 @@ function arraysEqual(
 		first.length === second.length &&
 		first.every((value, index) => value === second[index])
 	);
-}
-
-function categoryOrdersEqual(
-	first: Readonly<CategoryOrder>,
-	second: Readonly<CategoryOrder>,
-): boolean {
-	const keys = new Set([...Object.keys(first), ...Object.keys(second)]);
-
-	for (const key of keys) {
-		if (!arraysEqual(first[key] ?? [], second[key] ?? [])) {
-			return false;
-		}
-	}
-
-	return true;
-}
-
-function findContainingGroup(
-	items: Readonly<CategoryOrder>,
-	itemId: string,
-): string | null {
-	for (const [groupKey, ids] of Object.entries(items)) {
-		if (ids.includes(itemId)) {
-			return groupKey;
-		}
-	}
-
-	return null;
 }
 
 const DEFAULT_ICON = encodeEmojiIcon("❓");
@@ -253,6 +253,14 @@ export default function SettingsCategoriesPage() {
 				const children = [...(childrenByParent.get(parentName) ?? [])];
 
 				children.sort((first, second) => {
+					const firstDisabled = categoryPreferences[first.id]?.hidden === true;
+					const secondDisabled =
+						categoryPreferences[second.id]?.hidden === true;
+
+					if (firstDisabled !== secondDisabled) {
+						return firstDisabled ? 1 : -1;
+					}
+
 					const firstOrder = categoryPreferences[first.id]?.order;
 					const secondOrder = categoryPreferences[second.id]?.order;
 
@@ -295,10 +303,14 @@ export default function SettingsCategoriesPage() {
 					return first.name.localeCompare(second.name);
 				});
 
+				const isSystemGroup = !record || record.is_system;
+
 				return {
 					key,
 					name: parentName,
-					displayName: preference?.name?.trim() || parentName,
+					displayName: isSystemGroup
+						? parentName
+						: preference?.name?.trim() || parentName,
 					budgetMode: preference?.budgetMode ?? "category",
 					sectionId: preference?.sectionId ?? getDefaultSectionId(parentName),
 					order:
@@ -309,9 +321,7 @@ export default function SettingsCategoriesPage() {
 				};
 			})
 			.filter((group) => {
-				return (
-					!group.hidden && Boolean(group.record || group.children.length > 0)
-				);
+				return Boolean(group.record || group.children.length > 0);
 			});
 	}, [categoryPreferences, customCategories, groupPreferences]);
 
@@ -328,6 +338,10 @@ export default function SettingsCategoriesPage() {
 
 		for (const section of CATEGORY_SECTIONS) {
 			result[section.id].sort((first, second) => {
+				if (first.hidden !== second.hidden) {
+					return first.hidden ? 1 : -1;
+				}
+
 				if (first.order !== null || second.order !== null) {
 					if (first.order === null) {
 						return 1;
@@ -678,23 +692,27 @@ export default function SettingsCategoriesPage() {
 					order: groupsBySection[sectionId].length,
 				}));
 			} else if (editor.mode === "edit-group" && editor.group) {
-				if (!validateGroupName(cleanName, editor.group.key)) {
+				const isSystemGroup =
+					!editor.group.record || editor.group.record.is_system;
+
+				if (!isSystemGroup && !validateGroupName(cleanName, editor.group.key)) {
 					return;
 				}
 
 				await updateGroupPreference(editor.group.key, (current) => ({
 					...current,
-					name: cleanName,
+					...(isSystemGroup ? {} : { name: cleanName }),
 					budgetMode,
 					sectionId: editor.group?.sectionId,
-					hidden: false,
 				}));
 			} else if (editor.mode === "edit-category" && editor.category) {
-				await updateCustomCategory(editor.category.id, {
-					name: cleanName,
-					icon: icon.trim() || DEFAULT_ICON,
-					color: color.trim() || DEFAULT_COLOR,
-				});
+				if (!editor.category.is_system) {
+					await updateCustomCategory(editor.category.id, {
+						name: cleanName,
+						icon: icon.trim() || DEFAULT_ICON,
+						color: color.trim() || DEFAULT_COLOR,
+					});
+				}
 
 				await updateCategoryPreference(editor.category.id, (current) => ({
 					...current,
@@ -728,6 +746,64 @@ export default function SettingsCategoriesPage() {
 		}
 	};
 
+	const handleActivateCategory = async (): Promise<void> => {
+		if (
+			!editor ||
+			editor.mode !== "edit-category" ||
+			!editor.category?.is_system ||
+			isSaving
+		) {
+			return;
+		}
+
+		setIsSaving(true);
+		setErrorMessage(null);
+
+		try {
+			await updateCategoryPreference(editor.category.id, (current) => ({
+				...current,
+				hidden: false,
+			}));
+			setEditor(null);
+		} catch (error) {
+			setErrorMessage(
+				error instanceof Error ? error.message : "Failed to activate category.",
+			);
+		} finally {
+			setIsSaving(false);
+		}
+	};
+
+	const handleActivateGroup = async (): Promise<void> => {
+		if (
+			!editor ||
+			editor.mode !== "edit-group" ||
+			!editor.group ||
+			(editor.group.record && !editor.group.record.is_system) ||
+			isSaving
+		) {
+			return;
+		}
+
+		setIsSaving(true);
+		setErrorMessage(null);
+
+		try {
+			await updateGroupPreference(editor.group.key, (current) => ({
+				...current,
+				sectionId: editor.group?.sectionId,
+				hidden: false,
+			}));
+			setEditor(null);
+		} catch (error) {
+			setErrorMessage(
+				error instanceof Error ? error.message : "Failed to activate group.",
+			);
+		} finally {
+			setIsSaving(false);
+		}
+	};
+
 	const requestDelete = () => {
 		if (!editor || isSaving) {
 			return;
@@ -735,22 +811,32 @@ export default function SettingsCategoriesPage() {
 
 		if (editor.mode === "edit-group" && editor.group) {
 			const isBuiltIn = !editor.group.record || editor.group.record.is_system;
+
 			setDeleteConfirmation({
-				title: `Delete ${editor.group.displayName}?`,
+				title: isBuiltIn
+					? `Disable ${editor.group.displayName}?`
+					: `Delete ${editor.group.displayName}?`,
 				description: isBuiltIn
-					? "This built-in group will be hidden from your category settings. You can restore it later by clearing the saved category preferences."
+					? "This built-in group and its categories will be hidden from category settings and category selectors. Existing transactions will keep their current category values."
 					: "This permanently deletes the group and all custom categories currently inside it. This action cannot be undone.",
-				confirmLabel: "Delete group",
+				confirmLabel: isBuiltIn ? "Disable group" : "Delete group",
+				action: isBuiltIn ? "disable" : "delete",
 			});
 			return;
 		}
 
 		if (editor.mode === "edit-category" && editor.category) {
+			const isBuiltIn = editor.category.is_system;
+
 			setDeleteConfirmation({
-				title: `Delete ${editor.category.name}?`,
-				description:
-					"This permanently deletes the custom category. Existing transactions may need to be recategorized. This action cannot be undone.",
-				confirmLabel: "Delete category",
+				title: isBuiltIn
+					? `Disable ${editor.category.name}?`
+					: `Delete ${editor.category.name}?`,
+				description: isBuiltIn
+					? "This built-in category will be hidden from category settings and category selectors. Existing transactions will keep their current category value."
+					: "This permanently deletes the custom category. Existing transactions may need to be recategorized. This action cannot be undone.",
+				confirmLabel: isBuiltIn ? "Disable category" : "Delete category",
+				action: isBuiltIn ? "disable" : "delete",
 			});
 		}
 	};
@@ -794,13 +880,16 @@ export default function SettingsCategoriesPage() {
 						hidden: true,
 					}));
 				}
-			} else if (
-				editor.mode === "edit-category" &&
-				editor.category &&
-				!editor.category.is_system
-			) {
-				await deleteCustomCategory(editor.category.id);
-				await removeCategoryPreference(editor.category.id);
+			} else if (editor.mode === "edit-category" && editor.category) {
+				if (editor.category.is_system) {
+					await updateCategoryPreference(editor.category.id, (current) => ({
+						...current,
+						hidden: true,
+					}));
+				} else {
+					await deleteCustomCategory(editor.category.id);
+					await removeCategoryPreference(editor.category.id);
+				}
 			}
 
 			setEditor(null);
@@ -824,13 +913,6 @@ export default function SettingsCategoriesPage() {
 					</p>
 				</div>
 
-				{isReordering && (
-					<div className="mb-4 inline-flex items-center gap-2 text-xs font-medium text-[#777671] dark:text-[#aaa9a4]">
-						<Loader2 size={13} className="animate-spin" />
-						Saving order…
-					</div>
-				)}
-
 				<DragDropProvider
 					onDragStart={(event) => {
 						const source = event.operation.source;
@@ -844,27 +926,6 @@ export default function SettingsCategoriesPage() {
 						categorySnapshotRef.current = categoryOrderRef.current;
 						setErrorMessage(null);
 					}}
-					onDragOver={(event) => {
-						const { source, target } = event.operation;
-
-						if (
-							source?.type !== "category" ||
-							(target?.type !== "category" &&
-								target?.type !== "category-container")
-						) {
-							return;
-						}
-
-						const currentOrder = categoryOrderRef.current;
-						const nextOrder = move(currentOrder, event);
-
-						if (categoryOrdersEqual(currentOrder, nextOrder)) {
-							return;
-						}
-
-						categoryOrderRef.current = nextOrder;
-						setCategoryOrder(nextOrder);
-					}}
 					onDragEnd={(event) => {
 						const source = event.operation.source;
 						const dragType = activeDragTypeRef.current;
@@ -874,25 +935,41 @@ export default function SettingsCategoriesPage() {
 							return;
 						}
 
-						if (event.canceled) {
+						const initialGroup = getSortableGroup(source);
+						const currentGroup = getCurrentSortableGroup(source);
+
+						if (!initialGroup) {
+							return;
+						}
+
+						const restoreSnapshots = (): void => {
 							groupOrderRef.current = groupSnapshotRef.current;
 							categoryOrderRef.current = categorySnapshotRef.current;
 							setGroupOrder(groupSnapshotRef.current);
 							setCategoryOrder(categorySnapshotRef.current);
+						};
+
+						if (
+							event.canceled ||
+							(currentGroup !== null && initialGroup !== currentGroup)
+						) {
+							restoreSnapshots();
 							return;
 						}
 
 						if (dragType === "group") {
-							const sourceId = String(source.id);
-							const section = CATEGORY_SECTIONS.find(({ id }) =>
-								groupSnapshotRef.current[id].includes(sourceId),
-							);
+							const sectionId = initialGroup;
 
-							if (!section) {
+							if (
+								typeof sectionId !== "string" ||
+								!CATEGORY_SECTIONS.some((section) => section.id === sectionId)
+							) {
+								restoreSnapshots();
 								return;
 							}
 
-							const currentIds = groupOrderRef.current[section.id];
+							const typedSectionId = sectionId as CategorySectionId;
+							const currentIds = groupOrderRef.current[typedSectionId];
 							const nextIds = move(currentIds, event);
 
 							if (arraysEqual(currentIds, nextIds)) {
@@ -901,56 +978,48 @@ export default function SettingsCategoriesPage() {
 
 							const nextGroupOrder = {
 								...groupOrderRef.current,
-								[section.id]: nextIds,
+								[typedSectionId]: nextIds,
 							};
 							groupOrderRef.current = nextGroupOrder;
 							setGroupOrder(nextGroupOrder);
 							setIsReordering(true);
 
 							void saveGroupOrder(
-								section.id,
+								typedSectionId,
 								nextIds.map(getGroupKeyFromDragId),
 							)
 								.catch((error: unknown) => {
-									groupOrderRef.current = groupSnapshotRef.current;
-									setGroupOrder(groupSnapshotRef.current);
+									restoreSnapshots();
 									reportPreferenceError(error);
 								})
 								.finally(() => setIsReordering(false));
 							return;
 						}
 
-						const sourceId = String(source.id);
-						const previousOrder = categorySnapshotRef.current;
-						const nextOrder = move(categoryOrderRef.current, event);
-						const sourceGroupKey = findContainingGroup(previousOrder, sourceId);
-						const targetGroupKey = findContainingGroup(nextOrder, sourceId);
+						const groupKey = initialGroup;
 
+						if (typeof groupKey !== "string") {
+							restoreSnapshots();
+							return;
+						}
+
+						const currentIds = categoryOrderRef.current[groupKey] ?? [];
+						const nextIds = move(currentIds, event);
+
+						if (arraysEqual(currentIds, nextIds)) {
+							return;
+						}
+
+						const previousOrder = categorySnapshotRef.current;
+						const nextOrder = {
+							...categoryOrderRef.current,
+							[groupKey]: nextIds,
+						};
 						categoryOrderRef.current = nextOrder;
 						setCategoryOrder(nextOrder);
-
-						if (!sourceGroupKey || !targetGroupKey) {
-							return;
-						}
-
-						const affectedGroups =
-							sourceGroupKey === targetGroupKey
-								? [sourceGroupKey]
-								: [sourceGroupKey, targetGroupKey];
-						const changed = affectedGroups.some(
-							(groupKey) =>
-								!arraysEqual(
-									previousOrder[groupKey] ?? [],
-									nextOrder[groupKey] ?? [],
-								),
-						);
-
-						if (!changed) {
-							return;
-						}
-
 						setIsReordering(true);
-						void persistCategoryOrder(nextOrder, affectedGroups)
+
+						void persistCategoryOrder(nextOrder, [groupKey])
 							.catch((error: unknown) => {
 								categoryOrderRef.current = previousOrder;
 								setCategoryOrder(previousOrder);
@@ -1027,6 +1096,11 @@ export default function SettingsCategoriesPage() {
 				(editor.mode === "create-group" || editor.mode === "edit-group" ? (
 					<GroupEditorModal
 						mode={editor.mode}
+						isSystemGroup={
+							Boolean(editor.group) &&
+							(!editor.group?.record || editor.group.record.is_system)
+						}
+						isDisabled={editor.group?.hidden === true}
 						name={name}
 						budgetMode={budgetMode}
 						initialName={editor.group?.displayName ?? ""}
@@ -1037,6 +1111,7 @@ export default function SettingsCategoriesPage() {
 						onBudgetModeChange={setBudgetMode}
 						onClose={closeEditor}
 						onDelete={requestDelete}
+						onActivate={() => void handleActivateGroup()}
 						onSave={() => void handleSave()}
 					/>
 				) : (
@@ -1047,6 +1122,17 @@ export default function SettingsCategoriesPage() {
 						icon={icon}
 						selectedParentName={selectedParentName}
 						excludeFromBudget={excludeFromBudget}
+						initialExcludeFromBudget={
+							editor.category
+								? categoryPreferences[editor.category.id]
+										?.excludedFromBudget === true
+								: false
+						}
+						isDisabled={
+							editor.category
+								? categoryPreferences[editor.category.id]?.hidden === true
+								: false
+						}
 						isSaving={isSaving}
 						errorMessage={errorMessage}
 						onNameChange={setName}
@@ -1067,6 +1153,7 @@ export default function SettingsCategoriesPage() {
 						onExcludeFromBudgetChange={setExcludeFromBudget}
 						onClose={closeEditor}
 						onDelete={requestDelete}
+						onActivate={() => void handleActivateCategory()}
 						onSave={() => void handleSave()}
 					/>
 				))}
@@ -1076,6 +1163,7 @@ export default function SettingsCategoriesPage() {
 					title={deleteConfirmation.title}
 					description={deleteConfirmation.description}
 					confirmLabel={deleteConfirmation.confirmLabel}
+					action={deleteConfirmation.action}
 					isDeleting={isSaving}
 					onCancel={() => {
 						if (!isSaving) {
@@ -1117,24 +1205,30 @@ function SortableCategoryGroup({
 		element,
 		handle: handleRef,
 		type: "group",
-		accept: "group",
+		accept: (source) => {
+			return (
+				source.type === "group" && getSortableGroup(source) === group.sectionId
+			);
+		},
 		disabled: dragDisabled,
-	});
-	const { isDropTarget: isBodyDropTarget, ref: bodyRef } = useDroppable({
-		id: group.key,
-		type: "category-container",
-		accept: "category",
-		disabled: dragDisabled,
-		collisionPriority: -1,
-		data: { groupKey: group.key },
 	});
 	const theme = getCategoryTheme(group.name);
+
+	const openGroupEditor = (): void => {
+		if (!isDragging) {
+			onEditGroup();
+		}
+	};
 
 	return (
 		<div
 			ref={setElement}
 			data-shadow={isDragging || undefined}
-			className={`min-w-0 overflow-hidden rounded-2xl bg-[#f4f4f2] transition-[box-shadow] dark:bg-white/[0.04] ${
+			className={`min-w-0 overflow-hidden rounded-2xl transition-[box-shadow,background-color,color] ${
+				group.hidden
+					? "bg-[#eeeeeb] text-[#9b9a96] dark:bg-[#121210] dark:text-[#777671]"
+					: "bg-[#f4f4f2] dark:bg-[#151513]"
+			} ${
 				isDragging
 					? "relative z-20 shadow-[0_18px_50px_rgba(0,0,0,0.2)] ring-2 ring-cyan-500/20"
 					: isDropTarget
@@ -1142,12 +1236,33 @@ function SortableCategoryGroup({
 						: ""
 			}`}
 		>
-			<div className="flex min-h-13 min-w-0 flex-wrap items-center gap-2 border-b border-black/5 px-4 py-3 sm:flex-nowrap sm:gap-3 sm:px-5 dark:border-white/10">
+			<div
+				role="button"
+				tabIndex={0}
+				aria-label={`Edit ${group.displayName} group`}
+				onClick={openGroupEditor}
+				onKeyDown={(event) => {
+					if (event.target !== event.currentTarget) {
+						return;
+					}
+
+					if (event.key === "Enter" || event.key === " ") {
+						event.preventDefault();
+						openGroupEditor();
+					}
+				}}
+				className={`flex min-h-13 w-full min-w-0 items-center gap-2 border-b px-4 py-3 text-left outline-none transition focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-cyan-500/40 sm:gap-3 sm:px-5 ${
+					group.hidden
+						? "border-black/[0.04] bg-[#eeeeeb] text-[#9b9a96] hover:bg-[#e8e8e4] dark:border-white/[0.05] dark:bg-[#121210] dark:text-[#777671] dark:hover:bg-[#171715]"
+						: "border-black/5 bg-transparent hover:bg-black/[0.025] dark:border-white/10 dark:bg-[#151513] dark:hover:bg-white/[0.035]"
+				}`}
+			>
 				<button
 					ref={handleRef}
 					type="button"
 					disabled={dragDisabled}
-					className="grid size-8 shrink-0 cursor-grab touch-none place-items-center rounded-lg text-[#969691] outline-none transition hover:bg-black/[0.05] focus-visible:ring-2 focus-visible:ring-cyan-500/30 active:cursor-grabbing disabled:cursor-default disabled:opacity-50 dark:hover:bg-white/10"
+					onClick={(event) => event.stopPropagation()}
+					className="grid size-8 shrink-0 cursor-grab touch-none place-items-center rounded-lg text-[#969691] outline-none transition hover:bg-black/[0.05] focus-visible:ring-2 focus-visible:ring-cyan-500/30 active:cursor-grabbing disabled:cursor-default disabled:opacity-50 dark:text-[#777671] dark:hover:bg-white/10"
 					aria-label={`Move ${group.displayName} group`}
 				>
 					<GripVertical size={17} />
@@ -1157,32 +1272,42 @@ function SortableCategoryGroup({
 					size={18}
 					colorClass={theme.text}
 				/>
-				<span className="min-w-0 flex-1 truncate font-semibold sm:flex-none">
+				<span className="min-w-0 flex-1 truncate font-semibold">
 					{group.displayName}
 				</span>
-
+				{group.hidden && (
+					<EyeOff
+						size={18}
+						className="shrink-0 text-[#aaa9a4] dark:text-[#777671]"
+						aria-hidden="true"
+					/>
+				)}
 				<button
 					type="button"
-					onClick={onEditGroup}
-					className="text-sm text-[#73736f] hover:text-[#222220] dark:hover:text-white"
+					onClick={(event) => {
+						event.stopPropagation();
+						onEditGroup();
+					}}
+					className="relative z-10 shrink-0 rounded-lg px-2 py-1 text-sm text-[#73736f] transition hover:bg-black/[0.05] hover:text-[#222220] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/40 dark:text-[#aaa9a4] dark:hover:bg-white/10 dark:hover:text-white"
 				>
 					Edit
 				</button>
 			</div>
 
 			<div
-				ref={bodyRef}
-				className={`min-w-0 p-3 transition-colors sm:p-4 ${
-					isBodyDropTarget ? "bg-cyan-500/[0.08]" : ""
+				className={`min-w-0 p-3 sm:p-4 ${
+					group.hidden
+						? "bg-[#eeeeeb] dark:bg-[#121210]"
+						: "bg-transparent dark:bg-[#151513]"
 				}`}
 			>
 				{group.children.length === 0 ? (
-					<div className="flex min-h-[190px] min-w-0 flex-col items-center justify-center rounded-xl border border-dashed border-black/[0.06] bg-white/45 px-4 py-8 text-center sm:min-h-[230px] sm:px-6 sm:py-10 dark:border-white/10 dark:bg-black/10">
+					<div className="flex min-h-[190px] min-w-0 flex-col items-center justify-center rounded-xl border border-dashed border-black/[0.06] bg-white/45 px-4 py-8 text-center sm:min-h-[230px] sm:px-6 sm:py-10 dark:border-white/10 dark:bg-[#1d1d1b]">
 						<h3 className="text-lg font-semibold text-[#2f2f2c] dark:text-white">
 							No categories in this group
 						</h3>
 						<p className="mt-3 max-w-full text-sm leading-6 text-[#85837f] sm:text-base dark:text-[#aaa9a4]">
-							Drag categories into this group or create new ones
+							Create a category to add it to this group
 						</p>
 						<button
 							type="button"
@@ -1204,6 +1329,7 @@ function SortableCategoryGroup({
 								excludedFromBudget={
 									categoryPreferences[category.id]?.excludedFromBudget === true
 								}
+								isDisabled={categoryPreferences[category.id]?.hidden === true}
 								onEdit={() => onEditCategory(category)}
 							/>
 						))}
@@ -1229,6 +1355,7 @@ interface SortableCategoryRowProps {
 	group: CategoryGroup;
 	dragDisabled: boolean;
 	excludedFromBudget: boolean;
+	isDisabled: boolean;
 	onEdit: () => void;
 }
 
@@ -1238,6 +1365,7 @@ function SortableCategoryRow({
 	group,
 	dragDisabled,
 	excludedFromBudget,
+	isDisabled,
 	onEdit,
 }: SortableCategoryRowProps) {
 	const [element, setElement] = useState<Element | null>(null);
@@ -1249,28 +1377,55 @@ function SortableCategoryRow({
 		element,
 		handle: handleRef,
 		type: "category",
-		accept: "category",
+		accept: (source) => {
+			return (
+				source.type === "category" && getSortableGroup(source) === group.key
+			);
+		},
 		disabled: dragDisabled,
 	});
 	const theme = getCategoryTheme(group.name);
 
+	const openCategoryEditor = (): void => {
+		if (!isDragging) {
+			onEdit();
+		}
+	};
+
 	return (
 		<div
 			ref={setElement}
+			role="button"
+			tabIndex={0}
+			aria-label={`Edit ${category.name}`}
 			data-shadow={isDragging || undefined}
-			className={`flex min-h-12 min-w-0 items-center gap-2 rounded-xl border bg-white px-3 shadow-sm transition-[border-color,box-shadow] sm:gap-3 dark:bg-[#222220] ${
+			onClick={openCategoryEditor}
+			onKeyDown={(event) => {
+				if (event.target !== event.currentTarget) {
+					return;
+				}
+
+				if (event.key === "Enter" || event.key === " ") {
+					event.preventDefault();
+					openCategoryEditor();
+				}
+			}}
+			className={`flex min-h-12 w-full min-w-0 items-center gap-2 rounded-xl border px-3 text-left shadow-sm outline-none transition-[border-color,box-shadow,background-color,color] sm:gap-3 ${
 				isDragging
 					? "relative z-20 border-cyan-500 shadow-[0_14px_36px_rgba(0,0,0,0.18)] ring-2 ring-cyan-500/15"
 					: isDropTarget
 						? "border-cyan-500 ring-2 ring-cyan-500/20"
-						: "border-black/[0.03] dark:border-white/[0.06]"
+						: isDisabled
+							? "border-black/[0.03] bg-white/55 text-[#9b9a96] hover:border-black/10 hover:bg-white/75 focus-visible:ring-2 focus-visible:ring-cyan-500/40 dark:border-white/[0.04] dark:bg-[#1b1b19] dark:text-[#777671] dark:hover:bg-[#1e1e1c]"
+							: "border-black/[0.03] bg-white hover:border-black/10 hover:bg-[#fbfbfa] focus-visible:ring-2 focus-visible:ring-cyan-500/40 dark:border-white/[0.04] dark:bg-[#222220] dark:hover:bg-[#282826]"
 			}`}
 		>
 			<button
 				ref={handleRef}
 				type="button"
 				disabled={dragDisabled}
-				className="grid size-7 shrink-0 cursor-grab touch-none place-items-center rounded-md text-[#969691] outline-none transition hover:bg-black/[0.05] focus-visible:ring-2 focus-visible:ring-cyan-500/30 active:cursor-grabbing disabled:cursor-default disabled:opacity-50 dark:hover:bg-white/10"
+				onClick={(event) => event.stopPropagation()}
+				className="grid size-7 shrink-0 cursor-grab touch-none place-items-center rounded-md text-[#969691] outline-none transition hover:bg-black/[0.05] focus-visible:ring-2 focus-visible:ring-cyan-500/30 active:cursor-grabbing disabled:cursor-default disabled:opacity-50 dark:text-[#777671] dark:hover:bg-white/10"
 				aria-label={`Move ${category.name}`}
 			>
 				<GripVertical size={16} />
@@ -1278,31 +1433,32 @@ function SortableCategoryRow({
 			<CategoryGlyph
 				name={category.icon_name || category.name}
 				size={17}
-				colorClass={theme.text}
+				colorClass={isDisabled ? "text-[#aaa9a4]" : theme.text}
 			/>
-			<span className="min-w-0 flex-1 truncate text-[15px]">
+			<span
+				className={`min-w-0 flex-1 truncate text-[15px] ${
+					isDisabled ? "text-[#9b9a96] dark:text-[#777671]" : ""
+				}`}
+			>
 				{category.name}
 			</span>
 
 			{!category.is_system && (
-				<>
-					<span className="hidden text-xs font-medium text-[#6e6e69] sm:inline dark:text-[#aaa9a4]">
-						Custom
-					</span>
-					{excludedFromBudget && (
-						<span className="hidden rounded-md bg-amber-100 px-2 py-1 text-[11px] font-semibold text-amber-800 md:inline dark:bg-amber-500/15 dark:text-amber-300">
-							Excluded
-						</span>
-					)}
-					<button
-						type="button"
-						onClick={onEdit}
-						className="grid size-8 place-items-center rounded-lg text-[#777671] hover:bg-black/[0.05] hover:text-[#222220] dark:hover:bg-white/10 dark:hover:text-white"
-						aria-label={`Edit ${category.name}`}
-					>
-						<Pencil size={15} />
-					</button>
-				</>
+				<span className="hidden text-xs font-medium text-[#6e6e69] sm:inline dark:text-[#aaa9a4]">
+					Custom
+				</span>
+			)}
+			{excludedFromBudget && !isDisabled && (
+				<span className="hidden rounded-md bg-amber-100 px-2 py-1 text-[11px] font-semibold text-amber-800 md:inline dark:bg-amber-500/15 dark:text-amber-300">
+					Excluded
+				</span>
+			)}
+			{isDisabled && (
+				<EyeOff
+					size={18}
+					className="shrink-0 text-[#aaa9a4] dark:text-[#777671]"
+					aria-hidden="true"
+				/>
 			)}
 		</div>
 	);
@@ -1310,6 +1466,8 @@ function SortableCategoryRow({
 
 function GroupEditorModal({
 	mode,
+	isSystemGroup,
+	isDisabled,
 	name,
 	budgetMode,
 	initialName,
@@ -1320,9 +1478,12 @@ function GroupEditorModal({
 	onBudgetModeChange,
 	onClose,
 	onDelete,
+	onActivate,
 	onSave,
 }: {
 	mode: "create-group" | "edit-group";
+	isSystemGroup: boolean;
+	isDisabled: boolean;
 	name: string;
 	budgetMode: GroupBudgetMode;
 	initialName: string;
@@ -1333,17 +1494,19 @@ function GroupEditorModal({
 	onBudgetModeChange: (value: GroupBudgetMode) => void;
 	onClose: () => void;
 	onDelete: () => void;
+	onActivate: () => void;
 	onSave: () => void;
 }) {
 	const isCreate = mode === "create-group";
 	const hasChanges =
 		isCreate ||
-		name.trim() !== initialName.trim() ||
+		(!isSystemGroup && name.trim() !== initialName.trim()) ||
 		budgetMode !== initialBudgetMode;
-	const canSave = Boolean(name.trim()) && hasChanges && !isSaving;
+	const canSave =
+		Boolean(name.trim()) && hasChanges && !isSaving && !isDisabled;
 
 	return (
-		<div className="fixed inset-0 z-[300] grid place-items-center bg-black/45 p-4 backdrop-blur-[1px]">
+		<div className="fixed inset-0 z-[300] grid place-items-center overflow-y-auto bg-black/45 p-2 backdrop-blur-[1px] sm:p-4">
 			<button
 				type="button"
 				aria-label="Close group editor"
@@ -1351,40 +1514,45 @@ function GroupEditorModal({
 				onClick={onClose}
 			/>
 
-			<section className="relative w-full max-w-[892px] overflow-visible rounded-[20px] border border-black/10 bg-white text-[#282826] shadow-[0_28px_90px_rgba(0,0,0,0.28)] dark:border-white/10 dark:bg-[#242422] dark:text-white">
-				<header className="flex min-h-28 items-center justify-between border-b border-black/[0.06] px-10 dark:border-white/10">
-					<h2 className="text-[29px] font-semibold tracking-[-0.02em]">
+			<section className="relative my-auto flex max-h-[calc(100dvh-16px)] w-full max-w-[892px] min-w-0 flex-col overflow-hidden rounded-[16px] border border-black/10 bg-white text-[#282826] shadow-[0_28px_90px_rgba(0,0,0,0.28)] sm:max-h-[calc(100dvh-32px)] sm:rounded-[20px] dark:border-white/10 dark:bg-[#242422] dark:text-white">
+				<header className="flex shrink-0 items-center justify-between gap-4 border-b border-black/[0.06] px-4 py-4 sm:px-6 sm:py-5 lg:px-10 lg:py-6 dark:border-white/10">
+					<h2 className="min-w-0 truncate text-xl font-semibold tracking-[-0.02em] sm:text-2xl lg:text-[29px]">
 						{isCreate ? "Create Group" : "Edit Group"}
 					</h2>
 					<button
 						type="button"
 						onClick={onClose}
 						disabled={isSaving}
-						className="grid size-11 place-items-center rounded-full transition hover:bg-black/[0.05] disabled:opacity-50 dark:hover:bg-white/10"
+						className="grid size-9 shrink-0 place-items-center rounded-full transition hover:bg-black/[0.05] disabled:opacity-50 sm:size-11 dark:hover:bg-white/10"
 						aria-label="Close"
 					>
 						<X size={31} strokeWidth={1.8} />
 					</button>
 				</header>
 
-				<div className="space-y-8 px-10 py-10">
+				<div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-5 sm:space-y-7 sm:px-6 sm:py-7 lg:space-y-8 lg:px-10 lg:py-10">
 					<label className="block">
-						<span className="mb-4 block text-[23px] font-semibold">Name</span>
+						<span className="mb-2.5 block text-base font-semibold sm:mb-3 sm:text-lg lg:mb-4 lg:text-[23px]">
+							Name
+						</span>
 						<input
-							autoFocus
+							autoFocus={!isSystemGroup}
+							disabled={isSystemGroup}
 							value={name}
 							onChange={(event) => onNameChange(event.target.value)}
-							className="h-[66px] w-full rounded-[15px] border border-[#d8d6d2] bg-white px-5 text-[27px] outline-none transition focus:border-[#008eae] focus:ring-2 focus:ring-[#008eae]/15 dark:border-white/15 dark:bg-[#20201f]"
+							className="h-13 w-full min-w-0 rounded-[13px] border border-[#d8d6d2] bg-white px-4 text-lg outline-none transition focus:border-[#008eae] focus:ring-2 focus:ring-[#008eae]/15 disabled:cursor-not-allowed disabled:bg-[#f5f4f2] disabled:text-[#777671] sm:h-14 sm:rounded-[15px] sm:text-xl lg:h-[66px] lg:px-5 lg:text-[27px] dark:border-white/15 dark:bg-[#20201f] dark:disabled:bg-[#1b1b19] dark:disabled:text-[#8a8984]"
 						/>
 					</label>
 
 					<div>
-						<span className="mb-4 block text-[23px] font-semibold">Budget</span>
+						<span className="mb-2.5 block text-base font-semibold sm:mb-3 sm:text-lg lg:mb-4 lg:text-[23px]">
+							Budget
+						</span>
 						<BudgetModeSelect
 							value={budgetMode}
 							onChange={onBudgetModeChange}
 						/>
-						<p className="mt-4 text-[23px] leading-8 text-[#7d7b77] dark:text-[#aaa9a4]">
+						<p className="mt-3 text-sm leading-6 text-[#7d7b77] sm:text-base lg:mt-4 lg:text-[23px] lg:leading-8 dark:text-[#aaa9a4]">
 							{budgetMode === "group"
 								? "Budget with a single number for all categories within this group."
 								: "Budget by individual categories within this group."}
@@ -1399,26 +1567,46 @@ function GroupEditorModal({
 					)}
 				</div>
 
-				<footer className="flex min-h-28 items-center justify-between border-t border-black/[0.06] px-10 dark:border-white/10">
+				<footer className="flex shrink-0 flex-col-reverse items-stretch gap-3 border-t border-black/[0.06] px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-10 lg:py-5 dark:border-white/10">
 					{!isCreate ? (
-						<button
-							type="button"
-							onClick={onDelete}
-							disabled={isSaving}
-							className="h-[58px] rounded-[13px] border border-[#dedbd7] bg-white px-5 text-[23px] font-semibold text-[#de2529] shadow-sm transition hover:bg-red-50 disabled:opacity-50 dark:border-white/15 dark:bg-[#242422] dark:hover:bg-red-500/10"
-						>
-							Delete
-						</button>
+						<div className="flex w-full min-w-0 items-center gap-2 sm:w-auto sm:gap-4">
+							<button
+								type="button"
+								onClick={isSystemGroup && isDisabled ? onActivate : onDelete}
+								disabled={isSaving}
+								className={`h-12 flex-1 rounded-[12px] border border-[#dedbd7] bg-white px-4 text-base font-semibold shadow-sm transition disabled:opacity-50 sm:flex-none lg:h-[58px] lg:rounded-[13px] lg:px-5 lg:text-[23px] dark:border-white/15 dark:bg-[#242422] ${
+									isSystemGroup
+										? "text-[#282826] hover:bg-[#f7f6f4] dark:text-white dark:hover:bg-white/5"
+										: "text-[#de2529] hover:bg-red-50 dark:hover:bg-red-500/10"
+								}`}
+							>
+								{isSystemGroup
+									? isDisabled
+										? "Activate"
+										: "Disable"
+									: "Delete"}
+							</button>
+
+							{isSystemGroup && (
+								<DisableInfoTooltip
+									text={
+										isDisabled
+											? "Activate restores this built-in group and its categories throughout the app."
+											: "Disable keeps this built-in group visible here in a muted state while removing it from category selectors. Existing transactions keep their current category values."
+									}
+								/>
+							)}
+						</div>
 					) : (
 						<span />
 					)}
 
-					<div className="flex items-center gap-5">
+					<div className="flex w-full min-w-0 items-center gap-2 sm:w-auto sm:gap-4 lg:gap-5">
 						<button
 							type="button"
 							onClick={onClose}
 							disabled={isSaving}
-							className="h-[58px] rounded-[13px] border border-[#dedbd7] bg-white px-6 text-[23px] font-semibold shadow-sm transition hover:bg-[#f7f6f4] disabled:opacity-50 dark:border-white/15 dark:bg-[#242422] dark:hover:bg-white/5"
+							className="h-12 flex-1 rounded-[12px] border border-[#dedbd7] bg-white px-4 text-base font-semibold shadow-sm transition hover:bg-[#f7f6f4] disabled:opacity-50 sm:flex-none lg:h-[58px] lg:rounded-[13px] lg:px-6 lg:text-[23px] dark:border-white/15 dark:bg-[#242422] dark:hover:bg-white/5"
 						>
 							Cancel
 						</button>
@@ -1426,7 +1614,7 @@ function GroupEditorModal({
 							type="button"
 							onClick={onSave}
 							disabled={!canSave}
-							className="inline-flex h-[58px] min-w-24 items-center justify-center gap-2 rounded-[13px] bg-[#ff5a35] px-5 text-[23px] font-semibold text-white transition hover:bg-[#e94c28] disabled:cursor-not-allowed disabled:bg-[#ffad91] disabled:text-white/95"
+							className="inline-flex h-12 flex-1 items-center justify-center gap-2 rounded-[12px] bg-[#ff5a35] px-4 text-base font-semibold text-white transition hover:bg-[#e94c28] disabled:cursor-not-allowed disabled:bg-[#ffad91] disabled:text-white/95 sm:min-w-24 sm:flex-none lg:h-[58px] lg:rounded-[13px] lg:px-5 lg:text-[23px]"
 						>
 							{isSaving && <Loader2 size={20} className="animate-spin" />}
 							{isCreate ? "Create" : "Save"}
@@ -1526,6 +1714,8 @@ function CategoryEditorModal({
 	icon,
 	selectedParentName,
 	excludeFromBudget,
+	initialExcludeFromBudget,
+	isDisabled,
 	isSaving,
 	errorMessage,
 	onNameChange,
@@ -1534,6 +1724,7 @@ function CategoryEditorModal({
 	onExcludeFromBudgetChange,
 	onClose,
 	onDelete,
+	onActivate,
 	onSave,
 }: {
 	editor: EditorState;
@@ -1542,6 +1733,8 @@ function CategoryEditorModal({
 	icon: string;
 	selectedParentName: string;
 	excludeFromBudget: boolean;
+	initialExcludeFromBudget: boolean;
+	isDisabled: boolean;
 	isSaving: boolean;
 	errorMessage: string | null;
 	onNameChange: (value: string) => void;
@@ -1550,14 +1743,22 @@ function CategoryEditorModal({
 	onExcludeFromBudgetChange: (value: boolean) => void;
 	onClose: () => void;
 	onDelete: () => void;
+	onActivate: () => void;
 	onSave: () => void;
 }) {
 	const isEdit = editor.mode === "edit-category";
+	const isSystemCategory = Boolean(isEdit && editor.category?.is_system);
 	const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
 	const selectedEmoji = getEmojiIcon(icon) ?? "❓";
+	const initialIcon = editor.category?.icon_name ?? DEFAULT_ICON;
+	const hasChanges =
+		!isEdit ||
+		name.trim() !== (editor.category?.name ?? "").trim() ||
+		icon !== initialIcon ||
+		excludeFromBudget !== initialExcludeFromBudget;
 
 	return (
-		<div className="fixed inset-0 z-[300] grid place-items-center bg-black/45 p-4 backdrop-blur-[1px]">
+		<div className="fixed inset-0 z-[300] grid place-items-center overflow-y-auto bg-black/45 p-2 backdrop-blur-[1px] sm:p-4">
 			<button
 				type="button"
 				aria-label="Close category editor"
@@ -1565,50 +1766,52 @@ function CategoryEditorModal({
 				onClick={onClose}
 			/>
 
-			<section className="relative w-full max-w-[892px] overflow-visible rounded-[20px] border border-black/10 bg-white text-[#282826] shadow-[0_28px_90px_rgba(0,0,0,0.28)] dark:border-white/10 dark:bg-[#242422] dark:text-white">
-				<header className="flex min-h-28 items-center justify-between border-b border-black/[0.06] px-10 dark:border-white/10">
-					<h2 className="text-[29px] font-semibold tracking-[-0.02em]">
+			<section className="relative my-auto flex max-h-[calc(100dvh-16px)] w-full max-w-[892px] min-w-0 flex-col overflow-hidden rounded-[16px] border border-black/10 bg-white text-[#282826] shadow-[0_28px_90px_rgba(0,0,0,0.28)] sm:max-h-[calc(100dvh-32px)] sm:rounded-[20px] dark:border-white/10 dark:bg-[#242422] dark:text-white">
+				<header className="flex shrink-0 items-center justify-between gap-4 border-b border-black/[0.06] px-4 py-4 sm:px-6 sm:py-5 lg:px-10 lg:py-6 dark:border-white/10">
+					<h2 className="min-w-0 truncate text-xl font-semibold tracking-[-0.02em] sm:text-2xl lg:text-[29px]">
 						{isEdit ? "Edit Category" : "Create Category"}
 					</h2>
 					<button
 						type="button"
 						onClick={onClose}
 						disabled={isSaving}
-						className="grid size-11 place-items-center rounded-full transition hover:bg-black/[0.05] disabled:opacity-50 dark:hover:bg-white/10"
+						className="grid size-9 shrink-0 place-items-center rounded-full transition hover:bg-black/[0.05] disabled:opacity-50 sm:size-11 dark:hover:bg-white/10"
 						aria-label="Close"
 					>
 						<X size={31} strokeWidth={1.8} />
 					</button>
 				</header>
 
-				<div className="space-y-8 px-10 py-10">
+				<div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-5 sm:space-y-7 sm:px-6 sm:py-7 lg:space-y-8 lg:px-10 lg:py-10">
 					<div>
-						<span className="mb-3 block text-[23px] font-semibold">
+						<span className="mb-2.5 block text-base font-semibold sm:mb-3 sm:text-lg lg:text-[23px]">
 							Icon &amp; Name
 						</span>
 						<div className="relative">
-							<div className="flex h-[66px] overflow-hidden rounded-[15px] border border-[#d8d6d2] bg-white focus-within:border-[#008eae] focus-within:ring-2 focus-within:ring-[#008eae]/15 dark:border-white/15 dark:bg-[#20201f]">
+							<div className="flex h-13 min-w-0 overflow-hidden rounded-[13px] border border-[#d8d6d2] bg-white focus-within:border-[#008eae] focus-within:ring-2 focus-within:ring-[#008eae]/15 sm:h-14 sm:rounded-[15px] lg:h-[66px] dark:border-white/15 dark:bg-[#20201f]">
 								<button
 									type="button"
+									disabled={isSystemCategory}
 									onClick={() => {
 										setIsEmojiPickerOpen((current) => !current);
 									}}
 									aria-label="Choose category emoji"
 									aria-expanded={isEmojiPickerOpen}
-									className="grid w-[72px] shrink-0 place-items-center border-r border-[#d8d6d2] text-[31px] transition hover:bg-[#f6f5f3] dark:border-white/15 dark:hover:bg-white/5"
+									className="grid w-13 shrink-0 place-items-center border-r border-[#d8d6d2] text-2xl transition hover:bg-[#f6f5f3] sm:w-16 sm:text-[28px] lg:w-[72px] lg:text-[31px] dark:border-white/15 dark:hover:bg-white/5"
 								>
 									{selectedEmoji}
 								</button>
 								<input
 									autoFocus
+									disabled={isSystemCategory}
 									value={name}
 									onChange={(event) => onNameChange(event.target.value)}
 									placeholder="New Category"
-									className="min-w-0 flex-1 bg-transparent px-5 text-[27px] outline-none placeholder:text-[#8d8b87]"
+									className="min-w-0 flex-1 bg-transparent px-3 text-lg outline-none placeholder:text-[#8d8b87] sm:px-4 sm:text-xl lg:px-5 lg:text-[27px]"
 								/>
 							</div>
 
-							{isEmojiPickerOpen && (
+							{isEmojiPickerOpen && !isSystemCategory && (
 								<CategoryEmojiPicker
 									selectedEmoji={selectedEmoji}
 									onSelect={(emoji) => {
@@ -1621,10 +1824,19 @@ function CategoryEditorModal({
 								/>
 							)}
 						</div>
+
+						{isSystemCategory && (
+							<p className="mt-3 text-sm leading-6 text-[#7d7b77] sm:text-base sm:leading-7 lg:text-[20px] lg:leading-8 dark:text-[#aaa9a4]">
+								This system category automatically categorizes transactions
+								related to {name}.
+							</p>
+						)}
 					</div>
 
 					<div>
-						<span className="mb-3 block text-[23px] font-semibold">Group</span>
+						<span className="mb-2.5 block text-base font-semibold sm:mb-3 sm:text-lg lg:text-[23px]">
+							Group
+						</span>
 						<CategoryGroupSelect
 							value={selectedParentName}
 							groups={groups}
@@ -1639,12 +1851,12 @@ function CategoryEditorModal({
 						)}
 					</div>
 
-					<div className="flex items-center justify-between gap-6 rounded-[15px] border border-[#dedbd7] px-7 py-7 dark:border-white/15">
+					<div className="flex min-w-0 flex-col items-stretch gap-4 rounded-[13px] border border-[#dedbd7] px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6 sm:rounded-[15px] sm:px-6 sm:py-6 lg:px-7 lg:py-7 dark:border-white/15">
 						<div className="min-w-0">
-							<h3 className="text-[22px] font-semibold">
+							<h3 className="text-base font-semibold sm:text-lg lg:text-[22px]">
 								Exclude this category from the budget
 							</h3>
-							<p className="mt-2 max-w-[620px] text-[20px] leading-8 text-[#55534f] dark:text-[#c2c0bb]">
+							<p className="mt-2 max-w-[620px] text-sm leading-6 text-[#55534f] sm:text-base sm:leading-7 lg:text-[20px] lg:leading-8 dark:text-[#c2c0bb]">
 								This category and any transactions linked to it will be hidden
 								from your budget.
 							</p>
@@ -1657,7 +1869,7 @@ function CategoryEditorModal({
 							onClick={() => {
 								onExcludeFromBudgetChange(!excludeFromBudget);
 							}}
-							className={`relative h-7 w-14 shrink-0 rounded-full transition ${
+							className={`relative h-7 w-14 shrink-0 self-start rounded-full transition sm:self-auto ${
 								excludeFromBudget
 									? "bg-[#008eae]"
 									: "bg-[#989793] dark:bg-[#66645f]"
@@ -1679,28 +1891,48 @@ function CategoryEditorModal({
 					)}
 				</div>
 
-				<footer className="flex min-h-28 items-center justify-between border-t border-black/[0.06] px-10 dark:border-white/10">
-					{isEdit && editor.category && !editor.category.is_system ? (
-						<button
-							type="button"
-							onClick={onDelete}
-							disabled={isSaving}
-							className="inline-flex h-[58px] items-center gap-2 rounded-[13px] border border-[#dedbd7] bg-white px-5 text-[23px] font-semibold text-[#de2529] shadow-sm transition hover:bg-red-50 disabled:opacity-50 dark:border-white/15 dark:bg-[#242422] dark:hover:bg-red-500/10"
-						>
-							<Trash2 size={20} />
-							Delete
-						</button>
+				<footer className="flex shrink-0 flex-col-reverse items-stretch gap-3 border-t border-black/[0.06] px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-10 lg:py-5 dark:border-white/10">
+					{isEdit && editor.category ? (
+						<div className="flex w-full min-w-0 items-center gap-2 sm:w-auto sm:gap-4">
+							<button
+								type="button"
+								onClick={isSystemCategory && isDisabled ? onActivate : onDelete}
+								disabled={isSaving}
+								className={`inline-flex h-12 flex-1 items-center justify-center gap-2 rounded-[12px] border border-[#dedbd7] bg-white px-4 text-base font-semibold shadow-sm transition disabled:opacity-50 sm:flex-none lg:h-[58px] lg:rounded-[13px] lg:px-5 lg:text-[23px] dark:border-white/15 dark:bg-[#242422] ${
+									isSystemCategory
+										? "text-[#282826] hover:bg-[#f7f6f4] dark:text-white dark:hover:bg-white/5"
+										: "text-[#de2529] hover:bg-red-50 dark:hover:bg-red-500/10"
+								}`}
+							>
+								{!isSystemCategory && <Trash2 size={20} />}
+								{isSystemCategory
+									? isDisabled
+										? "Activate"
+										: "Disable"
+									: "Delete"}
+							</button>
+
+							{isSystemCategory && (
+								<DisableInfoTooltip
+									text={
+										isDisabled
+											? "Activate restores this built-in category to category settings and category selectors."
+											: "Disable keeps this built-in category visible here in a deactivated state, while hiding it from category selectors. Existing transactions keep their current category value."
+									}
+								/>
+							)}
+						</div>
 					) : (
 						<span />
 					)}
 
-					<div className="flex items-center gap-5">
-						{isEdit && (
+					<div className="flex w-full min-w-0 items-center gap-2 sm:w-auto sm:gap-4 lg:gap-5">
+						{isEdit && !isSystemCategory && (
 							<button
 								type="button"
 								onClick={onClose}
 								disabled={isSaving}
-								className="h-[58px] rounded-[13px] border border-[#dedbd7] bg-white px-6 text-[23px] font-semibold shadow-sm transition hover:bg-[#f7f6f4] disabled:opacity-50 dark:border-white/15 dark:bg-[#242422] dark:hover:bg-white/5"
+								className="h-12 flex-1 rounded-[12px] border border-[#dedbd7] bg-white px-4 text-base font-semibold shadow-sm transition hover:bg-[#f7f6f4] disabled:opacity-50 sm:flex-none lg:h-[58px] lg:rounded-[13px] lg:px-6 lg:text-[23px] dark:border-white/15 dark:bg-[#242422] dark:hover:bg-white/5"
 							>
 								Cancel
 							</button>
@@ -1708,8 +1940,8 @@ function CategoryEditorModal({
 						<button
 							type="button"
 							onClick={onSave}
-							disabled={isSaving || !name.trim()}
-							className="inline-flex h-[58px] min-w-24 items-center justify-center gap-2 rounded-[13px] bg-[#ff5a35] px-5 text-[23px] font-semibold text-white transition hover:bg-[#e94c28] disabled:cursor-not-allowed disabled:bg-[#ffad91] disabled:text-white/95"
+							disabled={isSaving || !name.trim() || !hasChanges}
+							className="inline-flex h-12 flex-1 items-center justify-center gap-2 rounded-[12px] bg-[#ff5a35] px-4 text-base font-semibold text-white transition hover:bg-[#e94c28] disabled:cursor-not-allowed disabled:bg-[#ffad91] disabled:text-white/95 sm:min-w-24 sm:flex-none lg:h-[58px] lg:rounded-[13px] lg:px-5 lg:text-[23px]"
 						>
 							{isSaving && <Loader2 size={20} className="animate-spin" />}
 							Save
@@ -1732,31 +1964,171 @@ function CategoryGroupSelect({
 	disabled: boolean;
 	onChange: (value: string) => void;
 }) {
+	const triggerRef = useRef<HTMLButtonElement | null>(null);
+	const menuRef = useRef<HTMLDivElement | null>(null);
 	const [isOpen, setIsOpen] = useState(false);
-	const incomeGroups = groups.filter((group) => {
+	const [searchQuery, setSearchQuery] = useState("");
+	const [menuPosition, setMenuPosition] = useState<{
+		top: number;
+		left: number;
+		width: number;
+		maxHeight: number;
+	} | null>(null);
+
+	const selectedGroup = groups.find((group) => group.name === value);
+	const normalizedSearch = searchQuery.trim().toLowerCase();
+	const selectableGroups = groups.filter((group) => !group.hidden);
+	const filteredGroups = normalizedSearch
+		? selectableGroups.filter((group) => {
+				return (
+					group.displayName.toLowerCase().includes(normalizedSearch) ||
+					group.name.toLowerCase().includes(normalizedSearch)
+				);
+			})
+		: selectableGroups;
+
+	const incomeGroups = filteredGroups.filter((group) => {
 		return group.sectionId === "income";
 	});
-	const expenseGroups = groups.filter((group) => {
+	const expenseGroups = filteredGroups.filter((group) => {
 		return group.sectionId === "expenses";
 	});
-	const transferGroups = groups.filter((group) => {
+	const transferGroups = filteredGroups.filter((group) => {
 		return group.sectionId === "transfers";
 	});
-	const selectedGroup = groups.find((group) => group.name === value);
+
+	const calculateMenuPosition = useCallback(() => {
+		const trigger = triggerRef.current;
+
+		if (!trigger || typeof window === "undefined") {
+			return null;
+		}
+
+		const bounds = trigger.getBoundingClientRect();
+		const viewportPadding = 16;
+		const gap = 10;
+		const minimumHeight = 220;
+		const preferredHeight = 500;
+		const spaceBelow =
+			window.innerHeight - bounds.bottom - gap - viewportPadding;
+		const spaceAbove = bounds.top - gap - viewportPadding;
+		const openAbove = spaceBelow < minimumHeight && spaceAbove > spaceBelow;
+		const availableHeight = Math.max(
+			minimumHeight,
+			openAbove ? spaceAbove : spaceBelow,
+		);
+		const maxHeight = Math.min(preferredHeight, availableHeight);
+		const width = Math.min(
+			bounds.width,
+			window.innerWidth - viewportPadding * 2,
+		);
+		const left = Math.min(
+			Math.max(viewportPadding, bounds.left),
+			window.innerWidth - viewportPadding - width,
+		);
+		const top = openAbove
+			? Math.max(viewportPadding, bounds.top - gap - maxHeight)
+			: Math.min(
+					bounds.bottom + gap,
+					window.innerHeight - viewportPadding - maxHeight,
+				);
+
+		return { top, left, width, maxHeight };
+	}, []);
+
+	const closeMenu = useCallback(() => {
+		setIsOpen(false);
+		setSearchQuery("");
+	}, []);
+
+	const openMenu = useCallback(() => {
+		const nextPosition = calculateMenuPosition();
+
+		if (!nextPosition) {
+			return;
+		}
+
+		setMenuPosition(nextPosition);
+		setSearchQuery("");
+		setIsOpen(true);
+	}, [calculateMenuPosition]);
+
+	useEffect(() => {
+		if (!isOpen) {
+			return;
+		}
+
+		const updatePosition = () => {
+			const nextPosition = calculateMenuPosition();
+
+			if (nextPosition) {
+				setMenuPosition(nextPosition);
+			}
+		};
+
+		const handlePointerDown = (event: PointerEvent) => {
+			const target = event.target;
+
+			if (!(target instanceof Node)) {
+				return;
+			}
+
+			if (
+				triggerRef.current?.contains(target) ||
+				menuRef.current?.contains(target)
+			) {
+				return;
+			}
+
+			closeMenu();
+		};
+
+		const handleKeyDown = (event: KeyboardEvent) => {
+			if (event.key === "Escape") {
+				event.preventDefault();
+				closeMenu();
+				triggerRef.current?.focus();
+			}
+		};
+
+		window.addEventListener("resize", updatePosition);
+		window.addEventListener("scroll", updatePosition, true);
+		document.addEventListener("pointerdown", handlePointerDown);
+		document.addEventListener("keydown", handleKeyDown);
+
+		return () => {
+			window.removeEventListener("resize", updatePosition);
+			window.removeEventListener("scroll", updatePosition, true);
+			document.removeEventListener("pointerdown", handlePointerDown);
+			document.removeEventListener("keydown", handleKeyDown);
+		};
+	}, [calculateMenuPosition, closeMenu, isOpen]);
+
+	const selectGroup = (nextValue: string) => {
+		onChange(nextValue);
+		closeMenu();
+		triggerRef.current?.focus();
+	};
 
 	return (
 		<div className="relative">
 			<button
+				ref={triggerRef}
 				type="button"
 				disabled={disabled}
 				aria-haspopup="listbox"
 				aria-expanded={isOpen}
-				onClick={() => setIsOpen((current) => !current)}
+				onClick={() => {
+					if (isOpen) {
+						closeMenu();
+					} else {
+						openMenu();
+					}
+				}}
 				onKeyDown={(event) => {
-					if (event.key === "Escape" && isOpen) {
+					if ((event.key === "ArrowDown" || event.key === "Enter") && !isOpen) {
 						event.preventDefault();
-						event.stopPropagation();
-						setIsOpen(false);
+						openMenu();
 					}
 				}}
 				className={`flex h-[66px] w-full items-center justify-between rounded-[15px] border bg-white px-5 text-left text-[27px] outline-none transition dark:bg-[#20201f] ${
@@ -1765,48 +2137,83 @@ function CategoryGroupSelect({
 						: "border-[#d8d6d2] dark:border-white/15"
 				} ${disabled ? "cursor-not-allowed opacity-70" : ""}`}
 			>
-				<span>{selectedGroup?.displayName ?? value}</span>
+				<span className="min-w-0 truncate">
+					{selectedGroup?.displayName ?? value}
+				</span>
 				<ChevronDown
 					size={27}
 					strokeWidth={1.8}
-					className={`transition-transform ${isOpen ? "rotate-180" : ""}`}
+					className={`shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`}
 				/>
 			</button>
 
-			{isOpen && !disabled && (
-				<div
-					role="listbox"
-					className="absolute left-0 right-0 top-[calc(100%+12px)] z-30 max-h-[420px] overflow-y-auto rounded-[20px] border border-[#dfddd9] bg-white py-3 shadow-[0_18px_45px_rgba(0,0,0,0.18)] dark:border-white/15 dark:bg-[#2a2a28]"
-				>
-					<GroupOptionSection
-						label="Income"
-						groups={incomeGroups}
-						value={value}
-						onChange={(nextValue) => {
-							onChange(nextValue);
-							setIsOpen(false);
+			{isOpen &&
+				!disabled &&
+				menuPosition &&
+				typeof document !== "undefined" &&
+				createPortal(
+					<div
+						ref={menuRef}
+						className="fixed z-[380] flex overflow-hidden rounded-[20px] border border-[#dfddd9] bg-white shadow-[0_24px_70px_rgba(0,0,0,0.24)] dark:border-white/15 dark:bg-[#2a2a28]"
+						style={{
+							top: menuPosition.top,
+							left: menuPosition.left,
+							width: menuPosition.width,
+							maxHeight: menuPosition.maxHeight,
 						}}
-					/>
-					<GroupOptionSection
-						label="Expenses"
-						groups={expenseGroups}
-						value={value}
-						onChange={(nextValue) => {
-							onChange(nextValue);
-							setIsOpen(false);
-						}}
-					/>
-					<GroupOptionSection
-						label="Transfers"
-						groups={transferGroups}
-						value={value}
-						onChange={(nextValue) => {
-							onChange(nextValue);
-							setIsOpen(false);
-						}}
-					/>
-				</div>
-			)}
+					>
+						<div className="flex min-h-0 w-full flex-col">
+							<div className="shrink-0 border-b border-black/[0.06] p-3 dark:border-white/10">
+								<label className="flex h-12 items-center gap-3 rounded-[13px] border border-[#d8d6d2] bg-[#f7f6f4] px-4 focus-within:border-[#008eae] focus-within:ring-2 focus-within:ring-[#008eae]/15 dark:border-white/15 dark:bg-[#20201f]">
+									<Search
+										size={19}
+										className="shrink-0 text-[#777570] dark:text-[#aaa9a4]"
+									/>
+									<input
+										autoFocus
+										value={searchQuery}
+										onChange={(event) => setSearchQuery(event.target.value)}
+										placeholder="Search groups"
+										className="min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-[#8d8b87] dark:text-white"
+									/>
+								</label>
+							</div>
+
+							<div
+								role="listbox"
+								className="min-h-0 flex-1 overflow-y-auto py-3"
+							>
+								{filteredGroups.length > 0 ? (
+									<>
+										<GroupOptionSection
+											label="Income"
+											groups={incomeGroups}
+											value={value}
+											onChange={selectGroup}
+										/>
+										<GroupOptionSection
+											label="Expenses"
+											groups={expenseGroups}
+											value={value}
+											onChange={selectGroup}
+										/>
+										<GroupOptionSection
+											label="Transfers"
+											groups={transferGroups}
+											value={value}
+											onChange={selectGroup}
+										/>
+									</>
+								) : (
+									<div className="px-5 py-10 text-center text-sm text-[#777570] dark:text-[#aaa9a4]">
+										No groups match “{searchQuery.trim()}”.
+									</div>
+								)}
+							</div>
+						</div>
+					</div>,
+					document.body,
+				)}
 		</div>
 	);
 }
@@ -1828,7 +2235,7 @@ function GroupOptionSection({
 
 	return (
 		<div className="px-3">
-			<div className="px-5 py-3 text-[21px] font-semibold text-[#777570] dark:text-[#aaa9a4]">
+			<div className="px-5 py-3 text-sm font-semibold uppercase tracking-[0.08em] text-[#777570] dark:text-[#aaa9a4] sm:text-base">
 				{label}
 			</div>
 			{groups.map((group) => {
@@ -1841,17 +2248,41 @@ function GroupOptionSection({
 						role="option"
 						aria-selected={selected}
 						onClick={() => onChange(group.name)}
-						className={`flex min-h-[58px] w-full items-center justify-between rounded-[14px] px-6 text-left text-[24px] transition ${
+						className={`flex min-h-[54px] w-full items-center justify-between rounded-[14px] px-5 text-left text-base transition sm:min-h-[58px] sm:px-6 sm:text-lg lg:text-[22px] ${
 							selected
 								? "bg-[#f2f1ef] dark:bg-white/10"
 								: "hover:bg-[#f7f6f4] dark:hover:bg-white/5"
 						}`}
 					>
-						<span>{group.displayName}</span>
-						{selected && <Check size={21} className="text-[#008eae]" />}
+						<span className="min-w-0 truncate">{group.displayName}</span>
+						{selected && (
+							<Check size={21} className="shrink-0 text-[#008eae]" />
+						)}
 					</button>
 				);
 			})}
+		</div>
+	);
+}
+
+function DisableInfoTooltip({ text }: { text: string }) {
+	return (
+		<div className="group/disable-tooltip relative">
+			<button
+				type="button"
+				aria-label="About disabling this item"
+				className="grid size-10 place-items-center rounded-full text-[#777570] transition hover:bg-black/[0.05] hover:text-[#282826] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/40 dark:text-[#aaa9a4] dark:hover:bg-white/10 dark:hover:text-white"
+			>
+				<Info size={21} />
+			</button>
+
+			<div
+				role="tooltip"
+				className="pointer-events-none fixed bottom-20 left-4 right-4 z-[390] rounded-xl bg-[#282826] px-4 py-3 text-center text-sm font-semibold leading-5 text-white opacity-0 shadow-[0_16px_40px_rgba(0,0,0,0.3)] transition-opacity group-hover/disable-tooltip:opacity-100 group-focus-within/disable-tooltip:opacity-100 sm:absolute sm:bottom-[calc(100%+14px)] sm:left-1/2 sm:right-auto sm:w-[360px] sm:max-w-[calc(100vw-32px)] sm:-translate-x-1/2 sm:px-5 sm:py-4 sm:text-[15px] sm:leading-6"
+			>
+				{text}
+				<span className="absolute left-1/2 top-full size-4 -translate-x-1/2 -translate-y-1/2 rotate-45 bg-[#282826]" />
+			</div>
 		</div>
 	);
 }
@@ -1860,6 +2291,7 @@ function DeleteConfirmModal({
 	title,
 	description,
 	confirmLabel,
+	action,
 	isDeleting,
 	onCancel,
 	onConfirm,
@@ -1867,12 +2299,13 @@ function DeleteConfirmModal({
 	title: string;
 	description: string;
 	confirmLabel: string;
+	action: "delete" | "disable";
 	isDeleting: boolean;
 	onCancel: () => void;
 	onConfirm: () => void;
 }) {
 	return (
-		<div className="fixed inset-0 z-[360] grid place-items-center bg-black/55 p-4 backdrop-blur-[2px]">
+		<div className="fixed inset-0 z-[360] grid place-items-center overflow-y-auto bg-black/55 p-2 backdrop-blur-[2px] sm:p-4">
 			<button
 				type="button"
 				aria-label="Close delete confirmation"
@@ -1885,16 +2318,22 @@ function DeleteConfirmModal({
 				aria-modal="true"
 				aria-labelledby="delete-confirm-title"
 				aria-describedby="delete-confirm-description"
-				className="relative w-full max-w-[520px] overflow-hidden rounded-[20px] border border-black/10 bg-white text-[#282826] shadow-[0_28px_90px_rgba(0,0,0,0.34)] dark:border-white/10 dark:bg-[#242422] dark:text-white"
+				className="relative my-auto w-full max-w-[520px] overflow-hidden rounded-[16px] border border-black/10 bg-white text-[#282826] shadow-[0_28px_90px_rgba(0,0,0,0.34)] sm:rounded-[20px] dark:border-white/10 dark:bg-[#242422] dark:text-white"
 			>
-				<div className="flex items-start gap-4 px-7 pb-5 pt-7">
-					<div className="grid size-11 shrink-0 place-items-center rounded-full bg-red-100 text-red-600 dark:bg-red-500/15 dark:text-red-300">
-						<Trash2 size={21} />
+				<div className="flex items-start gap-3 px-4 pb-4 pt-5 sm:gap-4 sm:px-7 sm:pb-5 sm:pt-7">
+					<div
+						className={`grid size-11 shrink-0 place-items-center rounded-full ${
+							action === "disable"
+								? "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300"
+								: "bg-red-100 text-red-600 dark:bg-red-500/15 dark:text-red-300"
+						}`}
+					>
+						{action === "disable" ? <Info size={21} /> : <Trash2 size={21} />}
 					</div>
 					<div className="min-w-0">
 						<h2
 							id="delete-confirm-title"
-							className="text-xl font-semibold tracking-[-0.01em]"
+							className="text-lg font-semibold tracking-[-0.01em] sm:text-xl"
 						>
 							{title}
 						</h2>
@@ -1907,12 +2346,12 @@ function DeleteConfirmModal({
 					</div>
 				</div>
 
-				<footer className="flex items-center justify-end gap-3 border-t border-black/[0.06] px-7 py-5 dark:border-white/10">
+				<footer className="flex flex-col-reverse items-stretch gap-3 border-t border-black/[0.06] px-4 py-4 sm:flex-row sm:items-center sm:justify-end sm:px-7 sm:py-5 dark:border-white/10">
 					<button
 						type="button"
 						onClick={onCancel}
 						disabled={isDeleting}
-						className="h-11 rounded-xl border border-[#dedbd7] bg-white px-5 text-sm font-semibold shadow-sm transition hover:bg-[#f7f6f4] disabled:opacity-50 dark:border-white/15 dark:bg-[#242422] dark:hover:bg-white/5"
+						className="h-11 w-full rounded-xl border border-[#dedbd7] bg-white px-5 text-sm font-semibold shadow-sm transition hover:bg-[#f7f6f4] disabled:opacity-50 sm:w-auto dark:border-white/15 dark:bg-[#242422] dark:hover:bg-white/5"
 					>
 						Cancel
 					</button>
@@ -1920,7 +2359,11 @@ function DeleteConfirmModal({
 						type="button"
 						onClick={onConfirm}
 						disabled={isDeleting}
-						className="inline-flex h-11 min-w-32 items-center justify-center gap-2 rounded-xl bg-red-600 px-5 text-sm font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-red-400"
+						className={`inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl px-5 text-sm font-semibold text-white transition disabled:cursor-not-allowed sm:min-w-32 sm:w-auto ${
+							action === "disable"
+								? "bg-[#282826] hover:bg-black disabled:bg-[#8d8b87] dark:bg-white dark:text-[#282826] dark:hover:bg-[#ebe9e4]"
+								: "bg-red-600 hover:bg-red-700 disabled:bg-red-400"
+						}`}
 					>
 						{isDeleting && <Loader2 size={17} className="animate-spin" />}
 						{confirmLabel}

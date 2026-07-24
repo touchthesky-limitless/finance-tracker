@@ -21,11 +21,11 @@ import {
 	Loader2,
 	Plus,
 	Search,
-	Trash2,
 	X,
 } from "lucide-react";
 
 import { CategorySelector } from "@/components/CategorySelector";
+import { DeleteConfirmModal } from "@/components/DeleteConfirmModal";
 import { CategoryIcon } from "@/components/CategoryIcon";
 import { MerchantOptionContent } from "@/components/Merchants/MerchantOptionContent";
 import type { MerchantListItem } from "@/components/Merchants/types";
@@ -508,7 +508,7 @@ export function RuleModal({
 	const [attemptedSave, setAttemptedSave] = useState(false);
 	const [isSaving, setIsSaving] = useState(false);
 	const [isDeleting, setIsDeleting] = useState(false);
-	const [deleteArmed, setDeleteArmed] = useState(false);
+	const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
 	const [saveError, setSaveError] = useState<string | null>(null);
 	const [floatingLayerElement, setFloatingLayerElement] =
 		useState<HTMLDivElement | null>(null);
@@ -522,9 +522,16 @@ export function RuleModal({
 		document.body.style.overflow = "hidden";
 
 		const handleKeyDown = (event: KeyboardEvent) => {
-			if (event.key === "Escape" && !isSaving && !isDeleting) {
-				onClose();
+			if (event.key !== "Escape" || isSaving || isDeleting) {
+				return;
 			}
+
+			if (isDeleteConfirmOpen) {
+				setIsDeleteConfirmOpen(false);
+				return;
+			}
+
+			onClose();
 		};
 
 		window.addEventListener("keydown", handleKeyDown);
@@ -533,7 +540,7 @@ export function RuleModal({
 			document.body.style.overflow = previousOverflow;
 			window.removeEventListener("keydown", handleKeyDown);
 		};
-	}, [isOpen, isDeleting, isSaving, onClose]);
+	}, [isDeleteConfirmOpen, isOpen, isDeleting, isSaving, onClose]);
 
 	const validation = useMemo(() => {
 		return validateDraft(draft);
@@ -610,12 +617,7 @@ export function RuleModal({
 	};
 
 	const handleDelete = async () => {
-		if (!initialRule || !onDelete) {
-			return;
-		}
-
-		if (!deleteArmed) {
-			setDeleteArmed(true);
+		if (!initialRule || !onDelete || isDeleting) {
 			return;
 		}
 
@@ -624,15 +626,16 @@ export function RuleModal({
 
 		try {
 			await onDelete(initialRule);
+			setIsDeleteConfirmOpen(false);
 			onClose();
 		} catch (error) {
 			console.error("Failed to delete rule:", error);
+			setIsDeleteConfirmOpen(false);
 			setSaveError(
 				error instanceof Error ? error.message : "Failed to delete the rule.",
 			);
 		} finally {
 			setIsDeleting(false);
-			setDeleteArmed(false);
 		}
 	};
 
@@ -732,7 +735,6 @@ export function RuleModal({
 								<div className="space-y-3">
 									<TextCriteriaEditor
 										title="Original statement"
-										required
 										placeholder="Original statement…"
 										criterion={draft.originalStatement}
 										error={
@@ -748,7 +750,6 @@ export function RuleModal({
 
 									<TextCriteriaEditor
 										title="Merchant name"
-										required
 										placeholder="Merchant name…"
 										criterion={draft.merchantName}
 										error={attemptedSave ? validation.merchantName : undefined}
@@ -1057,71 +1058,79 @@ export function RuleModal({
 					/>
 				)}
 
-				<footer className="shrink-0 border-t border-gray-200 bg-white/95 px-4 py-3 backdrop-blur dark:border-white/10 dark:bg-[#20201f]/95 sm:px-5">
+				<footer className="shrink-0 border-t border-gray-200 bg-white/95 backdrop-blur dark:border-white/10 dark:bg-[#20201f]/95">
 					{saveError && (
-						<div className="mb-3 flex items-start gap-2 rounded-xl bg-red-50 px-3 py-2.5 text-sm text-red-700 dark:bg-red-500/10 dark:text-red-300">
+						<div className="mx-4 mt-4 flex items-start gap-2 rounded-xl bg-red-50 px-3 py-2.5 text-sm text-red-700 dark:bg-red-500/10 dark:text-red-300 sm:mx-6">
 							<AlertCircle size={17} className="mt-0.5 shrink-0" />
 							<span>{saveError}</span>
 						</div>
 					)}
 
-					<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-						<label className="flex cursor-pointer items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
+					<div className="flex min-w-0 items-center justify-between gap-4 border-b border-gray-200 px-4 py-5 dark:border-white/10 sm:px-6 sm:py-6">
+						<label className="flex min-w-0 cursor-pointer items-center gap-3 text-sm font-semibold text-gray-900 dark:text-white sm:text-base">
 							<input
 								type="checkbox"
 								checked={applyToExisting}
 								onChange={(event) => {
 									setApplyToExisting(event.target.checked);
 								}}
-								className="size-4 rounded border-gray-300 text-orange-600 focus:ring-orange-500"
+								className="size-7 shrink-0 rounded-md border-2 border-gray-300 bg-transparent text-orange-600 focus:ring-2 focus:ring-orange-500/30 dark:border-white/15 dark:bg-black/10 sm:size-8"
 							/>
-							Update existing transactions
+							<span className="truncate">Update existing transactions</span>
 						</label>
 
-						<div className="flex items-center justify-end gap-2">
-							<span className="mr-auto text-sm text-gray-500 sm:mr-3 dark:text-gray-400">
-								{matchingTransactions.length === 1
-									? "1 matching transaction"
-									: `${matchingTransactions.length} matching transactions`}
-							</span>
+						<span className="shrink-0 text-right text-sm text-gray-500 dark:text-gray-400 sm:text-base">
+							{matchingTransactions.length === 1
+								? "1 matching transaction"
+								: `${matchingTransactions.length} matching transactions`}
+						</span>
+					</div>
 
-							{initialRule && onDelete && (
-								<button
-									type="button"
-									onClick={() => {
-										void handleDelete();
-									}}
-									disabled={isSaving || isDeleting}
-									className={`inline-flex h-10 items-center gap-2 rounded-xl border px-3 text-sm font-semibold transition disabled:opacity-50 ${
-										deleteArmed
-											? "border-red-600 bg-red-600 text-white hover:bg-red-500"
-											: "border-gray-200 text-red-600 hover:bg-red-50 dark:border-white/10 dark:hover:bg-red-500/10"
-									}`}
-								>
-									{isDeleting ? (
-										<Loader2 size={16} className="animate-spin" />
-									) : (
-										<Trash2 size={16} />
-									)}
-									{deleteArmed ? "Confirm delete" : "Delete"}
-								</button>
-							)}
-
+					<div className="flex items-center justify-between gap-4 px-4 py-5 sm:px-6 sm:py-6">
+						{initialRule && onDelete ? (
 							<button
 								type="button"
-								onClick={() => {
-									void handleSave();
-								}}
+								onClick={() => setIsDeleteConfirmOpen(true)}
 								disabled={isSaving || isDeleting}
-								className="inline-flex h-10 min-w-24 items-center justify-center gap-2 rounded-xl bg-orange-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-orange-500 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+								className="inline-flex h-12 items-center justify-center rounded-xl border border-gray-300 bg-transparent px-5 text-sm font-semibold text-red-500 shadow-sm transition hover:border-red-300 hover:bg-red-50 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/15 dark:text-red-400 dark:hover:border-red-500/30 dark:hover:bg-red-500/10 sm:h-14 sm:px-6 sm:text-base"
 							>
-								{isSaving && <Loader2 size={16} className="animate-spin" />}
-								{isSaving ? "Saving…" : "Save"}
+								Delete
 							</button>
-						</div>
+						) : (
+							<span />
+						)}
+
+						<button
+							type="button"
+							onClick={() => {
+								void handleSave();
+							}}
+							disabled={isSaving || isDeleting}
+							className="inline-flex h-12 min-w-24 items-center justify-center gap-2 rounded-xl bg-[#ff6433] px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#f25325] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 sm:h-14 sm:px-6 sm:text-base"
+						>
+							{isSaving && <Loader2 size={17} className="animate-spin" />}
+							{isSaving ? "Saving…" : "Save"}
+						</button>
 					</div>
 				</footer>
 			</section>
+
+			{isDeleteConfirmOpen && initialRule && (
+				<DeleteConfirmModal
+					title="Delete this rule?"
+					description={`This permanently deletes “${initialRule.name}”. This action cannot be undone.`}
+					confirmLabel="Delete rule"
+					isDeleting={isDeleting}
+					onCancel={() => {
+						if (!isDeleting) {
+							setIsDeleteConfirmOpen(false);
+						}
+					}}
+					onConfirm={() => {
+						void handleDelete();
+					}}
+				/>
+			)}
 		</div>,
 		document.body,
 	);
