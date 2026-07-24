@@ -4,12 +4,14 @@ import {
 	useCallback,
 	useEffect,
 	useMemo,
+	useRef,
 	useState,
 	useSyncExternalStore,
 	type FormEvent,
 	type ReactNode,
 } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import {
 	autoUpdate,
 	FloatingFocusManager,
@@ -48,6 +50,19 @@ import {
 	WalletCards,
 	X,
 } from "lucide-react";
+import {
+	Area,
+	AreaChart,
+	Bar,
+	BarChart,
+	CartesianGrid,
+	ReferenceDot,
+	ReferenceLine,
+	ResponsiveContainer,
+	Tooltip,
+	XAxis,
+	YAxis,
+} from "recharts";
 
 import { Shimmer } from "@/components/ui/Shimmer";
 import { useBudgetStore } from "@/store/useBudgetStore";
@@ -128,12 +143,27 @@ const MANUAL_ACCOUNT_OPTIONS: ReadonlyArray<{
 	icon: typeof CircleDollarSign;
 }> = [
 	{ kind: "cash", label: "Cash", section: "Asset", icon: CircleDollarSign },
-	{ kind: "investment", label: "Investments", section: "Asset", icon: LineChart },
+	{
+		kind: "investment",
+		label: "Investments",
+		section: "Asset",
+		icon: LineChart,
+	},
 	{ kind: "real-estate", label: "Real Estate", section: "Asset", icon: Home },
 	{ kind: "vehicle", label: "Vehicles", section: "Asset", icon: Car },
 	{ kind: "valuable", label: "Valuables", section: "Asset", icon: Sparkles },
-	{ kind: "other-asset", label: "Other Assets", section: "Asset", icon: ArrowUp },
-	{ kind: "credit-card", label: "Credit Card", section: "Liability", icon: CreditCard },
+	{
+		kind: "other-asset",
+		label: "Other Assets",
+		section: "Asset",
+		icon: ArrowUp,
+	},
+	{
+		kind: "credit-card",
+		label: "Credit Card",
+		section: "Liability",
+		icon: CreditCard,
+	},
 	{ kind: "mortgage", label: "Mortgage", section: "Liability", icon: Home },
 	{ kind: "loan", label: "Loans", section: "Liability", icon: Building2 },
 	{
@@ -244,15 +274,13 @@ function relativeTime(dateValue: string): string {
 }
 
 function isLiabilityKind(kind: AccountKind): boolean {
-	return [
-		"credit-card",
-		"mortgage",
-		"loan",
-		"other-liability",
-	].includes(kind);
+	return ["credit-card", "mortgage", "loan", "other-liability"].includes(kind);
 }
 
-function classifyAccount(name: string, balance: number): {
+function classifyAccount(
+	name: string,
+	balance: number,
+): {
 	kind: AccountKind;
 	type: string;
 	group: AccountRecord["group"];
@@ -436,11 +464,9 @@ function getDescendantParentIds(node: FilterNode): string[] {
 
 	return [
 		node.id,
-		...(
-			node.children?.flatMap((child) => {
-				return getDescendantParentIds(child);
-			}) ?? []
-		),
+		...(node.children?.flatMap((child) => {
+			return getDescendantParentIds(child);
+		}) ?? []),
 	];
 }
 
@@ -448,10 +474,7 @@ function findAccountAncestorIds(
 	tree: FilterNode[],
 	accountId: string,
 ): string[] {
-	function visit(
-		node: FilterNode,
-		ancestorIds: string[],
-	): string[] | null {
+	function visit(node: FilterNode, ancestorIds: string[]): string[] | null {
 		if (node.account?.id === accountId) {
 			return ancestorIds;
 		}
@@ -492,7 +515,10 @@ function AccountsPageSkeleton() {
 		>
 			<span className="sr-only">Loading accounts…</span>
 
-			<div aria-hidden="true" className="mb-5 flex items-center justify-between">
+			<div
+				aria-hidden="true"
+				className="mb-5 flex items-center justify-between"
+			>
 				<Shimmer className="h-7 w-28 rounded-md" />
 				<div className="flex gap-2">
 					<Shimmer className="h-10 w-24 rounded-lg" />
@@ -582,7 +608,6 @@ export default function AccountsPage() {
 	const chartType = normalizeChartType(searchParams.get("chartType"));
 	const dateRange = normalizeDateRange(searchParams.get("dateRange"));
 	const timeframe = normalizeTimeframe(searchParams.get("timeframe"));
-
 
 	useEffect(() => {
 		const hasRequiredQuery =
@@ -768,9 +793,7 @@ export default function AccountsPage() {
 				return !cutoff || date >= cutoff;
 			})
 			.sort((first, second) => {
-				return (
-					new Date(first.date).getTime() - new Date(second.date).getTime()
-				);
+				return new Date(first.date).getTime() - new Date(second.date).getTime();
 			});
 
 		const daily = new Map<string, number>();
@@ -819,13 +842,7 @@ export default function AccountsPage() {
 		}
 
 		return points;
-	}, [
-		dateRange,
-		selectedAccountIds,
-		summary,
-		timeframe,
-		transactions,
-	]);
+	}, [dateRange, selectedAccountIds, summary, timeframe, transactions]);
 
 	const filterTree = useMemo<FilterNode[]>(() => {
 		const allGroups = GROUP_ORDER.map((group) => {
@@ -842,9 +859,7 @@ export default function AccountsPage() {
 			return group.accounts.length > 0;
 		});
 
-		const convertGroup = (
-			group: (typeof allGroups)[number],
-		): FilterNode => ({
+		const convertGroup = (group: (typeof allGroups)[number]): FilterNode => ({
 			id: `group:${group.group}`,
 			label: group.group,
 			children: group.accounts.map((account) => ({
@@ -943,7 +958,6 @@ export default function AccountsPage() {
 					>
 						<Filter size={15} />
 						Filters
-
 						{selectedAccountIds.length > 0 && (
 							<span
 								aria-label={`${selectedAccountIds.length} account filters active`}
@@ -1085,6 +1099,205 @@ export default function AccountsPage() {
 	);
 }
 
+interface RechartsPerformancePoint extends ChartPoint {
+	timestamp: number;
+}
+
+interface RechartsBreakdownPoint {
+	label: string;
+	assets: number;
+	liabilities: number;
+	netWorth: number;
+}
+
+const PERFORMANCE_TOOLTIP_WIDTH = 378;
+const PERFORMANCE_TOOLTIP_HEIGHT = 174;
+const PERFORMANCE_TOOLTIP_POINT_GAP = 62;
+const PERFORMANCE_TOOLTIP_EDGE_PADDING = 12;
+const PERFORMANCE_TOOLTIP_MINIMUM_TOP = -116;
+
+interface PerformanceTooltipCardProps {
+	activePoint: RechartsPerformancePoint | null;
+	startPoint: RechartsPerformancePoint | null;
+	onMouseEnter: () => void;
+	onMouseLeave: () => void;
+}
+
+interface PerformanceTooltipState {
+	point: RechartsPerformancePoint;
+	coordinate: {
+		x: number;
+		y: number;
+	};
+	position: {
+		x: number;
+		y: number;
+	};
+}
+
+interface BreakdownTooltipPayloadEntry {
+	payload?: RechartsBreakdownPoint;
+}
+
+interface BreakdownTooltipProps {
+	active?: boolean;
+	payload?: BreakdownTooltipPayloadEntry[];
+}
+
+function getNetWorthChartDomain(
+	domain: readonly [number, number],
+): [number, number] {
+	const [dataMinimum, dataMaximum] = domain;
+	const minimum = Math.min(dataMinimum, 0);
+	const maximum = Math.max(dataMaximum, 0);
+	const span = Math.max(maximum - minimum, 1);
+	const padding = span * 0.08;
+
+	return [minimum - padding, maximum + padding];
+}
+
+function formatNetWorthXAxisTick(
+	timestamp: number,
+	dateRange: DateRange,
+	timeframe: Timeframe,
+): string {
+	const date = new Date(timestamp);
+
+	if (timeframe === "year" || dateRange === "1Y" || dateRange === "ALL") {
+		return date.toLocaleDateString("en-US", {
+			month: "short",
+			year: "2-digit",
+		});
+	}
+
+	if (dateRange === "YTD" || dateRange === "6M") {
+		return date.toLocaleDateString("en-US", {
+			month: "short",
+		});
+	}
+
+	return date.toLocaleDateString("en-US", {
+		month: "short",
+		day: "numeric",
+	});
+}
+
+function NetWorthPerformanceTooltip({
+	activePoint,
+	startPoint,
+	onMouseEnter,
+	onMouseLeave,
+}: PerformanceTooltipCardProps) {
+	if (!activePoint || !startPoint) {
+		return null;
+	}
+
+	const change = activePoint.value - startPoint.value;
+	const changePercent =
+		startPoint.value !== 0 ? (change / startPoint.value) * 100 : 0;
+	const isPositive = change >= 0;
+
+	const startDate = startPoint.date.toLocaleDateString("en-US", {
+		month: "short",
+		day: "numeric",
+		year: "numeric",
+	});
+	const endDate = activePoint.date.toLocaleDateString("en-US", {
+		month: "short",
+		day: "numeric",
+		year: "numeric",
+	});
+	const dateLabel =
+		startDate === endDate ? endDate : `${startDate} - ${endDate}`;
+
+	return (
+		<div
+			tabIndex={-1}
+			onMouseEnter={onMouseEnter}
+			onMouseLeave={onMouseLeave}
+			style={{
+				width: PERFORMANCE_TOOLTIP_WIDTH,
+				height: PERFORMANCE_TOOLTIP_HEIGHT,
+			}}
+			className="pointer-events-auto max-w-[calc(100vw-24px)] overflow-hidden rounded-[18px] border border-white/[0.04] bg-[#111111] text-white shadow-[0_24px_70px_rgba(0,0,0,0.58)]"
+		>
+			<div className="flex h-[51px] items-center border-b border-white/10 px-[21px] text-[16px] font-bold leading-none">
+				{dateLabel}
+			</div>
+
+			<div className="flex h-[55px] items-center justify-between gap-5 px-[21px]">
+				<span className="text-[17px] font-bold leading-none tracking-[-0.015em]">
+					{formatCurrency(activePoint.value)}
+				</span>
+
+				<span
+					className={`whitespace-nowrap text-[16px] font-bold leading-none ${
+						isPositive ? "text-[#27d990]" : "text-[#ff8589]"
+					}`}
+				>
+					{isPositive ? "+" : "-"}
+					{formatCurrency(Math.abs(change))}{" "}
+					<span className="ml-1">
+						({changePercent > 0 ? "+" : ""}
+						{changePercent.toFixed(2)}%)
+					</span>
+				</span>
+			</div>
+
+			<button
+				type="button"
+				className="mx-[21px] mb-[21px] flex h-12 w-[calc(100%-42px)] items-center justify-between rounded-[16px] bg-[#3b190d] px-4 text-left text-[16px] font-bold text-[#ff6b2c] transition-colors hover:bg-[#48200f]"
+			>
+				<span className="flex items-center gap-2">
+					<Sparkles size={17} strokeWidth={2.2} />
+					Explain this change
+				</span>
+
+				<ChevronRight size={18} strokeWidth={2.2} />
+			</button>
+		</div>
+	);
+}
+
+function NetWorthBreakdownTooltip({ active, payload }: BreakdownTooltipProps) {
+	const data = payload?.[0]?.payload;
+
+	if (!active || !data) {
+		return null;
+	}
+
+	return (
+		<div className="pointer-events-none min-w-72 overflow-hidden rounded-2xl border border-white/[0.05] bg-[#111111] text-white shadow-[0_24px_70px_rgba(0,0,0,0.55)]">
+			<div className="border-b border-white/10 px-5 py-4 text-base font-bold">
+				{data.label}
+			</div>
+
+			<div className="space-y-3 px-5 py-4 text-sm">
+				<div className="flex items-center justify-between gap-6">
+					<span className="flex items-center gap-2 font-semibold">
+						<span className="size-2.5 rounded-full bg-emerald-500" />
+						Assets
+					</span>
+					<strong>{formatCurrency(data.assets)}</strong>
+				</div>
+
+				<div className="flex items-center justify-between gap-6">
+					<span className="flex items-center gap-2 font-semibold">
+						<span className="size-2.5 rounded-full bg-red-500" />
+						Liabilities
+					</span>
+					<strong>{formatCurrency(Math.abs(data.liabilities))}</strong>
+				</div>
+
+				<div className="flex items-center justify-between gap-6 border-t border-white/10 pt-3">
+					<span className="font-semibold">Net Worth</span>
+					<strong>{formatCurrency(data.netWorth)}</strong>
+				</div>
+			</div>
+		</div>
+	);
+}
+
 function NetWorthChart({
 	chartType,
 	dateRange,
@@ -1102,132 +1315,90 @@ function NetWorthChart({
 	onChartTypeChange: (value: ChartType) => void;
 	onDateRangeChange: (value: DateRange) => void;
 }) {
-	const [hoverIndex, setHoverIndex] = useState<number | null>(null);
 	const [chartMenuOpen, setChartMenuOpen] = useState(false);
 	const [rangeMenuOpen, setRangeMenuOpen] = useState(false);
+	const [performanceTooltip, setPerformanceTooltip] =
+		useState<PerformanceTooltipState | null>(null);
+	const tooltipHideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+		null,
+	);
+	const chartContainerRef = useRef<HTMLDivElement | null>(null);
+	const isPerformanceTooltipHoveredRef = useRef(false);
 
-	const width = 1200;
-	const height = 250;
-	const padding = { top: 26, right: 18, bottom: 34, left: 70 };
-	const values =
-		chartType === "breakdown"
-			? [summary.assets, -summary.liabilities, summary.netWorth]
-			: points.map((point) => point.value);
-	const minimum = Math.min(...values, 0);
-	const maximum = Math.max(...values, 0);
-	const span = Math.max(maximum - minimum, 1);
-	const y = (value: number) =>
-		padding.top +
-		((maximum - value) / span) * (height - padding.top - padding.bottom);
-	const x = (index: number, count: number) =>
-		padding.left +
-		(index / Math.max(count - 1, 1)) *
-			(width - padding.left - padding.right);
-
-	const linePath = points
-		.map((point, index) => {
-			return `${index === 0 ? "M" : "L"} ${x(index, points.length)} ${y(
-				point.value,
-			)}`;
-		})
-		.join(" ");
-
-	const areaPath =
-		points.length > 0
-			? `${linePath} L ${x(points.length - 1, points.length)} ${y(
-					minimum,
-				)} L ${x(0, points.length)} ${y(minimum)} Z`
-			: "";
-
-	const activePoint =
-		hoverIndex === null ? null : points[Math.min(hoverIndex, points.length - 1)];
-	const tooltipStartPoint = points[0] ?? null;
-	const tooltipChange =
-		activePoint && tooltipStartPoint
-			? activePoint.value - tooltipStartPoint.value
-			: 0;
-	const tooltipChangePercent =
-		tooltipStartPoint && tooltipStartPoint.value !== 0
-			? Math.abs((tooltipChange / tooltipStartPoint.value) * 100)
-			: 0;
-	const tooltipIsPositive = tooltipChange >= 0;
-	const tooltipStartDate = tooltipStartPoint?.date.toLocaleDateString("en-US", {
-		month: "short",
-		day: "numeric",
-		year: "numeric",
-	});
-	const tooltipEndDate = activePoint?.date.toLocaleDateString("en-US", {
-		month: "short",
-		day: "numeric",
-		year: "numeric",
-	});
-	const tooltipDateLabel =
-		tooltipStartDate && tooltipEndDate && tooltipStartDate !== tooltipEndDate
-			? `${tooltipStartDate} - ${tooltipEndDate}`
-			: tooltipEndDate ?? tooltipStartDate ?? "";
-
-	const xAxisTickIndexes = (() => {
-		if (chartType !== "performance") {
-			return [0];
+	const clearTooltipHideTimeout = (): void => {
+		if (tooltipHideTimeoutRef.current) {
+			clearTimeout(tooltipHideTimeoutRef.current);
+			tooltipHideTimeoutRef.current = null;
 		}
-
-		const maximumTickCount = 7;
-
-		if (points.length <= maximumTickCount) {
-			return points.map((_, index) => index);
-		}
-
-		const indexes = new Set<number>();
-
-		for (let tickIndex = 0; tickIndex < maximumTickCount; tickIndex++) {
-			indexes.add(
-				Math.round(
-					(tickIndex / (maximumTickCount - 1)) * (points.length - 1),
-				),
-			);
-		}
-
-		return [...indexes];
-	})();
-
-	const formatXAxisLabel = (point: ChartPoint): string => {
-		if (
-			timeframe === "year" ||
-			dateRange === "1Y" ||
-			dateRange === "ALL"
-		) {
-			return point.date.toLocaleDateString("en-US", {
-				month: "short",
-				year: "2-digit",
-			});
-		}
-
-		if (dateRange === "YTD" || dateRange === "6M") {
-			return point.date.toLocaleDateString("en-US", {
-				month: "short",
-			});
-		}
-
-		return point.date.toLocaleDateString("en-US", {
-			month: "short",
-			day: "numeric",
-		});
 	};
 
-	const tooltipLeftPercent =
-		activePoint && hoverIndex !== null
-			? Math.min(
-					80,
-					Math.max(
-						20,
-						(x(hoverIndex, points.length) / width) * 100,
-					),
-				)
-			: 50;
+	const hidePerformanceTooltip = (): void => {
+		clearTooltipHideTimeout();
+		tooltipHideTimeoutRef.current = setTimeout(() => {
+			if (!isPerformanceTooltipHoveredRef.current) {
+				setPerformanceTooltip(null);
+			}
+			tooltipHideTimeoutRef.current = null;
+		}, 220);
+	};
 
-	const tooltipTopPercent = activePoint
-		? (y(activePoint.value) / height) * 100
-		: 0;
+	const clearPerformanceTooltip = (): void => {
+		clearTooltipHideTimeout();
+		isPerformanceTooltipHoveredRef.current = false;
+		setPerformanceTooltip(null);
+	};
+
+	const handlePerformanceTooltipMouseEnter = (): void => {
+		isPerformanceTooltipHoveredRef.current = true;
+		clearTooltipHideTimeout();
+	};
+
+	const handlePerformanceTooltipMouseLeave = (): void => {
+		isPerformanceTooltipHoveredRef.current = false;
+		hidePerformanceTooltip();
+	};
+
+	const performanceTooltipPosition = performanceTooltip?.position;
+
+	const performanceData: RechartsPerformancePoint[] = points.map((point) => {
+		return {
+			...point,
+			timestamp: point.date.getTime(),
+		};
+	});
+
+	const performanceValues = performanceData.map((point) => {
+		return point.value;
+	});
+	const performanceDomain = getNetWorthChartDomain([
+		Math.min(...performanceValues, 0),
+		Math.max(...performanceValues, 0),
+	]);
+
+	const breakdownData: RechartsBreakdownPoint[] = [
+		{
+			label:
+				timeframe === "year"
+					? String(new Date().getFullYear())
+					: new Date().toLocaleDateString("en-US", {
+							month: "short",
+							year: "numeric",
+						}),
+			assets: summary.assets,
+			liabilities: -summary.liabilities,
+			netWorth: summary.netWorth,
+		},
+	];
+
+	const breakdownValues = [
+		summary.assets,
+		-summary.liabilities,
+		summary.netWorth,
+	];
+	const breakdownDomain = getNetWorthChartDomain([
+		Math.min(...breakdownValues, 0),
+		Math.max(...breakdownValues, 0),
+	]);
 
 	return (
 		<section className="relative rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5 dark:border-white/5 dark:bg-[#222]">
@@ -1235,7 +1406,7 @@ function NetWorthChart({
 				<div>
 					<div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.17em] text-gray-500 dark:text-zinc-400">
 						Net Worth
-						<span className="flex size-3.5 items-center justify-center rounded-full border border-zinc-500 text-[8px]">
+						<span className="flex size-3.5 items-center justify-center rounded-full border border-gray-400 text-[8px] dark:border-zinc-500">
 							i
 						</span>
 					</div>
@@ -1244,14 +1415,18 @@ function NetWorthChart({
 						<strong className="text-2xl font-semibold tracking-tight sm:text-3xl">
 							{formatCurrency(summary.netWorth)}
 						</strong>
+
 						<span
 							className={`text-sm font-semibold ${
-								summary.netWorth >= 0 ? "text-emerald-400" : "text-red-400"
+								summary.netWorth >= 0
+									? "text-emerald-500 dark:text-emerald-400"
+									: "text-red-500 dark:text-red-400"
 							}`}
 						>
 							{summary.netWorth >= 0 ? "↗" : "↘"}{" "}
 							{formatCurrency(Math.abs(summary.netWorth))}
 						</span>
+
 						<span className="text-sm font-medium text-gray-500 dark:text-zinc-400">
 							{chartType === "breakdown"
 								? timeframe === "year"
@@ -1272,7 +1447,10 @@ function NetWorthChart({
 						open={chartMenuOpen}
 						onOpenChange={(open) => {
 							setChartMenuOpen(open);
-							if (open) setRangeMenuOpen(false);
+
+							if (open) {
+								setRangeMenuOpen(false);
+							}
 						}}
 						options={[
 							{ value: "performance", label: "Performance" },
@@ -1292,14 +1470,17 @@ function NetWorthChart({
 								? timeframe === "year"
 									? "Yearly"
 									: "Monthly"
-								: DATE_RANGE_OPTIONS.find(
+								: (DATE_RANGE_OPTIONS.find(
 										(option) => option.value === dateRange,
-									)?.label ?? "1 month"
+									)?.label ?? "1 month")
 						}
 						open={rangeMenuOpen}
 						onOpenChange={(open) => {
 							setRangeMenuOpen(open);
-							if (open) setChartMenuOpen(false);
+
+							if (open) {
+								setChartMenuOpen(false);
+							}
 						}}
 						options={
 							chartType === "breakdown"
@@ -1319,186 +1500,313 @@ function NetWorthChart({
 				</div>
 			</div>
 
-			<div className="relative mt-5 h-[250px] w-full">
-				<svg
-					viewBox={`0 0 ${width} ${height}`}
-					preserveAspectRatio="none"
-					className="h-full w-full overflow-visible"
-					onMouseLeave={() => setHoverIndex(null)}
-					onMouseMove={(event) => {
-						if (chartType !== "performance" || points.length === 0) {
-							return;
-						}
+			<div
+				ref={chartContainerRef}
+				onMouseLeave={clearPerformanceTooltip}
+				className="relative mt-5 h-[280px] w-full"
+			>
+				{chartType === "performance" ? (
+					<>
+						<ResponsiveContainer width="100%" height="100%">
+							<AreaChart
+								data={performanceData}
+								margin={{
+									top: 30,
+									right: 18,
+									bottom: 8,
+									left: 0,
+								}}
+								onMouseMove={(state) => {
+									if (isPerformanceTooltipHoveredRef.current) {
+										return;
+									}
 
-						const bounds = event.currentTarget.getBoundingClientRect();
-						const ratio = (event.clientX - bounds.left) / bounds.width;
-						const index = Math.round(ratio * (points.length - 1));
-						setHoverIndex(Math.max(0, Math.min(points.length - 1, index)));
-					}}
-				>
-					{Array.from({ length: 5 }, (_, index) => {
-						const lineY =
-							padding.top +
-							(index / 4) * (height - padding.top - padding.bottom);
-						const value = maximum - (index / 4) * span;
+									const pointIndex = Number(state.activeTooltipIndex);
+									const coordinate = state.activeCoordinate;
+									const point = performanceData[pointIndex];
 
-						return (
-							<g key={index}>
-								<line
-									x1={padding.left}
-									x2={width - padding.right}
-									y1={lineY}
-									y2={lineY}
-									className="stroke-gray-200 dark:stroke-white/10"
-									strokeWidth="1"
-								/>
-								<text
-									x={padding.left - 16}
-									y={lineY + 4}
-									textAnchor="end"
-									fontSize="12"
-									className="fill-gray-500 dark:fill-[#8a8a8a]"
-								>
-									{compactCurrency(value)}
-								</text>
-							</g>
-						);
-					})}
+									if (
+										!point ||
+										!coordinate ||
+										typeof coordinate.x !== "number" ||
+										typeof coordinate.y !== "number"
+									) {
+										return;
+									}
 
-					{chartType === "performance" ? (
-						<>
-							<defs>
-								<linearGradient id="accountArea" x1="0" y1="0" x2="0" y2="1">
-									<stop offset="0%" stopColor="#08b7df" stopOpacity="0.27" />
-									<stop offset="100%" stopColor="#08b7df" stopOpacity="0.05" />
-								</linearGradient>
-							</defs>
-							<path d={areaPath} fill="url(#accountArea)" />
-							<path
-								d={linePath}
-								fill="none"
-								stroke="#08b7df"
-								strokeWidth="3"
-								vectorEffect="non-scaling-stroke"
-							/>
+									const chartWidth =
+										chartContainerRef.current?.clientWidth ?? 0;
+									const desiredLeft =
+										coordinate.x - PERFORMANCE_TOOLTIP_WIDTH / 2;
+									const maximumLeft = Math.max(
+										PERFORMANCE_TOOLTIP_EDGE_PADDING,
+										chartWidth -
+											PERFORMANCE_TOOLTIP_WIDTH -
+											PERFORMANCE_TOOLTIP_EDGE_PADDING,
+									);
+									const clampedLeft =
+										chartWidth > 0
+											? Math.min(
+													Math.max(
+														desiredLeft,
+														PERFORMANCE_TOOLTIP_EDGE_PADDING,
+													),
+													maximumLeft,
+												)
+											: desiredLeft;
+									const clampedTop = Math.max(
+										PERFORMANCE_TOOLTIP_MINIMUM_TOP,
+										coordinate.y -
+											PERFORMANCE_TOOLTIP_HEIGHT -
+											PERFORMANCE_TOOLTIP_POINT_GAP,
+									);
 
-							{activePoint && hoverIndex !== null && (
-								<>
-									<line
-										x1={x(hoverIndex, points.length)}
-										x2={x(hoverIndex, points.length)}
-										y1={padding.top}
-										y2={height - padding.bottom}
-										stroke="#525252"
-										strokeDasharray="6 5"
-									/>
-									<circle
-										cx={x(hoverIndex, points.length)}
-										cy={y(activePoint.value)}
-										r="6"
-										fill="#08b7df"
-										stroke="white"
-										strokeWidth="3"
-										vectorEffect="non-scaling-stroke"
-									/>
-								</>
-							)}
-						</>
-					) : (
-						<>
-							<rect
-								x={width / 2 - 34}
-								y={y(summary.assets)}
-								width="34"
-								height={Math.max(y(0) - y(summary.assets), 1)}
-								fill="#35aa76"
-							/>
-							<rect
-								x={width / 2}
-								y={y(0)}
-								width="34"
-								height={Math.max(y(-summary.liabilities) - y(0), 1)}
-								fill="#ed4650"
-							/>
-						</>
-					)}
-
-					{chartType === "performance" ? (
-						xAxisTickIndexes.map((pointIndex) => {
-							const point = points[pointIndex];
-
-							if (!point) {
-								return null;
-							}
-
-							return (
-								<text
-									key={`${point.date.toISOString()}-${pointIndex}`}
-									x={x(pointIndex, points.length)}
-									y={height - 8}
-									textAnchor="middle"
-									fontSize="11"
-									className="fill-gray-500 dark:fill-[#878787]"
-								>
-									{formatXAxisLabel(point)}
-								</text>
-							);
-						})
-					) : (
-						<text
-							x={width / 2}
-							y={height - 8}
-							textAnchor="middle"
-							fontSize="11"
-							className="fill-gray-500 dark:fill-[#878787]"
-						>
-							{new Date().getFullYear()}
-						</text>
-					)}
-				</svg>
-
-				{activePoint && hoverIndex !== null && (
-					<div
-						className="pointer-events-none absolute z-40 w-[380px] max-w-[calc(100vw-32px)] overflow-hidden rounded-[20px] border border-white/[0.04] bg-[#111111] text-white shadow-[0_24px_70px_rgba(0,0,0,0.55)]"
-						style={{
-							left: `${tooltipLeftPercent}%`,
-							top: `${tooltipTopPercent}%`,
-							transform: "translate(-50%, calc(-100% - 14px))",
-						}}
-					>
-						<div className="border-b border-white/10 px-5 py-4 text-[15px] font-bold leading-none">
-							{tooltipDateLabel}
-						</div>
-
-						<div className="flex items-center justify-between gap-5 px-5 py-4">
-							<span className="text-[17px] font-bold leading-none tracking-[-0.01em]">
-								{formatCurrency(activePoint.value)}
-							</span>
-
-							<span
-								className={`whitespace-nowrap text-[15px] font-bold leading-none ${
-									tooltipIsPositive
-										? "text-emerald-400"
-										: "text-[#ff8589]"
-								}`}
+									clearTooltipHideTimeout();
+									setPerformanceTooltip({
+										point,
+										coordinate: {
+											x: coordinate.x,
+											y: coordinate.y,
+										},
+										position: {
+											x: clampedLeft,
+											y: clampedTop,
+										},
+									});
+								}}
 							>
-								{tooltipIsPositive ? "+" : "-"}
-								{formatCurrency(Math.abs(tooltipChange))}{" "}
-								<span className="ml-1">
-									({tooltipChangePercent.toFixed(2)}%)
-								</span>
-							</span>
-						</div>
+								<defs>
+									<linearGradient
+										id="activePointVerticalGradient"
+										x1="0"
+										y1="0"
+										x2="0"
+										y2="1"
+									>
+										<stop offset="0%" stopColor="#08b7df" stopOpacity={0.95} />
+										<stop
+											offset="100%"
+											stopColor="#08b7df"
+											stopOpacity={0.06}
+										/>
+									</linearGradient>
 
-						<div className="mx-5 mb-5 flex h-12 items-center justify-between rounded-[16px] bg-[#4a2010] px-4 text-[15px] font-bold text-[#ff6b2c]">
-							<span className="flex items-center gap-2">
-								<Sparkles size={17} strokeWidth={2.2} />
-								Explain this change
-							</span>
+									<linearGradient
+										id="netWorthAreaGradient"
+										x1="0"
+										y1="0"
+										x2="0"
+										y2="1"
+									>
+										<stop offset="0%" stopColor="#08b7df" stopOpacity={0.27} />
+										<stop
+											offset="100%"
+											stopColor="#08b7df"
+											stopOpacity={0.05}
+										/>
+									</linearGradient>
+								</defs>
 
-							<ChevronRight size={18} strokeWidth={2.2} />
-						</div>
-					</div>
+								<CartesianGrid
+									vertical={false}
+									stroke="rgba(148, 163, 184, 0.24)"
+								/>
+
+								<XAxis
+									type="number"
+									dataKey="timestamp"
+									domain={["dataMin", "dataMax"]}
+									scale="time"
+									tickCount={7}
+									minTickGap={42}
+									tickLine={false}
+									axisLine={false}
+									tickMargin={14}
+									tick={{
+										fill: "#878787",
+										fontSize: 11,
+									}}
+									tickFormatter={(timestamp: number) => {
+										return formatNetWorthXAxisTick(
+											timestamp,
+											dateRange,
+											timeframe,
+										);
+									}}
+								/>
+
+								<YAxis
+									width={72}
+									tickCount={5}
+									tickLine={false}
+									axisLine={false}
+									tick={{
+										fill: "#8a8a8a",
+										fontSize: 12,
+									}}
+									tickFormatter={compactCurrency}
+									domain={performanceDomain}
+								/>
+
+								<Tooltip
+									active={Boolean(performanceTooltip)}
+									position={performanceTooltipPosition}
+									content={
+										<NetWorthPerformanceTooltip
+											activePoint={performanceTooltip?.point ?? null}
+											startPoint={performanceData[0] ?? null}
+											onMouseEnter={handlePerformanceTooltipMouseEnter}
+											onMouseLeave={handlePerformanceTooltipMouseLeave}
+										/>
+									}
+									cursor={false}
+									allowEscapeViewBox={{
+										x: true,
+										y: true,
+									}}
+									isAnimationActive={false}
+									wrapperStyle={{
+										width: PERFORMANCE_TOOLTIP_WIDTH,
+										height: PERFORMANCE_TOOLTIP_HEIGHT,
+										outline: "none",
+										pointerEvents: "auto",
+										transition: "none",
+										zIndex: 40,
+									}}
+								/>
+
+								<Area
+									type="linear"
+									dataKey="value"
+									name="Net Worth"
+									stroke="#08b7df"
+									strokeWidth={3}
+									fill="url(#netWorthAreaGradient)"
+									fillOpacity={1}
+									baseValue="dataMin"
+									connectNulls
+									isAnimationActive={false}
+									dot={false}
+									activeDot={{
+										r: 6,
+										fill: "#08b7df",
+										stroke: "#ffffff",
+										strokeWidth: 3,
+									}}
+								/>
+
+								{performanceTooltip && (
+									<>
+										<ReferenceLine
+											segment={[
+												{
+													x: performanceTooltip.point.timestamp,
+													y: performanceTooltip.point.value,
+												},
+												{
+													x: performanceTooltip.point.timestamp,
+													y: performanceDomain[0],
+												},
+											]}
+											stroke="url(#activePointVerticalGradient)"
+											strokeWidth={4}
+										/>
+
+										<ReferenceDot
+											x={performanceTooltip.point.timestamp}
+											y={performanceTooltip.point.value}
+											r={8}
+											fill="#08b7df"
+											stroke="#ffffff"
+											strokeWidth={4}
+										/>
+									</>
+								)}
+							</AreaChart>
+						</ResponsiveContainer>
+					</>
+				) : (
+					<ResponsiveContainer width="100%" height="100%">
+						<BarChart
+							data={breakdownData}
+							stackOffset="sign"
+							barCategoryGap="58%"
+							margin={{
+								top: 30,
+								right: 18,
+								bottom: 8,
+								left: 0,
+							}}
+						>
+							<CartesianGrid
+								vertical={false}
+								stroke="rgba(148, 163, 184, 0.24)"
+							/>
+
+							<XAxis
+								dataKey="label"
+								tickLine={false}
+								axisLine={false}
+								tickMargin={14}
+								tick={{
+									fill: "#878787",
+									fontSize: 11,
+								}}
+							/>
+
+							<YAxis
+								width={72}
+								tickCount={5}
+								tickLine={false}
+								axisLine={false}
+								tick={{
+									fill: "#8a8a8a",
+									fontSize: 12,
+								}}
+								tickFormatter={compactCurrency}
+								domain={breakdownDomain}
+							/>
+
+							<ReferenceLine y={0} stroke="rgba(148, 163, 184, 0.36)" />
+
+							<Tooltip
+								content={<NetWorthBreakdownTooltip />}
+								cursor={{
+									fill: "rgba(255,255,255,0.025)",
+								}}
+								offset={18}
+								allowEscapeViewBox={{
+									x: true,
+									y: true,
+								}}
+								isAnimationActive={false}
+								wrapperStyle={{
+									outline: "none",
+									zIndex: 40,
+								}}
+							/>
+
+							<Bar
+								dataKey="assets"
+								name="Assets"
+								stackId="net-worth"
+								fill="#35aa76"
+								barSize={58}
+								radius={[5, 5, 0, 0]}
+								isAnimationActive={false}
+							/>
+
+							<Bar
+								dataKey="liabilities"
+								name="Liabilities"
+								stackId="net-worth"
+								fill="#ed4650"
+								barSize={58}
+								radius={[0, 0, 5, 5]}
+								isAnimationActive={false}
+							/>
+						</BarChart>
+					</ResponsiveContainer>
 				)}
 			</div>
 		</section>
@@ -1523,34 +1831,58 @@ function Dropdown({
 	className?: string;
 }) {
 	return (
-		<div className={`relative ${className}`}>
-			<button
-				type="button"
-				onClick={() => onOpenChange(!open)}
-				className="flex h-11 w-full items-center justify-between gap-4 rounded-lg border border-gray-200 bg-white px-3 text-left text-sm font-medium text-gray-900 dark:border-white/10 dark:bg-[#202020] dark:text-white"
-			>
-				{label}
-				<ChevronDown size={15} />
-			</button>
+		<DropdownMenu.Root open={open} onOpenChange={onOpenChange} modal={false}>
+			<div className={className}>
+				<DropdownMenu.Trigger asChild>
+					<button
+						type="button"
+						className="flex h-11 w-full items-center justify-between gap-4 rounded-lg border border-gray-200 bg-white px-3 text-left text-sm font-medium text-gray-900 outline-none transition-colors hover:bg-gray-50 focus-visible:ring-2 focus-visible:ring-cyan-500/30 data-[state=open]:border-cyan-500 dark:border-white/10 dark:bg-[#202020] dark:text-white dark:hover:bg-[#292929]"
+					>
+						<span className="truncate">{label}</span>
+						<ChevronDown
+							size={15}
+							className="shrink-0 transition-transform data-[state=open]:rotate-180"
+						/>
+					</button>
+				</DropdownMenu.Trigger>
 
-			{open && (
-				<div className="absolute right-0 top-[calc(100%+8px)] z-50 w-full min-w-48 overflow-hidden rounded-xl border border-gray-200 bg-white p-2 text-gray-900 shadow-2xl dark:border-white/10 dark:bg-[#222] dark:text-white">
-					{options.map((option) => (
-						<button
-							key={option.value}
-							type="button"
-							onClick={() => onChange(option.value)}
-							className={`flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left text-sm transition hover:bg-white/5 ${
-								value === option.value ? "text-white" : "text-gray-700 dark:text-zinc-300"
-							}`}
-						>
-							{option.label}
-							{value === option.value && <Check size={15} />}
-						</button>
-					))}
-				</div>
-			)}
-		</div>
+				<DropdownMenu.Portal>
+					<DropdownMenu.Content
+						align="end"
+						side="bottom"
+						sideOffset={8}
+						collisionPadding={12}
+						loop
+						className="z-[120] min-w-[var(--radix-dropdown-menu-trigger-width)] overflow-hidden rounded-xl border border-gray-200 bg-white p-2 text-gray-900 shadow-2xl outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 dark:border-white/10 dark:bg-[#222] dark:text-white"
+					>
+						<DropdownMenu.RadioGroup value={value} onValueChange={onChange}>
+							{options.map((option) => {
+								const isSelected = value === option.value;
+
+								return (
+									<DropdownMenu.RadioItem
+										key={option.value}
+										value={option.value}
+										textValue={option.label}
+										className={`relative flex min-h-10 cursor-default select-none items-center justify-between gap-3 rounded-lg px-3 text-sm outline-none transition-colors data-[highlighted]:bg-gray-100 data-[highlighted]:text-gray-900 dark:data-[highlighted]:bg-white/5 dark:data-[highlighted]:text-white ${
+											isSelected
+												? "font-semibold text-gray-900 dark:text-white"
+												: "text-gray-700 dark:text-zinc-300"
+										}`}
+									>
+										<span>{option.label}</span>
+
+										<DropdownMenu.ItemIndicator>
+											<Check size={15} />
+										</DropdownMenu.ItemIndicator>
+									</DropdownMenu.RadioItem>
+								);
+							})}
+						</DropdownMenu.RadioGroup>
+					</DropdownMenu.Content>
+				</DropdownMenu.Portal>
+			</div>
+		</DropdownMenu.Root>
 	);
 }
 
@@ -1596,7 +1928,9 @@ function AccountGroupCard({
 						↗ {formatCurrency(change)}
 						{isLiability ? " (30.6%)" : ""}
 					</span>
-					<span className="text-sm text-gray-500 dark:text-zinc-400">1 month change</span>
+					<span className="text-sm text-gray-500 dark:text-zinc-400">
+						1 month change
+					</span>
 				</div>
 
 				<strong className="shrink-0">{formatCurrency(total)}</strong>
@@ -1693,11 +2027,7 @@ function SummaryPanel({
 	const liabilityAccounts = accounts.filter((account) => account.isLiability);
 	const [showInsight, setShowInsight] = useState(false);
 
-	const renderRows = (
-		rows: AccountRecord[],
-		total: number,
-		color: string,
-	) => {
+	const renderRows = (rows: AccountRecord[], total: number, color: string) => {
 		const groupTotals = new Map<string, number>();
 
 		for (const account of rows) {
@@ -1776,21 +2106,26 @@ function SummaryPanel({
 					)}
 				</div>
 
-				<div className="flex rounded-full bg-[#2b2b2b] p-1 text-xs">
+				<div className="flex rounded-full border border-gray-200 bg-gray-100 p-1 text-xs dark:border-white/5 dark:bg-[#2b2b2b]">
 					<button
 						type="button"
 						onClick={() => onModeChange("totals")}
-						className={`rounded-full px-3 py-1.5 ${
-							mode === "totals" ? "bg-[#353535] text-white" : "text-gray-500 dark:text-zinc-400"
+						className={`rounded-full px-3 py-1.5 font-medium transition-colors ${
+							mode === "totals"
+								? "bg-white text-gray-900 shadow-sm dark:bg-[#353535] dark:text-white dark:shadow-none"
+								: "text-gray-500 hover:text-gray-900 dark:text-zinc-400 dark:hover:text-white"
 						}`}
 					>
 						Totals
 					</button>
+
 					<button
 						type="button"
 						onClick={() => onModeChange("percent")}
-						className={`rounded-full px-3 py-1.5 ${
-							mode === "percent" ? "bg-[#353535] text-white" : "text-gray-500 dark:text-zinc-400"
+						className={`rounded-full px-3 py-1.5 font-medium transition-colors ${
+							mode === "percent"
+								? "bg-white text-gray-900 shadow-sm dark:bg-[#353535] dark:text-white dark:shadow-none"
+								: "text-gray-500 hover:text-gray-900 dark:text-zinc-400 dark:hover:text-white"
 						}`}
 					>
 						Percent
@@ -1911,11 +2246,15 @@ function AccountFilterModal({
 
 	const allAccounts = useMemo(() => {
 		return tree.flatMap((section) => {
-			return section.children?.flatMap((group) => {
-				return group.children?.flatMap((node) => {
-					return node.account ? [node.account] : [];
-				}) ?? [];
-			}) ?? [];
+			return (
+				section.children?.flatMap((group) => {
+					return (
+						group.children?.flatMap((node) => {
+							return node.account ? [node.account] : [];
+						}) ?? []
+					);
+				}) ?? []
+			);
 		});
 	}, [tree]);
 
@@ -1942,11 +2281,9 @@ function AccountFilterModal({
 			}
 
 			const visibleChildren =
-				node.children
-					?.map(filterNode)
-					.filter((child): child is FilterNode => {
-						return child !== null;
-					}) ?? [];
+				node.children?.map(filterNode).filter((child): child is FilterNode => {
+					return child !== null;
+				}) ?? [];
 
 			if (ownMatch) {
 				return node;
@@ -1962,11 +2299,9 @@ function AccountFilterModal({
 			};
 		};
 
-		return tree
-			.map(filterNode)
-			.filter((node): node is FilterNode => {
-				return node !== null;
-			});
+		return tree.map(filterNode).filter((node): node is FilterNode => {
+			return node !== null;
+		});
 	}, [query, tree]);
 
 	const selectedAccounts = useMemo(() => {
@@ -1979,10 +2314,7 @@ function AccountFilterModal({
 			});
 	}, [accountById, selectedIds]);
 
-	const toggleAccount = (
-		accountId: string,
-		ancestorIds: string[],
-	): void => {
+	const toggleAccount = (accountId: string, ancestorIds: string[]): void => {
 		const resolvedAncestorIds =
 			ancestorIds.length > 0
 				? ancestorIds
@@ -2144,11 +2476,7 @@ function AccountFilterModal({
 
 	return (
 		<FloatingPortal>
-			<FloatingFocusManager
-				context={context}
-				initialFocus={-1}
-				modal={false}
-			>
+			<FloatingFocusManager context={context} initialFocus={-1} modal={false}>
 				<div
 					ref={setFloatingElement}
 					style={floatingStyles}
@@ -2157,194 +2485,190 @@ function AccountFilterModal({
 					})}
 					className="z-[100] w-[min(900px,calc(100vw-24px))] overflow-hidden rounded-2xl border border-gray-200 bg-white text-gray-900 shadow-2xl dark:border-white/10 dark:bg-[#1B1B1B] dark:text-white"
 				>
-						<div className="flex h-[min(610px,calc(100vh-96px))] min-h-[460px] flex-col">
-							<div className="grid min-h-0 flex-1 grid-cols-[180px_350px_minmax(260px,1fr)]">
-								<aside className="border-r border-gray-200 dark:border-white/10">
-									<h2 className="flex h-14 items-center border-b border-gray-200 px-5 text-lg font-semibold text-gray-900 dark:border-white/10 dark:text-white">
-										Filters
-									</h2>
+					<div className="flex h-[min(610px,calc(100vh-96px))] min-h-[460px] flex-col">
+						<div className="grid min-h-0 flex-1 grid-cols-[180px_350px_minmax(260px,1fr)]">
+							<aside className="border-r border-gray-200 dark:border-white/10">
+								<h2 className="flex h-14 items-center border-b border-gray-200 px-5 text-lg font-semibold text-gray-900 dark:border-white/10 dark:text-white">
+									Filters
+								</h2>
 
-									<nav className="space-y-0.5 px-2 py-2">
+								<nav className="space-y-0.5 px-2 py-2">
+									<button
+										type="button"
+										onClick={() => {
+											onQueryChange("");
+										}}
+										className="w-full rounded-lg bg-cyan-100 px-3 py-2 text-left text-sm font-medium text-cyan-700 transition-colors dark:bg-cyan-500/15 dark:text-cyan-300"
+									>
+										Accounts
+									</button>
+								</nav>
+							</aside>
+
+							<section className="flex min-h-0 flex-col border-r border-gray-200 dark:border-white/10">
+								<label className="flex h-14 items-center gap-2.5 border-b border-gray-200 px-4 dark:border-white/10">
+									<Search size={19} className="text-gray-500" strokeWidth={2} />
+
+									<input
+										value={query}
+										onChange={(event) => {
+											onQueryChange(event.target.value);
+										}}
+										placeholder="Search..."
+										className="min-w-0 flex-1 bg-transparent text-base text-gray-900 outline-none placeholder:text-gray-400 dark:text-white"
+									/>
+
+									{query && (
 										<button
 											type="button"
+											aria-label="Clear filter search"
 											onClick={() => {
 												onQueryChange("");
 											}}
-											className="w-full rounded-lg bg-cyan-100 px-3 py-2 text-left text-sm font-medium text-cyan-700 transition-colors dark:bg-cyan-500/15 dark:text-cyan-300"
+											className="rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-white/10 dark:hover:text-white"
 										>
-											Accounts
+											<X size={17} />
 										</button>
-									</nav>
-								</aside>
+									)}
+								</label>
 
-								<section className="flex min-h-0 flex-col border-r border-gray-200 dark:border-white/10">
-									<label className="flex h-14 items-center gap-2.5 border-b border-gray-200 px-4 dark:border-white/10">
-										<Search
-											size={19}
-											className="text-gray-500"
-											strokeWidth={2}
-										/>
-
-										<input
-											value={query}
-											onChange={(event) => {
-												onQueryChange(event.target.value);
-											}}
-											placeholder="Search..."
-											className="min-w-0 flex-1 bg-transparent text-base text-gray-900 outline-none placeholder:text-gray-400 dark:text-white"
-										/>
-
-										{query && (
-											<button
-												type="button"
-												aria-label="Clear filter search"
-												onClick={() => {
-													onQueryChange("");
-												}}
-												className="rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-white/10 dark:hover:text-white"
-											>
-												<X size={17} />
-											</button>
-										)}
-									</label>
-
-									<div className="min-h-0 flex-1 overflow-y-auto">
-										{visibleTree.length === 0 ? (
-											<div className="flex h-full flex-col items-center justify-center px-8 text-center">
-												<Search
-													size={38}
-													strokeWidth={1.6}
-													className="text-gray-400"
+								<div className="min-h-0 flex-1 overflow-y-auto">
+									{visibleTree.length === 0 ? (
+										<div className="flex h-full flex-col items-center justify-center px-8 text-center">
+											<Search
+												size={38}
+												strokeWidth={1.6}
+												className="text-gray-400"
+											/>
+											<h3 className="mt-5 text-lg font-semibold text-gray-900 dark:text-white">
+												No results found
+											</h3>
+											<p className="mt-3 text-base font-medium text-gray-500 dark:text-gray-400">
+												Try searching for something else.
+											</p>
+										</div>
+									) : (
+										<div className="px-3 py-2">
+											<label className="flex min-h-9 cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 font-semibold transition-colors hover:bg-gray-50 dark:hover:bg-white/5">
+												<input
+													type="checkbox"
+													checked={selectAllExplicit}
+													onChange={toggleSelectAll}
+													className="h-4 w-4 shrink-0 rounded border-gray-300 text-[#FF5A35] focus:ring-[#FF5A35]/30 dark:border-white/20 dark:bg-transparent"
 												/>
-												<h3 className="mt-5 text-lg font-semibold text-gray-900 dark:text-white">
-													No results found
-												</h3>
-												<p className="mt-3 text-base font-medium text-gray-500 dark:text-gray-400">
-													Try searching for something else.
-												</p>
-											</div>
-										) : (
-											<div className="px-3 py-2">
-												<label className="flex min-h-9 cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 font-semibold transition-colors hover:bg-gray-50 dark:hover:bg-white/5">
-													<input
-														type="checkbox"
-														checked={selectAllExplicit}
-														onChange={toggleSelectAll}
-														className="h-4 w-4 shrink-0 rounded border-gray-300 text-[#FF5A35] focus:ring-[#FF5A35]/30 dark:border-white/20 dark:bg-transparent"
-													/>
-													<span className="text-sm">Select all</span>
-												</label>
+												<span className="text-sm">Select all</span>
+											</label>
 
-												<div className="mt-1 space-y-0.5">
-													{visibleTree.map((node) => {
-														return renderNode(node, 0, []);
+											<div className="mt-1 space-y-0.5">
+												{visibleTree.map((node) => {
+													return renderNode(node, 0, []);
+												})}
+											</div>
+										</div>
+									)}
+								</div>
+							</section>
+
+							<section className="flex min-h-0 flex-col">
+								<div className="flex h-14 items-center border-b border-gray-200 px-4 dark:border-white/10">
+									<h3 className="text-base font-semibold text-gray-500 dark:text-gray-400">
+										{activeCount} {activeCount === 1 ? "filter" : "filters"}{" "}
+										selected
+									</h3>
+								</div>
+
+								<div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+									{selectedAccounts.length === 0 ? (
+										<div className="flex h-full items-center justify-center text-center text-sm text-gray-400">
+											Selected filters will appear here.
+										</div>
+									) : (
+										<div className="space-y-4">
+											<section>
+												<div className="mb-1.5 flex items-center justify-between gap-3">
+													<h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400">
+														Accounts
+													</h4>
+
+													<button
+														type="button"
+														onClick={clearDraftFilters}
+														className="text-xs font-semibold text-cyan-600 transition-colors hover:text-cyan-700 dark:text-cyan-400 dark:hover:text-cyan-300"
+													>
+														Clear
+													</button>
+												</div>
+
+												<div className="space-y-1">
+													{selectedAccounts.map((account) => {
+														const Icon = accountIcon(account.kind);
+
+														return (
+															<button
+																key={account.id}
+																type="button"
+																aria-label={`Remove ${account.name} filter`}
+																onClick={() => {
+																	toggleAccount(account.id, []);
+																}}
+																className="flex min-h-9 w-full cursor-pointer items-center justify-between gap-3 rounded-md px-1 text-left transition-colors hover:bg-gray-50 dark:hover:bg-white/5"
+															>
+																<div className="flex min-w-0 items-center gap-2">
+																	<span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white">
+																		<Icon size={11} />
+																	</span>
+
+																	<p className="min-w-0 truncate text-sm font-medium text-gray-900 dark:text-white">
+																		{account.name}
+																	</p>
+																</div>
+
+																<CircleX
+																	size={18}
+																	strokeWidth={2.2}
+																	className="shrink-0 text-gray-400 transition-colors group-hover:text-gray-700 dark:group-hover:text-gray-200"
+																/>
+															</button>
+														);
 													})}
 												</div>
-											</div>
-										)}
-									</div>
-								</section>
+											</section>
+										</div>
+									)}
+								</div>
+							</section>
+						</div>
 
-								<section className="flex min-h-0 flex-col">
-									<div className="flex h-14 items-center border-b border-gray-200 px-4 dark:border-white/10">
-										<h3 className="text-base font-semibold text-gray-500 dark:text-gray-400">
-											{activeCount}{" "}
-											{activeCount === 1 ? "filter" : "filters"} selected
-										</h3>
-									</div>
+						<div className="flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 dark:border-white/10 dark:bg-[#1B1B1B]">
+							<button
+								type="button"
+								onClick={clearDraftFilters}
+								disabled={activeCount === 0}
+								className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-45 dark:border-white/10 dark:bg-white/5 dark:text-gray-200 dark:hover:bg-white/10"
+							>
+								Clear
+							</button>
 
-									<div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
-										{selectedAccounts.length === 0 ? (
-											<div className="flex h-full items-center justify-center text-center text-sm text-gray-400">
-												Selected filters will appear here.
-											</div>
-										) : (
-											<div className="space-y-4">
-												<section>
-													<div className="mb-1.5 flex items-center justify-between gap-3">
-														<h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400">
-															Accounts
-														</h4>
-
-														<button
-															type="button"
-															onClick={clearDraftFilters}
-															className="text-xs font-semibold text-cyan-600 transition-colors hover:text-cyan-700 dark:text-cyan-400 dark:hover:text-cyan-300"
-														>
-															Clear
-														</button>
-													</div>
-
-													<div className="space-y-1">
-														{selectedAccounts.map((account) => {
-															const Icon = accountIcon(account.kind);
-
-															return (
-																<button
-																	key={account.id}
-																	type="button"
-																	aria-label={`Remove ${account.name} filter`}
-																	onClick={() => {
-																		toggleAccount(account.id, []);
-																	}}
-																	className="flex min-h-9 w-full cursor-pointer items-center justify-between gap-3 rounded-md px-1 text-left transition-colors hover:bg-gray-50 dark:hover:bg-white/5"
-																>
-																	<div className="flex min-w-0 items-center gap-2">
-																		<span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white">
-																			<Icon size={11} />
-																		</span>
-
-																		<p className="min-w-0 truncate text-sm font-medium text-gray-900 dark:text-white">
-																			{account.name}
-																		</p>
-																	</div>
-
-																	<CircleX
-																		size={18}
-																		strokeWidth={2.2}
-																		className="shrink-0 text-gray-400 transition-colors group-hover:text-gray-700 dark:group-hover:text-gray-200"
-																	/>
-																</button>
-															);
-														})}
-													</div>
-												</section>
-											</div>
-										)}
-									</div>
-								</section>
-							</div>
-
-							<div className="flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 dark:border-white/10 dark:bg-[#1B1B1B]">
+							<div className="flex items-center gap-2">
 								<button
 									type="button"
-									onClick={clearDraftFilters}
-									disabled={activeCount === 0}
-									className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-45 dark:border-white/10 dark:bg-white/5 dark:text-gray-200 dark:hover:bg-white/10"
+									onClick={onCancel}
+									className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-900 shadow-sm transition-colors hover:bg-gray-50 dark:border-white/10 dark:bg-[#222] dark:text-white dark:hover:bg-white/5"
 								>
-									Clear
+									Cancel
 								</button>
 
-								<div className="flex items-center gap-2">
-									<button
-										type="button"
-										onClick={onCancel}
-										className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-900 shadow-sm transition-colors hover:bg-gray-50 dark:border-white/10 dark:bg-[#222] dark:text-white dark:hover:bg-white/5"
-									>
-										Cancel
-									</button>
-
-									<button
-										type="button"
-										onClick={onApply}
-										disabled={applyDisabled}
-										className="rounded-lg bg-[#FF5A35] px-4 py-2 text-sm font-bold text-white shadow-sm transition-colors hover:bg-[#E04825] disabled:cursor-not-allowed disabled:opacity-45"
-									>
-										Apply
-									</button>
-								</div>
+								<button
+									type="button"
+									onClick={onApply}
+									disabled={applyDisabled}
+									className="rounded-lg bg-[#FF5A35] px-4 py-2 text-sm font-bold text-white shadow-sm transition-colors hover:bg-[#E04825] disabled:cursor-not-allowed disabled:opacity-45"
+								>
+									Apply
+								</button>
 							</div>
 						</div>
+					</div>
 				</div>
 			</FloatingFocusManager>
 		</FloatingPortal>
@@ -2453,7 +2777,7 @@ function ManualAccountPicker({
 
 			{(["Asset", "Liability"] as const).map((section) => (
 				<div key={section}>
-					<div className="border-y border-gray-200 bg-gray-100 px-6 py-3 text-gray-500 dark:border-white/5 dark:bg-[#292929] dark:text-zinc-400">
+					<div className="border-y border-gray-200 bg-gray-100 px-6 py-3 text-gray-500 dark:border-white/5 dark:bg-[#292929] dark:text-gray-500">
 						{section}
 					</div>
 
@@ -2592,7 +2916,11 @@ function ManualAccountForm({
 						disabled={!name.trim() || isSaving}
 						className="flex min-w-20 items-center justify-center rounded-xl bg-[#a94628] px-5 py-3 font-semibold text-white disabled:opacity-50"
 					>
-						{isSaving ? <LoaderCircle size={18} className="animate-spin" /> : "Save"}
+						{isSaving ? (
+							<LoaderCircle size={18} className="animate-spin" />
+						) : (
+							"Save"
+						)}
 					</button>
 				</div>
 			</form>
