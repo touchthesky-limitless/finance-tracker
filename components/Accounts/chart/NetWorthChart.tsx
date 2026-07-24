@@ -1,9 +1,6 @@
 "use client";
 
-import {
-	useRef,
-	useState,
-} from "react";
+import { useEffect, useRef, useState } from "react";
 import {
 	Area,
 	AreaChart,
@@ -18,9 +15,7 @@ import {
 	YAxis,
 } from "recharts";
 
-import {
-	DATE_RANGE_OPTIONS,
-} from "@/components/Accounts/constants";
+import { DATE_RANGE_OPTIONS } from "@/components/Accounts/constants";
 import { Dropdown } from "@/components/Accounts/controls/ChartDropdown";
 import {
 	getNetWorthChartDomain,
@@ -68,9 +63,11 @@ export function NetWorthChart({
 	const [rangeMenuOpen, setRangeMenuOpen] = useState(false);
 	const [performanceTooltip, setPerformanceTooltip] =
 		useState<PerformanceTooltipState | null>(null);
-	const tooltipHideTimeoutRef =
-		useRef<ReturnType<typeof setTimeout> | null>(null);
+	const tooltipHideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+		null,
+	);
 	const chartContainerRef = useRef<HTMLDivElement | null>(null);
+	const performanceTooltipCardRef = useRef<HTMLDivElement | null>(null);
 	const isPerformanceTooltipHoveredRef = useRef(false);
 
 	const clearTooltipHideTimeout = (): void => {
@@ -107,6 +104,73 @@ export function NetWorthChart({
 	};
 
 	const performanceTooltipPosition = performanceTooltip?.position;
+	const isPerformanceTooltipVisible = Boolean(performanceTooltip);
+
+	useEffect(() => {
+		if (!isPerformanceTooltipVisible) {
+			return;
+		}
+
+		const isInsideElement = (
+			element: HTMLElement | null,
+			clientX: number,
+			clientY: number,
+		): boolean => {
+			if (!element) {
+				return false;
+			}
+
+			const bounds = element.getBoundingClientRect();
+
+			return (
+				clientX >= bounds.left &&
+				clientX <= bounds.right &&
+				clientY >= bounds.top &&
+				clientY <= bounds.bottom
+			);
+		};
+
+		const dismissTooltip = (): void => {
+			if (tooltipHideTimeoutRef.current) {
+				clearTimeout(tooltipHideTimeoutRef.current);
+				tooltipHideTimeoutRef.current = null;
+			}
+
+			isPerformanceTooltipHoveredRef.current = false;
+			setPerformanceTooltip(null);
+		};
+
+		const handleDocumentPointerMove = (event: PointerEvent): void => {
+			const isInsideChart = isInsideElement(
+				chartContainerRef.current,
+				event.clientX,
+				event.clientY,
+			);
+			const isInsideTooltip = isInsideElement(
+				performanceTooltipCardRef.current,
+				event.clientX,
+				event.clientY,
+			);
+
+			if (!isInsideChart && !isInsideTooltip) {
+				dismissTooltip();
+			}
+		};
+
+		const handleWindowBlur = (): void => {
+			dismissTooltip();
+		};
+
+		document.addEventListener("pointermove", handleDocumentPointerMove, {
+			passive: true,
+		});
+		window.addEventListener("blur", handleWindowBlur);
+
+		return () => {
+			document.removeEventListener("pointermove", handleDocumentPointerMove);
+			window.removeEventListener("blur", handleWindowBlur);
+		};
+	}, [isPerformanceTooltipVisible]);
 
 	const performanceData: RechartsPerformancePoint[] = points.map((point) => {
 		return {
@@ -218,9 +282,9 @@ export function NetWorthChart({
 								? timeframe === "year"
 									? "Yearly"
 									: "Monthly"
-								: DATE_RANGE_OPTIONS.find(
+								: (DATE_RANGE_OPTIONS.find(
 										(option) => option.value === dateRange,
-									)?.label ?? "1 month"
+									)?.label ?? "1 month")
 						}
 						open={rangeMenuOpen}
 						onOpenChange={(open) => {
@@ -250,7 +314,7 @@ export function NetWorthChart({
 
 			<div
 				ref={chartContainerRef}
-				onMouseLeave={clearPerformanceTooltip}
+				onPointerLeave={clearPerformanceTooltip}
 				className="relative mt-5 h-[280px] w-full"
 			>
 				{chartType === "performance" ? (
@@ -323,164 +387,156 @@ export function NetWorthChart({
 									});
 								}}
 							>
-							<defs>
-								<linearGradient
-									id="activePointVerticalGradient"
-									x1="0"
-									y1="0"
-									x2="0"
-									y2="1"
-								>
-									<stop
-										offset="0%"
-										stopColor="#08b7df"
-										stopOpacity={0.95}
-									/>
-									<stop
-										offset="100%"
-										stopColor="#08b7df"
-										stopOpacity={0.06}
-									/>
-								</linearGradient>
+								<defs>
+									<linearGradient
+										id="activePointVerticalGradient"
+										x1="0"
+										y1="0"
+										x2="0"
+										y2="1"
+									>
+										<stop offset="0%" stopColor="#08b7df" stopOpacity={0.95} />
+										<stop
+											offset="100%"
+											stopColor="#08b7df"
+											stopOpacity={0.06}
+										/>
+									</linearGradient>
 
-								<linearGradient
-									id="netWorthAreaGradient"
-									x1="0"
-									y1="0"
-									x2="0"
-									y2="1"
-								>
-									<stop
-										offset="0%"
-										stopColor="#08b7df"
-										stopOpacity={0.27}
-									/>
-									<stop
-										offset="100%"
-										stopColor="#08b7df"
-										stopOpacity={0.05}
-									/>
-								</linearGradient>
-							</defs>
+									<linearGradient
+										id="netWorthAreaGradient"
+										x1="0"
+										y1="0"
+										x2="0"
+										y2="1"
+									>
+										<stop offset="0%" stopColor="#08b7df" stopOpacity={0.27} />
+										<stop
+											offset="100%"
+											stopColor="#08b7df"
+											stopOpacity={0.05}
+										/>
+									</linearGradient>
+								</defs>
 
-							<CartesianGrid
-								vertical={false}
-								stroke="rgba(148, 163, 184, 0.24)"
-							/>
+								<CartesianGrid
+									vertical={false}
+									stroke="rgba(148, 163, 184, 0.24)"
+								/>
 
-							<XAxis
-								type="number"
-								dataKey="timestamp"
-								domain={["dataMin", "dataMax"]}
-								scale="time"
-								tickCount={7}
-								minTickGap={42}
-								tickLine={false}
-								axisLine={false}
-								tickMargin={14}
-								tick={{
-									fill: "#878787",
-									fontSize: 11,
-								}}
-								tickFormatter={(timestamp: number) => {
-									return formatNetWorthXAxisTick(
-										timestamp,
-										dateRange,
-										timeframe,
-									);
-								}}
-							/>
+								<XAxis
+									type="number"
+									dataKey="timestamp"
+									domain={["dataMin", "dataMax"]}
+									scale="time"
+									tickCount={7}
+									minTickGap={42}
+									tickLine={false}
+									axisLine={false}
+									tickMargin={14}
+									tick={{
+										fill: "#878787",
+										fontSize: 11,
+									}}
+									tickFormatter={(timestamp: number) => {
+										return formatNetWorthXAxisTick(
+											timestamp,
+											dateRange,
+											timeframe,
+										);
+									}}
+								/>
 
-							<YAxis
-								width={72}
-								tickCount={5}
-								tickLine={false}
-								axisLine={false}
-								tick={{
-									fill: "#8a8a8a",
-									fontSize: 12,
-								}}
-								tickFormatter={compactCurrency}
-								domain={performanceDomain}
-							/>
+								<YAxis
+									width={72}
+									tickCount={5}
+									tickLine={false}
+									axisLine={false}
+									tick={{
+										fill: "#8a8a8a",
+										fontSize: 12,
+									}}
+									tickFormatter={compactCurrency}
+									domain={performanceDomain}
+								/>
 
-							<Tooltip
-								active={Boolean(performanceTooltip)}
-								position={performanceTooltipPosition}
-								content={
-									<NetWorthPerformanceTooltip
-										activePoint={performanceTooltip?.point ?? null}
-										startPoint={performanceData[0] ?? null}
-										onMouseEnter={handlePerformanceTooltipMouseEnter}
-										onMouseLeave={handlePerformanceTooltipMouseLeave}
-									/>
-								}
-								cursor={false}
-								allowEscapeViewBox={{
-									x: true,
-									y: true,
-								}}
-								isAnimationActive={false}
-								wrapperStyle={{
-									width: PERFORMANCE_TOOLTIP_WIDTH,
-									height: PERFORMANCE_TOOLTIP_HEIGHT,
-									outline: "none",
-									pointerEvents: "auto",
-									transition: "none",
-									zIndex: 40,
-								}}
-							/>
+								<Tooltip
+									active={Boolean(performanceTooltip)}
+									position={performanceTooltipPosition}
+									content={
+										<NetWorthPerformanceTooltip
+											ref={performanceTooltipCardRef}
+											activePoint={performanceTooltip?.point ?? null}
+											startPoint={performanceData[0] ?? null}
+											onMouseEnter={handlePerformanceTooltipMouseEnter}
+											onMouseLeave={handlePerformanceTooltipMouseLeave}
+										/>
+									}
+									cursor={false}
+									allowEscapeViewBox={{
+										x: true,
+										y: true,
+									}}
+									isAnimationActive={false}
+									wrapperStyle={{
+										width: PERFORMANCE_TOOLTIP_WIDTH,
+										height: PERFORMANCE_TOOLTIP_HEIGHT,
+										outline: "none",
+										pointerEvents: "auto",
+										transition: "none",
+										zIndex: 40,
+									}}
+								/>
 
-							<Area
-								type="linear"
-								dataKey="value"
-								name="Net Worth"
-								stroke="#08b7df"
-								strokeWidth={3}
-								fill="url(#netWorthAreaGradient)"
-								fillOpacity={1}
-								baseValue="dataMin"
-								connectNulls
-								isAnimationActive={false}
-								dot={false}
-								activeDot={{
-									r: 6,
-									fill: "#08b7df",
-									stroke: "#ffffff",
-									strokeWidth: 3,
-								}}
-							/>
+								<Area
+									type="linear"
+									dataKey="value"
+									name="Net Worth"
+									stroke="#08b7df"
+									strokeWidth={3}
+									fill="url(#netWorthAreaGradient)"
+									fillOpacity={1}
+									baseValue="dataMin"
+									connectNulls
+									isAnimationActive={false}
+									dot={false}
+									activeDot={{
+										r: 6,
+										fill: "#08b7df",
+										stroke: "#ffffff",
+										strokeWidth: 3,
+									}}
+								/>
 
-							{performanceTooltip && (
-								<>
-									<ReferenceLine
-										segment={[
-											{
-												x: performanceTooltip.point.timestamp,
-												y: performanceTooltip.point.value,
-											},
-											{
-												x: performanceTooltip.point.timestamp,
-												y: performanceDomain[0],
-											},
-										]}
-										stroke="url(#activePointVerticalGradient)"
-										strokeWidth={4}
-									/>
+								{performanceTooltip && (
+									<>
+										<ReferenceLine
+											segment={[
+												{
+													x: performanceTooltip.point.timestamp,
+													y: performanceTooltip.point.value,
+												},
+												{
+													x: performanceTooltip.point.timestamp,
+													y: performanceDomain[0],
+												},
+											]}
+											stroke="url(#activePointVerticalGradient)"
+											strokeWidth={4}
+										/>
 
-									<ReferenceDot
-										x={performanceTooltip.point.timestamp}
-										y={performanceTooltip.point.value}
-										r={8}
-										fill="#08b7df"
-										stroke="#ffffff"
-										strokeWidth={4}
-									/>
-								</>
-							)}
+										<ReferenceDot
+											x={performanceTooltip.point.timestamp}
+											y={performanceTooltip.point.value}
+											r={8}
+											fill="#08b7df"
+											stroke="#ffffff"
+											strokeWidth={4}
+										/>
+									</>
+								)}
 							</AreaChart>
 						</ResponsiveContainer>
-
 					</>
 				) : (
 					<ResponsiveContainer width="100%" height="100%">
@@ -524,10 +580,7 @@ export function NetWorthChart({
 								domain={breakdownDomain}
 							/>
 
-							<ReferenceLine
-								y={0}
-								stroke="rgba(148, 163, 184, 0.36)"
-							/>
+							<ReferenceLine y={0} stroke="rgba(148, 163, 184, 0.36)" />
 
 							<Tooltip
 								content={<NetWorthBreakdownTooltip />}

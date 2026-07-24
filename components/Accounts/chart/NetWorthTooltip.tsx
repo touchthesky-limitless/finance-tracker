@@ -1,7 +1,5 @@
-import {
-	ChevronRight,
-	Sparkles,
-} from "lucide-react";
+import { forwardRef } from "react";
+import { ChevronRight, Sparkles } from "lucide-react";
 
 import type {
 	ChartPoint,
@@ -74,11 +72,7 @@ export function formatNetWorthXAxisTick(
 ): string {
 	const date = new Date(timestamp);
 
-	if (
-		timeframe === "year" ||
-		dateRange === "1Y" ||
-		dateRange === "ALL"
-	) {
+	if (timeframe === "year" || dateRange === "1Y" || dateRange === "ALL") {
 		return date.toLocaleDateString("en-US", {
 			month: "short",
 			year: "2-digit",
@@ -97,12 +91,13 @@ export function formatNetWorthXAxisTick(
 	});
 }
 
-export function NetWorthPerformanceTooltip({
-	activePoint,
-	startPoint,
-	onMouseEnter,
-	onMouseLeave,
-}: PerformanceTooltipCardProps) {
+export const NetWorthPerformanceTooltip = forwardRef<
+	HTMLDivElement,
+	PerformanceTooltipCardProps
+>(function NetWorthPerformanceTooltip(
+	{ activePoint, startPoint, onMouseEnter, onMouseLeave },
+	ref,
+) {
 	if (!activePoint || !startPoint) {
 		return null;
 	}
@@ -127,6 +122,8 @@ export function NetWorthPerformanceTooltip({
 
 	return (
 		<div
+			ref={ref}
+			data-net-worth-performance-tooltip="true"
 			tabIndex={-1}
 			onMouseEnter={onMouseEnter}
 			onMouseLeave={onMouseLeave}
@@ -153,8 +150,7 @@ export function NetWorthPerformanceTooltip({
 					{isPositive ? "+" : "-"}
 					{formatSignedCurrency(Math.abs(change))}{" "}
 					<span className="ml-1">
-						(
-						{changePercent > 0 ? "+" : ""}
+						({changePercent > 0 ? "+" : ""}
 						{changePercent.toFixed(2)}%)
 					</span>
 				</span>
@@ -173,7 +169,9 @@ export function NetWorthPerformanceTooltip({
 			</button>
 		</div>
 	);
-}
+});
+
+NetWorthPerformanceTooltip.displayName = "NetWorthPerformanceTooltip";
 
 export function NetWorthBreakdownTooltip({
 	active,

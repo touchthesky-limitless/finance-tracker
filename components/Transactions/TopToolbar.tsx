@@ -15,7 +15,6 @@ import {
 } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
-	Calendar,
 	Filter,
 	Import,
 	Plus,
@@ -23,6 +22,15 @@ import {
 	Sidebar as SidebarIcon,
 } from "lucide-react";
 import * as Popover from "@radix-ui/react-popover";
+
+import {
+	DateRangeButton,
+	EMPTY_DATE_RANGE,
+	dateRangesEqual,
+	readDateParam,
+} from "@/components/Transactions/DateRangeButton";
+
+export { DateRangeButton } from "@/components/Transactions/DateRangeButton";
 
 import { TransactionFilterPanel } from "@/components/Transactions/TransactionFilterPanel";
 import {
@@ -53,22 +61,10 @@ interface TopToolbarProps {
 	filters: TransactionFilters;
 	filterData: TransactionFilterData;
 	onFiltersChange: (filters: TransactionFilters) => void;
+	showAddTransaction?: boolean;
 }
 
-type OpenPopover = "search" | "date" | "filter" | null;
-type DatePreset =
-	| "last-7"
-	| "last-14"
-	| "last-30"
-	| "this-month"
-	| "last-month"
-	| "this-year"
-	| "last-year";
-
-const EMPTY_DATE_RANGE: TransactionDateRange = {
-	startDate: "",
-	endDate: "",
-};
+type OpenPopover = "search" | "filter" | null;
 
 const TRANSACTION_URL_KEYS = [
 	"search",
@@ -94,18 +90,14 @@ interface SearchParamReader {
 	getAll: (name: string) => string[];
 }
 
-function readDateParam(
-	searchParams: SearchParamReader,
-	key: "startDate" | "endDate",
-): string {
-	const value = searchParams.get(key)?.trim() ?? "";
-
-	return /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : "";
-}
-
 function readStringList(
 	searchParams: SearchParamReader,
-	key: "categoryNames" | "merchantNames" | "accountNames" | "tags" | "goalIds",
+	key:
+		| "categoryNames"
+		| "merchantNames"
+		| "accountNames"
+		| "tags"
+		| "goalIds",
 ): string[] {
 	const seen = new Set<string>();
 	const values: string[] = [];
@@ -149,11 +141,18 @@ function readTransactionFiltersFromUrl(
 		amountMode: readEnumParam(
 			searchParams,
 			"amountMode",
-			["none", "greater-than", "less-than", "equal-to", "between"] as const,
+			[
+				"none",
+				"greater-than",
+				"less-than",
+				"equal-to",
+				"between",
+			] as const,
 			"none",
 		),
 		amountValue: searchParams.get("amountValue")?.trim() ?? "",
-		amountMaxValue: searchParams.get("amountMaxValue")?.trim() ?? "",
+		amountMaxValue:
+			searchParams.get("amountMaxValue")?.trim() ?? "",
 		transactionType: readEnumParam(
 			searchParams,
 			"transactionType",
@@ -189,7 +188,12 @@ function readTransactionFiltersFromUrl(
 
 function appendStringList(
 	searchParams: URLSearchParams,
-	key: "categoryNames" | "merchantNames" | "accountNames" | "tags" | "goalIds",
+	key:
+		| "categoryNames"
+		| "merchantNames"
+		| "accountNames"
+		| "tags"
+		| "goalIds",
 	values: string[],
 ): void {
 	for (const rawValue of values) {
@@ -225,9 +229,21 @@ function writeTransactionStateToUrl(
 		searchParams.set("endDate", dateRange.endDate);
 	}
 
-	appendStringList(searchParams, "categoryNames", filters.categoryNames);
-	appendStringList(searchParams, "merchantNames", filters.merchantNames);
-	appendStringList(searchParams, "accountNames", filters.accountNames);
+	appendStringList(
+		searchParams,
+		"categoryNames",
+		filters.categoryNames,
+	);
+	appendStringList(
+		searchParams,
+		"merchantNames",
+		filters.merchantNames,
+	);
+	appendStringList(
+		searchParams,
+		"accountNames",
+		filters.accountNames,
+	);
 	appendStringList(searchParams, "tags", filters.tags);
 	appendStringList(searchParams, "goalIds", filters.goalIds);
 
@@ -236,15 +252,24 @@ function writeTransactionStateToUrl(
 	}
 
 	if (filters.amountValue.trim()) {
-		searchParams.set("amountValue", filters.amountValue.trim());
+		searchParams.set(
+			"amountValue",
+			filters.amountValue.trim(),
+		);
 	}
 
 	if (filters.amountMaxValue.trim()) {
-		searchParams.set("amountMaxValue", filters.amountMaxValue.trim());
+		searchParams.set(
+			"amountMaxValue",
+			filters.amountMaxValue.trim(),
+		);
 	}
 
 	if (filters.transactionType !== "all") {
-		searchParams.set("transactionType", filters.transactionType);
+		searchParams.set(
+			"transactionType",
+			filters.transactionType,
+		);
 	}
 
 	if (filters.needsReview !== "any") {
@@ -265,79 +290,6 @@ function writeTransactionStateToUrl(
 
 	searchParams.sort();
 }
-
-const DATE_PRESETS: ReadonlyArray<{
-	value: DatePreset;
-	label: string;
-}> = [
-	{ value: "last-7", label: "Last 7 days" },
-	{ value: "last-14", label: "Last 14 days" },
-	{ value: "last-30", label: "Last 30 days" },
-	{ value: "this-month", label: "This month" },
-	{ value: "last-month", label: "Last month" },
-	{ value: "this-year", label: "This year" },
-	{ value: "last-year", label: "Last year" },
-];
-
-function toIsoDate(date: Date): string {
-	const year = date.getFullYear();
-	const month = String(date.getMonth() + 1).padStart(2, "0");
-	const day = String(date.getDate()).padStart(2, "0");
-
-	return `${year}-${month}-${day}`;
-}
-
-function getDatePreset(preset: DatePreset): TransactionDateRange {
-	const now = new Date();
-	const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-
-	if (preset === "last-7" || preset === "last-14" || preset === "last-30") {
-		const dayCount = preset === "last-7" ? 7 : preset === "last-14" ? 14 : 30;
-		const start = new Date(today);
-		start.setDate(start.getDate() - (dayCount - 1));
-
-		return {
-			startDate: toIsoDate(start),
-			endDate: toIsoDate(today),
-		};
-	}
-
-	if (preset === "this-month") {
-		return {
-			startDate: toIsoDate(new Date(today.getFullYear(), today.getMonth(), 1)),
-			endDate: toIsoDate(
-				new Date(today.getFullYear(), today.getMonth() + 1, 0),
-			),
-		};
-	}
-
-	if (preset === "last-month") {
-		return {
-			startDate: toIsoDate(
-				new Date(today.getFullYear(), today.getMonth() - 1, 1),
-			),
-			endDate: toIsoDate(new Date(today.getFullYear(), today.getMonth(), 0)),
-		};
-	}
-
-	const year =
-		preset === "this-year" ? today.getFullYear() : today.getFullYear() - 1;
-
-	return {
-		startDate: `${year}-01-01`,
-		endDate: `${year}-12-31`,
-	};
-}
-
-function rangesEqual(
-	first: TransactionDateRange,
-	second: TransactionDateRange,
-): boolean {
-	return (
-		first.startDate === second.startDate && first.endDate === second.endDate
-	);
-}
-
 export function TopToolbar({
 	searchQuery,
 	setSearchQuery,
@@ -352,6 +304,7 @@ export function TopToolbar({
 	filters,
 	filterData,
 	onFiltersChange,
+	showAddTransaction = true,
 }: TopToolbarProps) {
 	const router = useRouter();
 	const pathname = usePathname();
@@ -362,8 +315,6 @@ export function TopToolbar({
 	const hydratedUrlRef = useRef<string | null>(null);
 	const [openPopover, setOpenPopover] = useState<OpenPopover>(null);
 	const [draftSearch, setDraftSearch] = useState(searchQuery);
-	const [draftDateRange, setDraftDateRange] =
-		useState<TransactionDateRange>(dateRange);
 	const [draftFilters, setDraftFilters] = useState<TransactionFilters>(filters);
 
 	const replaceUrlState = useCallback(
@@ -412,7 +363,7 @@ export function TopToolbar({
 			setSearchQuery(nextSearchQuery);
 		}
 
-		if (!rangesEqual(nextDateRange, dateRange)) {
+		if (!dateRangesEqual(nextDateRange, dateRange)) {
 			setDateRange(nextDateRange);
 		}
 
@@ -431,7 +382,6 @@ export function TopToolbar({
 
 	const resetDrafts = () => {
 		setDraftSearch(searchQuery);
-		setDraftDateRange(dateRange);
 		setDraftFilters(filters);
 	};
 
@@ -445,10 +395,6 @@ export function TopToolbar({
 		setOpenPopover((current) => (current === "search" ? null : "search"));
 	};
 
-	const toggleDatePopover = () => {
-		setDraftDateRange(dateRange);
-		setOpenPopover((current) => (current === "date" ? null : "date"));
-	};
 
 	const toggleFilterPopover = () => {
 		setDraftFilters(filters);
@@ -477,14 +423,7 @@ export function TopToolbar({
 	const isDateActive = Boolean(dateRange.startDate || dateRange.endDate);
 	const isFilterActive = hasTransactionFilters(filters);
 	const activeFilterCount = countActiveTransactionFilters(filters);
-	const invalidDateRange = Boolean(
-		draftDateRange.startDate &&
-		draftDateRange.endDate &&
-		draftDateRange.startDate > draftDateRange.endDate,
-	);
 	const canApplySearch = draftSearch.trim() !== searchQuery.trim();
-	const canApplyDate =
-		!invalidDateRange && !rangesEqual(draftDateRange, dateRange);
 	const canApplyFilters = !transactionFiltersEqual(draftFilters, filters);
 
 	const handleToolbarPointerDownCapture = (
@@ -564,7 +503,7 @@ export function TopToolbar({
 						onClick={() => {
 							onClearAll();
 							setDraftSearch("");
-							setDraftDateRange(EMPTY_DATE_RANGE);
+							setDateRange(EMPTY_DATE_RANGE);
 							setDraftFilters(EMPTY_TRANSACTION_FILTERS);
 							replaceUrlState("", EMPTY_DATE_RANGE, EMPTY_TRANSACTION_FILTERS);
 						}}
@@ -670,135 +609,18 @@ export function TopToolbar({
 					</Popover.Portal>
 				</Popover.Root>
 
-				<Popover.Root
-					modal={false}
-					open={openPopover === "date"}
-					onOpenChange={(isOpen) => {
-						if (!isOpen && openPopover === "date") {
-							closeOpenPopover();
-						}
+				<DateRangeButton
+					value={dateRange}
+					onChange={(nextDateRange) => {
+						setDateRange(nextDateRange);
+						replaceUrlState(searchQuery, nextDateRange, filters);
 					}}
-				>
-					<Popover.Anchor asChild>
-						<ToolbarButton
-							data-toolbar-popover-trigger="date"
-							aria-expanded={openPopover === "date"}
-							aria-haspopup="dialog"
-							onClick={toggleDatePopover}
-							active={isDateActive}
-							icon={<Calendar size={17} strokeWidth={2} />}
-							label="Date"
-						/>
-					</Popover.Anchor>
-
-					<Popover.Portal>
-						<Popover.Content
-							side="bottom"
-							align="end"
-							sideOffset={14}
-							collisionPadding={16}
-							onPointerDownOutside={handlePopoverPointerDownOutside}
-							className="z-[9999] w-[min(826px,calc(100vw-32px))] overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl outline-none dark:border-white/10 dark:bg-[#1B1B1B]"
-						>
-							<div className="grid min-h-[535px] grid-cols-[230px_minmax(0,1fr)]">
-								<div className="border-r border-gray-200 dark:border-white/10">
-									<h2 className="border-b border-gray-200 px-7 py-6 text-xl font-semibold text-gray-900 dark:border-white/10 dark:text-white">
-										Date Range
-									</h2>
-
-									<div className="flex flex-col px-4 py-4">
-										{DATE_PRESETS.map((preset) => {
-											const range = getDatePreset(preset.value);
-											const selected = rangesEqual(range, draftDateRange);
-
-											return (
-												<button
-													key={preset.value}
-													type="button"
-													onClick={() => {
-														setDraftDateRange(range);
-														setDateRange(range);
-														replaceUrlState(searchQuery, range, filters);
-														setOpenPopover(null);
-													}}
-													className={`rounded-xl px-5 py-3 text-left text-base font-medium transition-colors ${
-														selected
-															? "bg-[#FF5A35]/10 text-[#FF5A35]"
-															: "text-gray-800 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-white/5"
-													}`}
-												>
-													{preset.label}
-												</button>
-											);
-										})}
-									</div>
-								</div>
-
-								<div className="px-8 py-14">
-									<DateField
-										id="transaction-start-date"
-										label="Start date"
-										value={draftDateRange.startDate}
-										onChange={(startDate) => {
-											setDraftDateRange((current) => ({
-												...current,
-												startDate,
-											}));
-										}}
-									/>
-
-									<div className="mt-14">
-										<DateField
-											id="transaction-end-date"
-											label="End date"
-											value={draftDateRange.endDate}
-											onChange={(endDate) => {
-												setDraftDateRange((current) => ({
-													...current,
-													endDate,
-												}));
-											}}
-										/>
-
-										{invalidDateRange && (
-											<p className="mt-3 text-sm font-medium text-red-500">
-												End date must be on or after the start date.
-											</p>
-										)}
-									</div>
-								</div>
-							</div>
-
-							<PopoverFooter
-								onClear={() => {
-									setDraftDateRange(EMPTY_DATE_RANGE);
-									setDateRange(EMPTY_DATE_RANGE);
-									replaceUrlState(searchQuery, EMPTY_DATE_RANGE, filters);
-									setOpenPopover(null);
-								}}
-								onCancel={() => {
-									setDraftDateRange(dateRange);
-									setOpenPopover(null);
-								}}
-								onApply={() => {
-									if (invalidDateRange) {
-										return;
-									}
-
-									setDateRange(draftDateRange);
-									replaceUrlState(searchQuery, draftDateRange, filters);
-									setOpenPopover(null);
-								}}
-								clearDisabled={
-									!draftDateRange.startDate &&
-									!draftDateRange.endDate &&
-									!isDateActive
-								}
-								applyDisabled={!canApplyDate}
-							/>
-						</Popover.Content>
-					</Popover.Portal>
-				</Popover.Root>
+					active={isDateActive}
+					variant="toolbar"
+					onBeforeOpen={() => {
+						setOpenPopover(null);
+					}}
+				/>
 
 				<Popover.Root
 					modal={false}
@@ -876,14 +698,16 @@ export function TopToolbar({
 					Import
 				</button>
 
-				<button
-					type="button"
-					onClick={onAddTransaction}
-					className="flex h-10 items-center justify-center gap-1.5 rounded-xl bg-[#FF5A35] px-4 text-sm font-bold text-white shadow-sm transition-colors hover:bg-[#E04825]"
-				>
-					<Plus size={18} strokeWidth={2.5} />
-					Add
-				</button>
+				{showAddTransaction && (
+					<button
+						type="button"
+						onClick={onAddTransaction}
+						className="flex h-10 items-center justify-center gap-1.5 rounded-xl bg-[#FF5A35] px-4 text-sm font-bold text-white shadow-sm transition-colors hover:bg-[#E04825]"
+					>
+						<Plus size={18} strokeWidth={2.5} />
+						Add transaction
+					</button>
+				)}
 
 				<button
 					type="button"
@@ -947,49 +771,6 @@ const ToolbarButton = forwardRef<HTMLButtonElement, ToolbarButtonProps>(
 );
 
 ToolbarButton.displayName = "ToolbarButton";
-
-function DateField({
-	id,
-	label,
-	value,
-	onChange,
-}: {
-	id: string;
-	label: string;
-	value: string;
-	onChange: (value: string) => void;
-}) {
-	return (
-		<div>
-			<div className="mb-4 flex items-center justify-between">
-				<label
-					htmlFor={id}
-					className="text-lg font-semibold text-gray-900 dark:text-white"
-				>
-					{label}
-				</label>
-				<button
-					type="button"
-					onClick={() => {
-						onChange("");
-					}}
-					className="text-base font-semibold text-cyan-600 hover:text-cyan-700 dark:text-cyan-400"
-				>
-					Clear
-				</button>
-			</div>
-			<input
-				id={id}
-				type="date"
-				value={value}
-				onChange={(event) => {
-					onChange(event.target.value);
-				}}
-				className="h-14 w-full rounded-xl border border-gray-300 bg-transparent px-5 text-lg text-gray-900 outline-none transition-colors focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 dark:border-white/15 dark:text-white"
-			/>
-		</div>
-	);
-}
 
 function PopoverFooter({
 	onClear,

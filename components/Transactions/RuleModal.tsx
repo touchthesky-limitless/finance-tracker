@@ -26,11 +26,11 @@ import {
 } from "lucide-react";
 
 import { CategorySelector } from "@/components/CategorySelector";
+import { MultiCategorySelectorField } from "@/components/Categories/MultiCategorySelectorField";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
-import { CategoryIcon } from "@/components/CategoryIcon";
 import { MerchantOptionContent } from "@/components/Merchants/MerchantOptionContent";
 import type { MerchantListItem } from "@/components/Merchants/types";
-import { findParentCategory, getCategoryTheme } from "@/constants";
+
 import { useMerchantOptions } from "@/hooks/useMerchantOptions";
 import {
 	type Account,
@@ -852,7 +852,7 @@ export function RuleModal({
 										}}
 										error={attemptedSave ? validation.categories : undefined}
 									>
-										<CategoryCriteriaField
+										<MultiCategorySelectorField
 											values={draft.categories.values}
 											onChange={(values) => {
 												setDraft((current) => ({
@@ -1691,75 +1691,6 @@ function MerchantSearchField({
 						portalRoot,
 					)
 				: null}
-		</div>
-	);
-}
-
-interface CategoryCriteriaFieldProps {
-	values: string[];
-	onChange: (values: string[]) => void;
-}
-
-function CategoryCriteriaField({
-	values,
-	onChange,
-}: CategoryCriteriaFieldProps) {
-	return (
-		<div className="overflow-visible rounded-xl border border-gray-200 bg-white dark:border-white/10 dark:bg-[#1f1f1e]">
-			{values.length > 0 && (
-				<div className="flex flex-wrap gap-1.5 p-2 pb-0">
-					{values.map((value) => {
-						const parentCategory = findParentCategory(value);
-
-						return (
-							<span
-								key={value}
-								className="inline-flex items-center gap-1.5 rounded-lg bg-gray-100 px-2 py-1.5 text-xs font-medium text-gray-700 dark:bg-white/10 dark:text-gray-200"
-							>
-								<CategoryIcon
-									name={value}
-									size={14}
-									colorClass={getCategoryTheme(parentCategory).text}
-								/>
-								<span>{value}</span>
-								<button
-									type="button"
-									onClick={() => {
-										onChange(values.filter((item) => item !== value));
-									}}
-									className="rounded p-0.5 text-gray-400 transition hover:bg-black/10 hover:text-gray-800 dark:hover:bg-white/10 dark:hover:text-white"
-									aria-label={`Remove ${value}`}
-								>
-									<X size={12} />
-								</button>
-							</span>
-						);
-					})}
-				</div>
-			)}
-
-			<div
-				className={
-					values.length > 0
-						? "mt-2 border-t border-gray-100 dark:border-white/5"
-						: ""
-				}
-			>
-				<CategorySelector
-					currentCategory=""
-					placeholder="Search categories…"
-					showChevron
-					onSelect={(category) => {
-						const alreadySelected = values.some((value) => {
-							return normalize(value) === normalize(category);
-						});
-
-						if (!alreadySelected) {
-							onChange([...values, category]);
-						}
-					}}
-				/>
-			</div>
 		</div>
 	);
 }

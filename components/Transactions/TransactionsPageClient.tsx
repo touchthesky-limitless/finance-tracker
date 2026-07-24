@@ -1034,6 +1034,7 @@ export default function TransactionsPageClient({
 				filters={transactionFilters}
 				filterData={filterData}
 				onFiltersChange={setTransactionFilters}
+				showAddTransaction
 			/>
 
 			<div className="flex flex-1 min-h-0 overflow-hidden p-6 gap-6">
@@ -1054,6 +1055,7 @@ export default function TransactionsPageClient({
 						columnVisibility={columnVisibility}
 						setColumnVisibility={setColumnVisibility}
 						onEditMultiple={handleOpenBulkEdit}
+						showAddTransaction={false}
 					/>
 
 					<div className="flex-1 overflow-hidden relative">
