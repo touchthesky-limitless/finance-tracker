@@ -8,7 +8,6 @@ import {
 
 import type {
 	AccountRecord,
-	AccountSummary,
 	SummaryMode,
 } from "@/components/Accounts/types";
 import { formatSignedCurrency } from "@/utils/formatters";

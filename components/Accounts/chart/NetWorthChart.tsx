@@ -37,7 +37,6 @@ import {
 	type RechartsPerformancePoint,
 } from "@/components/Accounts/chart/NetWorthTooltip";
 import type {
-	AccountSummary,
 	ChartPoint,
 	ChartType,
 	DateRange,
