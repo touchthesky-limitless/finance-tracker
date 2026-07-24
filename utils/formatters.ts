@@ -21,6 +21,10 @@ const longDateFormatter = new Intl.DateTimeFormat("en-US", {
 	year: "numeric",
 });
 
+const relativeTimeFormatter = new Intl.RelativeTimeFormat("en-US", {
+	numeric: "auto",
+});
+
 /**
  * Formats a number as a standard US dollar currency string with commas and decimals.
  * @example
@@ -28,6 +32,50 @@ const longDateFormatter = new Intl.DateTimeFormat("en-US", {
  */
 export function formatMoney(amount: number) {
 	return moneyFormatter.format(amount);
+}
+
+/**
+ * Formats a signed number as US dollars.
+ *
+ * This is intentionally separate from `formatCurrency`, which preserves the
+ * existing positive-only behavior used by amount inputs and forms.
+ *
+ * @example
+ * formatSignedCurrency(-1540.6) // "-$1,540.60"
+ */
+export function formatSignedCurrency(value: number): string {
+	if (!Number.isFinite(value)) {
+		return "$0.00";
+	}
+
+	return moneyFormatter.format(value);
+}
+
+/**
+ * Formats signed currency values using K and M suffixes for chart axes.
+ *
+ * @example
+ * compactCurrency(1540) // "$1.5K"
+ * compactCurrency(-5_500) // "-$5.5K"
+ * compactCurrency(2_300_000) // "$2.3M"
+ */
+export function compactCurrency(value: number): string {
+	if (!Number.isFinite(value)) {
+		return "$0";
+	}
+
+	const sign = value < 0 ? "-" : "";
+	const absoluteValue = Math.abs(value);
+
+	if (absoluteValue >= 1_000_000) {
+		return `${sign}$${(absoluteValue / 1_000_000).toFixed(1)}M`;
+	}
+
+	if (absoluteValue >= 1_000) {
+		return `${sign}$${(absoluteValue / 1_000).toFixed(1)}K`;
+	}
+
+	return `${sign}$${Math.round(absoluteValue)}`;
 }
 
 /**
@@ -137,6 +185,51 @@ export function formatYAxis(num: number) {
 		return `${sign}$${Math.round(absNum / 1000)}k`;
 	}
 	return `${sign}$${Math.round(absNum)}`;
+}
+
+/**
+ * Formats a date as a concise relative time label.
+ *
+ * @example
+ * relativeTime(new Date(Date.now() - 7_200_000)) // "2 hours ago"
+ */
+export function relativeTime(
+	dateValue: string | number | Date,
+	now: number = Date.now(),
+): string {
+	const timestamp = new Date(dateValue).getTime();
+
+	if (!Number.isFinite(timestamp)) {
+		return "Recently";
+	}
+
+	const differenceInSeconds = Math.round((timestamp - now) / 1_000);
+	const absoluteSeconds = Math.abs(differenceInSeconds);
+
+	if (absoluteSeconds < 60) {
+		return "Just now";
+	}
+
+	const units: ReadonlyArray<{
+		unit: Intl.RelativeTimeFormatUnit;
+		seconds: number;
+	}> = [
+		{ unit: "year", seconds: 31_536_000 },
+		{ unit: "month", seconds: 2_592_000 },
+		{ unit: "week", seconds: 604_800 },
+		{ unit: "day", seconds: 86_400 },
+		{ unit: "hour", seconds: 3_600 },
+		{ unit: "minute", seconds: 60 },
+	];
+
+	const selectedUnit =
+		units.find((item) => absoluteSeconds >= item.seconds) ??
+		units[units.length - 1];
+
+	return relativeTimeFormatter.format(
+		Math.round(differenceInSeconds / selectedUnit.seconds),
+		selectedUnit.unit,
+	);
 }
 
 // --- Date & Time Constants ---
