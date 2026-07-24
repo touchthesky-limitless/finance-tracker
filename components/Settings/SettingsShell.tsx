@@ -15,28 +15,28 @@ interface SettingsItem {
 }
 
 const ACCOUNT_ITEMS: SettingsItem[] = [
-	{ label: "Profile" },
-	{ label: "Display" },
-	{ label: "Notifications" },
-	{ label: "Security" },
-	{ label: "Integrations", badge: "Beta" },
+	{ label: "Profile", href: "/settings/profile" },
+	{ label: "Display", href: "/settings/display" },
+	{ label: "Notifications", href: "/settings/notifications" },
+	{ label: "Security", href: "/settings/security" },
+	{ label: "Integrations",  href: "/settings/integrations", badge: "Beta" },
 ];
 
 const HOUSEHOLD_ITEMS: SettingsItem[] = [
-	{ label: "General" },
-	{ label: "Businesses" },
-	{ label: "Members" },
-	{ label: "Preferences" },
-	{ label: "Institutions" },
+	{ label: "General", href: "/settings/household" },
+	{ label: "Businesses", href: "/settings/businesses" },
+	{ label: "Members", href: "/settings/members" },
+	{ label: "Preferences", href: "/settings/preferences" },
+	{ label: "Institutions", href: "/settings/institutions" },
 	{ label: "Categories", href: "/settings/categories" },
-	{ label: "Merchants" },
+	{ label: "Merchants", href: "/settings/merchants" },
 	{ label: "Rules", href: "/settings/rules" },
-	{ label: "Tags" },
-	{ label: "Data" },
-	{ label: "Billing" },
-	{ label: "Gift Monarch" },
-	{ label: "Estate Planning" },
-	{ label: "Referrals" },
+	{ label: "Tags", href: "/settings/tags" },
+	{ label: "Data", href: "/settings/data" },
+	{ label: "Billing", href: "/settings/billing" },
+	{ label: "Gift Touch The Sky", href: "/settings/gifts" },
+	{ label: "Estate Planning", href: "/settings/trust-and-will" },
+	{ label: "Referrals", href: "/settings/referrals" },
 ];
 
 export function SettingsShell({ children }: SettingsShellProps) {
