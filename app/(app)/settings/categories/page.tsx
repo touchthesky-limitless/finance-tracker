@@ -21,6 +21,10 @@ import {
 
 import { CategoryEmojiPicker } from "@/components/Categories/CategoryEmojiPicker";
 import {
+	ConfirmDialog,
+	type ConfirmDialogVariant,
+} from "@/components/ui/ConfirmDialog";
+import {
 	CategoryGlyph,
 	encodeEmojiIcon,
 	getEmojiIcon,
@@ -62,11 +66,12 @@ interface EditorState {
 	group?: CategoryGroup;
 }
 
-interface DeleteConfirmation {
+interface ConfirmationState {
 	title: string;
 	description: string;
 	confirmLabel: string;
-	action: "delete" | "disable";
+	variant: ConfirmDialogVariant;
+	icon: "delete" | "disable";
 }
 
 type ActiveDragType = "group" | "category";
@@ -187,8 +192,9 @@ export default function SettingsCategoriesPage() {
 	const [isSaving, setIsSaving] = useState(false);
 	const [errorMessage, setErrorMessage] = useState<string | null>(null);
 	const [isReordering, setIsReordering] = useState(false);
-	const [deleteConfirmation, setDeleteConfirmation] =
-		useState<DeleteConfirmation | null>(null);
+	const [confirmation, setConfirmation] = useState<ConfirmationState | null>(
+		null,
+	);
 
 	useEffect(() => {
 		void fetchCustomCategories();
@@ -567,7 +573,7 @@ export default function SettingsCategoriesPage() {
 
 	const openEditor = (nextEditor: EditorState) => {
 		setEditor(nextEditor);
-		setDeleteConfirmation(null);
+		setConfirmation(null);
 		setErrorMessage(null);
 
 		if (nextEditor.mode === "edit-group" && nextEditor.group) {
@@ -620,7 +626,7 @@ export default function SettingsCategoriesPage() {
 		}
 
 		setEditor(null);
-		setDeleteConfirmation(null);
+		setConfirmation(null);
 		setErrorMessage(null);
 	};
 
@@ -812,7 +818,7 @@ export default function SettingsCategoriesPage() {
 		if (editor.mode === "edit-group" && editor.group) {
 			const isBuiltIn = !editor.group.record || editor.group.record.is_system;
 
-			setDeleteConfirmation({
+			setConfirmation({
 				title: isBuiltIn
 					? `Disable ${editor.group.displayName}?`
 					: `Delete ${editor.group.displayName}?`,
@@ -820,7 +826,8 @@ export default function SettingsCategoriesPage() {
 					? "This built-in group and its categories will be hidden from category settings and category selectors. Existing transactions will keep their current category values."
 					: "This permanently deletes the group and all custom categories currently inside it. This action cannot be undone.",
 				confirmLabel: isBuiltIn ? "Disable group" : "Delete group",
-				action: isBuiltIn ? "disable" : "delete",
+				variant: isBuiltIn ? "warning" : "danger",
+				icon: isBuiltIn ? "disable" : "delete",
 			});
 			return;
 		}
@@ -828,7 +835,7 @@ export default function SettingsCategoriesPage() {
 		if (editor.mode === "edit-category" && editor.category) {
 			const isBuiltIn = editor.category.is_system;
 
-			setDeleteConfirmation({
+			setConfirmation({
 				title: isBuiltIn
 					? `Disable ${editor.category.name}?`
 					: `Delete ${editor.category.name}?`,
@@ -836,7 +843,8 @@ export default function SettingsCategoriesPage() {
 					? "This built-in category will be hidden from category settings and category selectors. Existing transactions will keep their current category value."
 					: "This permanently deletes the custom category. Existing transactions may need to be recategorized. This action cannot be undone.",
 				confirmLabel: isBuiltIn ? "Disable category" : "Delete category",
-				action: isBuiltIn ? "disable" : "delete",
+				variant: isBuiltIn ? "warning" : "danger",
+				icon: isBuiltIn ? "disable" : "delete",
 			});
 		}
 	};
@@ -846,7 +854,7 @@ export default function SettingsCategoriesPage() {
 			return;
 		}
 
-		setDeleteConfirmation(null);
+		setConfirmation(null);
 		setIsSaving(true);
 		setErrorMessage(null);
 
@@ -1158,19 +1166,26 @@ export default function SettingsCategoriesPage() {
 					/>
 				))}
 
-			{deleteConfirmation && (
-				<DeleteConfirmModal
-					title={deleteConfirmation.title}
-					description={deleteConfirmation.description}
-					confirmLabel={deleteConfirmation.confirmLabel}
-					action={deleteConfirmation.action}
-					isDeleting={isSaving}
+			{confirmation && (
+				<ConfirmDialog
+					title={confirmation.title}
+					description={confirmation.description}
+					confirmLabel={confirmation.confirmLabel}
+					confirmVariant={confirmation.variant}
+					icon={
+						confirmation.icon === "disable" ? (
+							<EyeOff size={21} />
+						) : (
+							<Trash2 size={21} />
+						)
+					}
+					isLoading={isSaving}
 					onCancel={() => {
 						if (!isSaving) {
-							setDeleteConfirmation(null);
+							setConfirmation(null);
 						}
 					}}
-					onConfirm={() => void handleDelete()}
+					onConfirm={handleDelete}
 				/>
 			)}
 		</SettingsContentCard>
@@ -2283,93 +2298,6 @@ function DisableInfoTooltip({ text }: { text: string }) {
 				{text}
 				<span className="absolute left-1/2 top-full size-4 -translate-x-1/2 -translate-y-1/2 rotate-45 bg-[#282826]" />
 			</div>
-		</div>
-	);
-}
-
-function DeleteConfirmModal({
-	title,
-	description,
-	confirmLabel,
-	action,
-	isDeleting,
-	onCancel,
-	onConfirm,
-}: {
-	title: string;
-	description: string;
-	confirmLabel: string;
-	action: "delete" | "disable";
-	isDeleting: boolean;
-	onCancel: () => void;
-	onConfirm: () => void;
-}) {
-	return (
-		<div className="fixed inset-0 z-[360] grid place-items-center overflow-y-auto bg-black/55 p-2 backdrop-blur-[2px] sm:p-4">
-			<button
-				type="button"
-				aria-label="Close delete confirmation"
-				className="absolute inset-0"
-				onClick={onCancel}
-			/>
-
-			<section
-				role="alertdialog"
-				aria-modal="true"
-				aria-labelledby="delete-confirm-title"
-				aria-describedby="delete-confirm-description"
-				className="relative my-auto w-full max-w-[520px] overflow-hidden rounded-[16px] border border-black/10 bg-white text-[#282826] shadow-[0_28px_90px_rgba(0,0,0,0.34)] sm:rounded-[20px] dark:border-white/10 dark:bg-[#242422] dark:text-white"
-			>
-				<div className="flex items-start gap-3 px-4 pb-4 pt-5 sm:gap-4 sm:px-7 sm:pb-5 sm:pt-7">
-					<div
-						className={`grid size-11 shrink-0 place-items-center rounded-full ${
-							action === "disable"
-								? "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300"
-								: "bg-red-100 text-red-600 dark:bg-red-500/15 dark:text-red-300"
-						}`}
-					>
-						{action === "disable" ? <Info size={21} /> : <Trash2 size={21} />}
-					</div>
-					<div className="min-w-0">
-						<h2
-							id="delete-confirm-title"
-							className="text-lg font-semibold tracking-[-0.01em] sm:text-xl"
-						>
-							{title}
-						</h2>
-						<p
-							id="delete-confirm-description"
-							className="mt-2 text-sm leading-6 text-[#686661] dark:text-[#b8b6b1]"
-						>
-							{description}
-						</p>
-					</div>
-				</div>
-
-				<footer className="flex flex-col-reverse items-stretch gap-3 border-t border-black/[0.06] px-4 py-4 sm:flex-row sm:items-center sm:justify-end sm:px-7 sm:py-5 dark:border-white/10">
-					<button
-						type="button"
-						onClick={onCancel}
-						disabled={isDeleting}
-						className="h-11 w-full rounded-xl border border-[#dedbd7] bg-white px-5 text-sm font-semibold shadow-sm transition hover:bg-[#f7f6f4] disabled:opacity-50 sm:w-auto dark:border-white/15 dark:bg-[#242422] dark:hover:bg-white/5"
-					>
-						Cancel
-					</button>
-					<button
-						type="button"
-						onClick={onConfirm}
-						disabled={isDeleting}
-						className={`inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl px-5 text-sm font-semibold text-white transition disabled:cursor-not-allowed sm:min-w-32 sm:w-auto ${
-							action === "disable"
-								? "bg-[#282826] hover:bg-black disabled:bg-[#8d8b87] dark:bg-white dark:text-[#282826] dark:hover:bg-[#ebe9e4]"
-								: "bg-red-600 hover:bg-red-700 disabled:bg-red-400"
-						}`}
-					>
-						{isDeleting && <Loader2 size={17} className="animate-spin" />}
-						{confirmLabel}
-					</button>
-				</footer>
-			</section>
 		</div>
 	);
 }

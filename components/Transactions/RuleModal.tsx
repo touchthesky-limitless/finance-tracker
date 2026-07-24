@@ -21,11 +21,12 @@ import {
 	Loader2,
 	Plus,
 	Search,
+	Trash2,
 	X,
 } from "lucide-react";
 
 import { CategorySelector } from "@/components/CategorySelector";
-import { DeleteConfirmModal } from "@/components/DeleteConfirmModal";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { CategoryIcon } from "@/components/CategoryIcon";
 import { MerchantOptionContent } from "@/components/Merchants/MerchantOptionContent";
 import type { MerchantListItem } from "@/components/Merchants/types";
@@ -1116,19 +1117,19 @@ export function RuleModal({
 			</section>
 
 			{isDeleteConfirmOpen && initialRule && (
-				<DeleteConfirmModal
+				<ConfirmDialog
 					title="Delete this rule?"
 					description={`This permanently deletes “${initialRule.name}”. This action cannot be undone.`}
 					confirmLabel="Delete rule"
-					isDeleting={isDeleting}
+					confirmVariant="danger"
+					icon={<Trash2 size={21} />}
+					isLoading={isDeleting}
 					onCancel={() => {
 						if (!isDeleting) {
 							setIsDeleteConfirmOpen(false);
 						}
 					}}
-					onConfirm={() => {
-						void handleDelete();
-					}}
+					onConfirm={handleDelete}
 				/>
 			)}
 		</div>,

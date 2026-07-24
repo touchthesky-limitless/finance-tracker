@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 
 import { CategoryIcon } from "@/components/CategoryIcon";
-import { DeleteConfirmModal } from "@/components/DeleteConfirmModal";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { SettingsContentCard } from "@/components/Settings/SettingsShell";
 import {
 	CATEGORY_HIERARCHY,
@@ -421,19 +421,19 @@ export default function SettingsRulesPage() {
 			</div>
 
 			{isDeleteConfirmOpen && (
-				<DeleteConfirmModal
+				<ConfirmDialog
 					title={`Delete all ${rules.length} ${rules.length === 1 ? "rule" : "rules"}?`}
 					description="This permanently deletes every transaction rule. This action cannot be undone."
 					confirmLabel="Delete all rules"
-					isDeleting={isDeletingAllRules}
+					confirmVariant="danger"
+					icon={<Trash2 size={21} />}
+					isLoading={isDeletingAllRules}
 					onCancel={() => {
 						if (!isDeletingAllRules) {
 							setIsDeleteConfirmOpen(false);
 						}
 					}}
-					onConfirm={() => {
-						void handleDeleteAllRules();
-					}}
+					onConfirm={handleDeleteAllRules}
 				/>
 			)}
 
