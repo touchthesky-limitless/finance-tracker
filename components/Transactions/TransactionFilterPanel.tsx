@@ -37,7 +37,7 @@ import {
 } from "@/components/Transactions/transactionFilters";
 import { MerchantOptionContent } from "@/components/Merchants/MerchantOptionContent";
 
-type FilterSection =
+export type TransactionFilterSection =
 	| "categories"
 	| "merchants"
 	| "accounts"
@@ -46,6 +46,18 @@ type FilterSection =
 	| "amount"
 	| "other";
 
+export interface TransactionFilterPanelCustomSection {
+	id: string;
+	label: string;
+	selectedGroupLabel?: string;
+	options: TransactionFilterOption[];
+	selectedValues: string[];
+	onToggle: (value: string) => void;
+	onClear: () => void;
+	emptyLabel?: string;
+	showCounts?: boolean;
+}
+
 type MultiSelectFilterKey =
 	| "categoryNames"
 	| "merchantNames"
@@ -53,7 +65,7 @@ type MultiSelectFilterKey =
 	| "tags"
 	| "goalIds";
 
-interface TransactionFilterPanelProps {
+export interface TransactionFilterPanelProps {
 	filters: TransactionFilters;
 	setFilters: Dispatch<SetStateAction<TransactionFilters>>;
 	data: TransactionFilterData;
@@ -61,10 +73,15 @@ interface TransactionFilterPanelProps {
 	onCancel: () => void;
 	onApply: () => void;
 	applyDisabled: boolean;
+	visibleSections?: readonly TransactionFilterSection[];
+	customSections?: readonly TransactionFilterPanelCustomSection[];
+	sectionOrder?: readonly string[];
+	initialSectionId?: string;
+	allowEmptyClear?: boolean;
 }
 
 const FILTER_SECTIONS: ReadonlyArray<{
-	id: FilterSection;
+	id: TransactionFilterSection;
 	label: string;
 }> = [
 	{ id: "categories", label: "Categories" },
@@ -386,14 +403,62 @@ export function TransactionFilterPanel({
 	onCancel,
 	onApply,
 	applyDisabled,
+	visibleSections = FILTER_SECTIONS.map((section) => section.id),
+	customSections = [],
+	sectionOrder,
+	initialSectionId,
+	allowEmptyClear = false,
 }: TransactionFilterPanelProps) {
-	const [activeSection, setActiveSection] =
-		useState<FilterSection>("categories");
+	const availableSections = useMemo(() => {
+		const builtInById = new Map(
+			FILTER_SECTIONS.filter((section) => {
+				return visibleSections.includes(section.id);
+			}).map((section) => {
+				return [section.id, section] as const;
+			}),
+		);
+		const customById = new Map(
+			customSections.map((section) => {
+				return [section.id, section] as const;
+			}),
+		);
+		const defaultOrder = [
+			...visibleSections,
+			...customSections.map((section) => section.id),
+		];
+		const order = sectionOrder ?? defaultOrder;
+		const sections: Array<{ id: string; label: string }> = [];
+		const seen = new Set<string>();
+
+		for (const sectionId of order) {
+			if (seen.has(sectionId)) {
+				continue;
+			}
+
+			const section =
+				builtInById.get(sectionId as TransactionFilterSection) ??
+				customById.get(sectionId);
+
+			if (section) {
+				seen.add(sectionId);
+				sections.push({ id: section.id, label: section.label });
+			}
+		}
+
+		return sections;
+	}, [customSections, sectionOrder, visibleSections]);
+	const [activeSection, setActiveSection] = useState<string>(() => {
+		return initialSectionId ?? availableSections[0]?.id ?? "categories";
+	});
 	const [query, setQuery] = useState("");
 	const [explicitAccountSelectionKeys, setExplicitAccountSelectionKeys] =
 		useState<Set<string>>(() => new Set());
 
-	const activeCount = countActiveTransactionFilters(filters);
+	const transactionActiveCount = countActiveTransactionFilters(filters);
+	const customActiveCount = customSections.reduce((count, section) => {
+		return count + section.selectedValues.length;
+	}, 0);
+	const activeCount = transactionActiveCount + customActiveCount;
 
 	const optionMaps = useMemo(() => {
 		return {
@@ -980,7 +1045,84 @@ export function TransactionFilterPanel({
 		);
 	};
 
+	const renderCustomSection = (
+		section: TransactionFilterPanelCustomSection,
+	) => {
+		const normalizedQuery = normalize(query);
+		const visibleOptions = section.options.filter((option) => {
+			if (!normalizedQuery) {
+				return true;
+			}
+
+			return [option.label, option.group, option.secondaryLabel].some(
+				(value) => {
+					return normalize(String(value ?? "")).includes(normalizedQuery);
+				},
+			);
+		});
+		const selectableOptions = visibleOptions.filter((option) => {
+			return !option.disabled;
+		});
+		const allVisibleSelected =
+			selectableOptions.length > 0 &&
+			selectableOptions.every((option) => {
+				return section.selectedValues.includes(option.value);
+			});
+
+		if (visibleOptions.length === 0) {
+			return (
+				<div className="flex h-full items-center justify-center px-8 text-center text-sm text-gray-500 dark:text-gray-400">
+					{section.emptyLabel ?? "No options match this search."}
+				</div>
+			);
+		}
+
+		return (
+			<div className="px-3 py-2">
+				<CheckboxRow
+					checked={allVisibleSelected}
+					label="Select all"
+					onChange={() => {
+						for (const option of selectableOptions) {
+							const isSelected = section.selectedValues.includes(option.value);
+
+							if (allVisibleSelected ? isSelected : !isSelected) {
+								section.onToggle(option.value);
+							}
+						}
+					}}
+				/>
+
+				<div className="mt-1 space-y-1">
+					{visibleOptions.map((option) => {
+						return (
+							<CheckboxRow
+								key={option.value}
+								checked={section.selectedValues.includes(option.value)}
+								disabled={option.disabled}
+								label={option.label}
+								secondaryLabel={option.secondaryLabel}
+								count={section.showCounts ? option.count : undefined}
+								onChange={() => {
+									section.onToggle(option.value);
+								}}
+							/>
+						);
+					})}
+				</div>
+			</div>
+		);
+	};
+
 	const renderActiveSection = () => {
+		const customSection = customSections.find((section) => {
+			return section.id === activeSection;
+		});
+
+		if (customSection) {
+			return renderCustomSection(customSection);
+		}
+
 		if (activeSection === "categories") {
 			return renderCategorySection();
 		}
@@ -1293,6 +1435,23 @@ export function TransactionFilterPanel({
 			},
 		);
 
+		for (const section of customSections) {
+			for (const value of section.selectedValues) {
+				const option = section.options.find((candidate) => {
+					return candidate.value === value;
+				});
+
+				items.push({
+					id: `${section.id}:${value}`,
+					section: `custom:${section.id}`,
+					label: option?.label ?? value,
+					onRemove: () => {
+						section.onToggle(value);
+					},
+				});
+			}
+		}
+
 		return items;
 	})();
 
@@ -1304,6 +1463,10 @@ export function TransactionFilterPanel({
 		{ label: "Goals", itemSection: "Goal" },
 		{ label: "Amount", itemSection: "Amount" },
 		{ label: "Other", itemSection: "Other" },
+		...customSections.map((section) => ({
+			label: section.selectedGroupLabel ?? section.label,
+			itemSection: `custom:${section.id}`,
+		})),
 	]
 		.map((group) => ({
 			...group,
@@ -1312,6 +1475,12 @@ export function TransactionFilterPanel({
 		.filter((group) => group.items.length > 0);
 
 	const clearSelectedGroup = (itemSection: string) => {
+		if (itemSection.startsWith("custom:")) {
+			const sectionId = itemSection.slice("custom:".length);
+			customSections.find((section) => section.id === sectionId)?.onClear();
+			return;
+		}
+
 		setFilters((current) => {
 			if (itemSection === "Category") {
 				return { ...current, categoryNames: [] };
@@ -1362,7 +1531,7 @@ export function TransactionFilterPanel({
 					</h2>
 
 					<nav className="space-y-0.5 px-2 py-2">
-						{FILTER_SECTIONS.map((section) => {
+						{availableSections.map((section) => {
 							return (
 								<button
 									key={section.id}
@@ -1489,7 +1658,7 @@ export function TransactionFilterPanel({
 						setExplicitAccountSelectionKeys(new Set());
 						onClear();
 					}}
-					disabled={activeCount === 0}
+					disabled={activeCount === 0 && !allowEmptyClear}
 					className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-45 dark:border-white/10 dark:bg-white/5 dark:text-gray-200 dark:hover:bg-white/10"
 				>
 					Clear
