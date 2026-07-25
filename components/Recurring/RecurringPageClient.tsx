@@ -38,12 +38,12 @@ import {
 	writeRecurringFiltersToSearchParams,
 } from "@/components/Recurring/recurringUrlState";
 import {
+	buildPredictedBillCandidates,
 	buildRecurringCandidates,
 	candidateFromMerchant,
 	countRecurringFilters,
 	getOccurrencesForMonth,
 	matchesRecurringFilters,
-	mergeLegacyPredictedBills,
 	normalize,
 } from "@/components/Recurring/recurringUtils";
 import type { MerchantListItem } from "@/components/Merchants/types";
@@ -114,10 +114,12 @@ export default function RecurringPageClient() {
 		(state) => state.suppressedSourceKeys,
 	);
 	const recurringHydrated = useRecurringStore((state) => state.hasHydrated);
+	const fetchRecurringData = useRecurringStore(
+		(state) => state.fetchRecurringData,
+	);
 	const upsertRecord = useRecurringStore((state) => state.upsertRecord);
 	const removeRecord = useRecurringStore((state) => state.removeRecord);
 	const dismissCandidate = useRecurringStore((state) => state.dismissCandidate);
-	const suppressSource = useRecurringStore((state) => state.suppressSource);
 	const merchantItems = useMerchantOptions();
 	const { predictedBills } = useBudgetData("all");
 
@@ -179,6 +181,7 @@ export default function RecurringPageClient() {
 			fetchAccounts(),
 			fetchMerchants(),
 			fetchCustomCategories(),
+			fetchRecurringData(),
 		])
 			.catch((error) => console.error("Failed to load recurring data:", error))
 			.finally(() => {
@@ -187,61 +190,100 @@ export default function RecurringPageClient() {
 		return () => {
 			active = false;
 		};
-	}, [fetchAccounts, fetchCustomCategories, fetchMerchants, fetchTransactions]);
+	}, [
+		fetchAccounts,
+		fetchCustomCategories,
+		fetchMerchants,
+		fetchRecurringData,
+		fetchTransactions,
+	]);
 
-	const allRecords = useMemo(
-		() =>
-			mergeLegacyPredictedBills(
-				records,
-				predictedBills,
-				merchantItems,
-				transactions,
-				accounts,
-				customCategories,
-				new Set(suppressedSourceKeys),
-			),
-		[
-			accounts,
-			customCategories,
-			merchantItems,
-			predictedBills,
-			records,
-			suppressedSourceKeys,
+	/*
+	 * Confirmed recurring data has one source of truth:
+	 * the records loaded from public.recurring_data.
+	 *
+	 * Automatic predictions belong only in the review queue and
+	 * are never rendered as active recurring records until saved.
+	 */
+	const allRecords = records;
+
+	const filteredRecords = useMemo(() => {
+		return allRecords.filter((record) => {
+			return matchesRecurringFilters(record, filters);
+		});
+	}, [allRecords, filters]);
+
+	const occurrences = useMemo(() => {
+		return getOccurrencesForMonth(filteredRecords, month, transactions);
+	}, [filteredRecords, month, transactions]);
+
+	const knownSourceKeys = useMemo(() => {
+		return new Set(
+			records.map((record) => {
+				return record.sourceKey;
+			}),
+		);
+	}, [records]);
+
+	const hiddenSourceKeys = useMemo(() => {
+		return new Set([...dismissedCandidateKeys, ...suppressedSourceKeys]);
+	}, [dismissedCandidateKeys, suppressedSourceKeys]);
+
+	const reviewCandidates = useMemo(() => {
+		const candidateByKey = new Map<string, RecurringCandidate>();
+
+		/*
+		 * Transaction inference supplies normal recurring
+		 * suggestions.
+		 */
+		for (const candidate of buildRecurringCandidates(
 			transactions,
-		],
-	);
-	const filteredRecords = useMemo(
-		() =>
-			allRecords.filter((record) => matchesRecurringFilters(record, filters)),
-		[allRecords, filters],
-	);
-	const occurrences = useMemo(
-		() => getOccurrencesForMonth(filteredRecords, month, transactions),
-		[filteredRecords, month, transactions],
-	);
-	const knownSourceKeys = useMemo(
-		() => new Set(allRecords.map((record) => record.sourceKey)),
-		[allRecords],
-	);
-	const reviewCandidates = useMemo(
-		() =>
-			buildRecurringCandidates(
-				transactions,
-				merchantItems,
-				knownSourceKeys,
-				new Set(dismissedCandidateKeys),
-				accounts,
-				customCategories,
-			),
-		[
-			accounts,
-			customCategories,
-			dismissedCandidateKeys,
+			merchantItems,
 			knownSourceKeys,
+			hiddenSourceKeys,
+			accounts,
+			customCategories,
+		)) {
+			candidateByKey.set(candidate.key, candidate);
+		}
+
+		/*
+		 * Dashboard bill predictions are also suggestions,
+		 * never confirmed records. They override matching
+		 * inferred suggestions because they carry a more
+		 * specific predicted amount and due date.
+		 */
+		for (const candidate of buildPredictedBillCandidates(
+			predictedBills,
 			merchantItems,
 			transactions,
-		],
-	);
+			knownSourceKeys,
+			hiddenSourceKeys,
+			accounts,
+			customCategories,
+		)) {
+			candidateByKey.set(candidate.key, candidate);
+		}
+
+		return [...candidateByKey.values()]
+			.sort((first, second) => {
+				return (
+					second.transactions.length - first.transactions.length ||
+					first.merchantName.localeCompare(second.merchantName, "en-US", {
+						sensitivity: "base",
+					})
+				);
+			})
+			.slice(0, 12);
+	}, [
+		accounts,
+		customCategories,
+		hiddenSourceKeys,
+		knownSourceKeys,
+		merchantItems,
+		predictedBills,
+		transactions,
+	]);
 	const activeCandidate =
 		reviewCandidates[reviewIndex] ?? reviewCandidates[0] ?? null;
 
@@ -383,19 +425,24 @@ export default function RecurringPageClient() {
 			);
 		});
 
-		suppressSource(sourceRecord.sourceKey);
-
 		if (targetRecurringRecord) {
-			removeRecord(sourceRecord.id);
-		} else {
-			upsertRecord({
-				...sourceRecord,
-				sourceKey: targetSourceKey,
-				merchantId: target.id,
-				merchantName: target.name,
-				logoUrl: targetMerchant?.logoUrl ?? sourceRecord.logoUrl,
-				updatedAt: new Date().toISOString(),
+			await removeRecord(sourceRecord.id, {
+				suppressSourceKey: sourceRecord.sourceKey,
 			});
+		} else {
+			await upsertRecord(
+				{
+					...sourceRecord,
+					sourceKey: targetSourceKey,
+					merchantId: target.id,
+					merchantName: target.name,
+					logoUrl: targetMerchant?.logoUrl ?? sourceRecord.logoUrl,
+					updatedAt: new Date().toISOString(),
+				},
+				{
+					suppressSourceKey: sourceRecord.sourceKey,
+				},
+			);
 		}
 
 		replaceRecurringMerchantName(source.name, target.name);
@@ -406,16 +453,34 @@ export default function RecurringPageClient() {
 		setActiveDialog(null);
 	};
 
-	const saveRecord = (record: RecurringRecord): void => {
-		upsertRecord(record);
+	const saveRecord = async (record: RecurringRecord): Promise<void> => {
+		await upsertRecord(record);
 		confirmRecurring(record.merchantName);
-		setReviewIndex(0);
 		setActiveDialog(null);
 	};
+
+	const saveReviewRecord = async (record: RecurringRecord): Promise<void> => {
+		const hasMoreCandidates = reviewCandidates.length > 1;
+
+		await upsertRecord(record);
+		confirmRecurring(record.merchantName);
+		setReviewIndex(0);
+
+		if (!hasMoreCandidates) {
+			setActiveDialog(null);
+		}
+	};
+
 	const markNotRecurring = (record: RecurringRecord): void => {
-		removeRecord(record.id);
-		suppressSource(record.sourceKey);
-		setActiveDialog(null);
+		void removeRecord(record.id, {
+			suppressSourceKey: record.sourceKey,
+		})
+			.then(() => {
+				setActiveDialog(null);
+			})
+			.catch((error) => {
+				console.error("Failed to remove recurring record:", error);
+			});
 	};
 	const openEditorForRecord = (record: RecurringRecord): void => {
 		const merchant = merchantItems.find((item) =>
@@ -600,20 +665,14 @@ export default function RecurringPageClient() {
 				<RecurringReviewDialog
 					open
 					candidate={activeCandidate}
-					remainingCount={Math.max(
-						0,
-						reviewCandidates.length - 1,
-					)}
+					remainingCount={Math.max(0, reviewCandidates.length - 1)}
 					onClose={() => {
 						setActiveDialog(null);
 					}}
 					onSkip={() => {
 						if (reviewCandidates.length > 1) {
 							setReviewIndex((current) => {
-								return (
-									(current + 1) %
-									reviewCandidates.length
-								);
+								return (current + 1) % reviewCandidates.length;
 							});
 							return;
 						}
@@ -621,14 +680,21 @@ export default function RecurringPageClient() {
 						setActiveDialog(null);
 					}}
 					onNotRecurring={(candidate) => {
-						dismissCandidate(candidate.key);
-						setReviewIndex(0);
+						const hasMoreCandidates = reviewCandidates.length > 1;
+
+						void dismissCandidate(candidate.key)
+							.then(() => {
+								setReviewIndex(0);
+
+								if (!hasMoreCandidates) {
+									setActiveDialog(null);
+								}
+							})
+							.catch((error) => {
+								console.error("Failed to dismiss recurring candidate:", error);
+							});
 					}}
-					onSave={(record) => {
-						upsertRecord(record);
-						confirmRecurring(record.merchantName);
-						setReviewIndex(0);
-					}}
+					onSave={saveReviewRecord}
 				/>
 			)}
 
@@ -655,10 +721,7 @@ export default function RecurringPageClient() {
 						setActiveDialog(null);
 					}}
 					onSelect={(merchant) => {
-						selectMerchant(
-							merchant,
-							activeDialog.defaultType,
-						);
+						selectMerchant(merchant, activeDialog.defaultType);
 					}}
 				/>
 			)}
