@@ -148,11 +148,7 @@ export default function RecurringPageClient() {
 	const replaceActiveDialog = (
 		nextDialog: Exclude<ActiveDialog, null>,
 	): void => {
-		setActiveDialog(null);
-
-		window.requestAnimationFrame(() => {
-			setActiveDialog(nextDialog);
-		});
+		setActiveDialog(nextDialog);
 	};
 
 	const navigateToTab = (nextTab: "monthly" | "all"): void => {
@@ -600,53 +596,73 @@ export default function RecurringPageClient() {
 				onMarkNotRecurring={markNotRecurring}
 			/>
 
-			<RecurringReviewDialog
-				open={activeDialog?.type === "review"}
-				candidate={activeCandidate}
-				remainingCount={Math.max(0, reviewCandidates.length - 1)}
-				onClose={() => setActiveDialog(null)}
-				onSkip={() =>
-					reviewCandidates.length > 1
-						? setReviewIndex(
-								(current) => (current + 1) % reviewCandidates.length,
-							)
-						: setActiveDialog(null)
-				}
-				onNotRecurring={(candidate) => {
-					dismissCandidate(candidate.key);
-					setReviewIndex(0);
-				}}
-				onSave={(record) => {
-					upsertRecord(record);
-					confirmRecurring(record.merchantName);
-					setReviewIndex(0);
-				}}
-			/>
-			<RecurringManagerDialog
-				open={activeDialog?.type === "manager"}
-				onClose={() => {
-					setActiveDialog(null);
-				}}
-				onOpenSearch={(defaultType) => {
-					replaceActiveDialog({
-						type: "search",
-						defaultType,
-					});
-				}}
-			/>
-			<RecurringMerchantSearchDialog
-				open={activeDialog?.type === "search"}
-				merchantItems={merchantItems}
-				onClose={() => setActiveDialog(null)}
-				onSelect={(merchant) =>
-					selectMerchant(
-						merchant,
-						activeDialog?.type === "search"
-							? activeDialog.defaultType
-							: "expense",
-					)
-				}
-			/>
+			{activeDialog?.type === "review" && (
+				<RecurringReviewDialog
+					open
+					candidate={activeCandidate}
+					remainingCount={Math.max(
+						0,
+						reviewCandidates.length - 1,
+					)}
+					onClose={() => {
+						setActiveDialog(null);
+					}}
+					onSkip={() => {
+						if (reviewCandidates.length > 1) {
+							setReviewIndex((current) => {
+								return (
+									(current + 1) %
+									reviewCandidates.length
+								);
+							});
+							return;
+						}
+
+						setActiveDialog(null);
+					}}
+					onNotRecurring={(candidate) => {
+						dismissCandidate(candidate.key);
+						setReviewIndex(0);
+					}}
+					onSave={(record) => {
+						upsertRecord(record);
+						confirmRecurring(record.merchantName);
+						setReviewIndex(0);
+					}}
+				/>
+			)}
+
+			{activeDialog?.type === "manager" && (
+				<RecurringManagerDialog
+					open
+					onClose={() => {
+						setActiveDialog(null);
+					}}
+					onOpenSearch={(defaultType) => {
+						replaceActiveDialog({
+							type: "search",
+							defaultType,
+						});
+					}}
+				/>
+			)}
+
+			{activeDialog?.type === "search" && (
+				<RecurringMerchantSearchDialog
+					open
+					merchantItems={merchantItems}
+					onClose={() => {
+						setActiveDialog(null);
+					}}
+					onSelect={(merchant) => {
+						selectMerchant(
+							merchant,
+							activeDialog.defaultType,
+						);
+					}}
+				/>
+			)}
+
 			{activeDialog?.type === "editor" && (
 				<RecurringEditorDialog
 					open

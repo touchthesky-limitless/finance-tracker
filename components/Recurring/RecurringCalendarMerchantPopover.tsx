@@ -116,7 +116,7 @@ export function RecurringCalendarMerchantPopover({
 					title={`${record.merchantName || "Merchant"} · ${formatSignedCurrency(
 						displayAmount,
 					)}`}
-					className={`flex w-full items-center justify-between gap-2 truncate rounded-lg px-2 py-1.5 text-left text-xs font-bold ${statusClasses}`}
+					className={`flex w-full items-center justify-between gap-2 truncate rounded-lg px-2 py-1.5 text-left text-xs font-bold transition-colors hover:text-cyan-100 focus-visible:text-cyan-100 ${statusClasses}`}
 				>
 					<span className="truncate">
 						{occurrence.status === "complete" ? "✓" : "×"}{" "}
@@ -203,7 +203,7 @@ export function RecurringCalendarMerchantPopover({
 											`/transactions/${encodeURIComponent(transaction.id)}`,
 										);
 									}}
-									className="grid min-h-[84px] w-full grid-cols-[36px_minmax(0,1fr)_28px_110px] items-center gap-3 px-6 text-left transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.035]"
+									className="group grid min-h-[84px] w-full grid-cols-[36px_minmax(0,1fr)_28px_110px] items-center gap-3 px-6 text-left transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-cyan-500/30 dark:hover:bg-white/[0.035]"
 								>
 									<CategoryIcon
 										name={
@@ -214,7 +214,7 @@ export function RecurringCalendarMerchantPopover({
 										size={20}
 									/>
 
-									<span className="truncate text-base font-semibold text-gray-900 dark:text-white">
+									<span className="truncate text-base font-semibold text-gray-900 transition-colors group-hover:text-cyan-600 group-focus-visible:text-cyan-600 dark:text-white dark:group-hover:text-cyan-400 dark:group-focus-visible:text-cyan-400">
 										{formatLongDate(transaction.date)}
 									</span>
 
@@ -223,7 +223,7 @@ export function RecurringCalendarMerchantPopover({
 										className="text-gray-500 dark:text-gray-400"
 									/>
 
-									<span className="text-right text-base font-bold text-gray-900 dark:text-white">
+									<span className="text-right text-base font-bold text-gray-900 transition-colors group-hover:text-cyan-600 group-focus-visible:text-cyan-600 dark:text-white dark:group-hover:text-cyan-400 dark:group-focus-visible:text-cyan-400">
 										{formatSignedCurrency(transactionAmount)}
 									</span>
 								</button>

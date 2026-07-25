@@ -35,7 +35,7 @@ export function RecurringRowMenu({
 				<button
 					type="button"
 					aria-label={`Actions for ${record.merchantName}`}
-					className="grid size-11 place-items-center rounded-full border border-transparent text-gray-700 outline-none transition-colors hover:border-cyan-500 hover:bg-gray-100 data-[state=open]:border-cyan-500 dark:text-white dark:hover:bg-white/7"
+					className="grid size-11 place-items-center rounded-full border border-transparent text-gray-700 outline-none transition-colors hover:border-cyan-500 hover:bg-gray-100 hover:text-cyan-600 focus-visible:ring-2 focus-visible:ring-cyan-500/30 data-[state=open]:border-cyan-500 data-[state=open]:text-cyan-600 dark:text-white dark:hover:bg-white/7 dark:hover:text-cyan-400 dark:data-[state=open]:text-cyan-400"
 				>
 					<MoreHorizontal size={22} />
 				</button>
@@ -98,7 +98,9 @@ function MenuItem({
 				onSelect();
 			}}
 			className={`flex min-h-14 cursor-pointer items-center gap-4 rounded-xl px-4 text-base font-semibold outline-none transition-colors data-[highlighted]:bg-gray-100 dark:data-[highlighted]:bg-white/7 ${
-				danger ? "text-red-500" : "text-gray-900 dark:text-white"
+				danger
+					? "text-red-500 data-[highlighted]:text-red-600 dark:data-[highlighted]:text-red-400"
+					: "text-gray-900 data-[highlighted]:text-cyan-600 dark:text-white dark:data-[highlighted]:text-cyan-400"
 			}`}
 		>
 			{icon}

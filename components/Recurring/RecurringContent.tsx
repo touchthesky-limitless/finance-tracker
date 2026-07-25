@@ -213,7 +213,7 @@ function OccurrenceRow({
 				onClick={viewMerchant}
 				disabled={!record.merchantId}
 				title={record.merchantName || "Merchant"}
-				className="flex min-w-0 items-center gap-4 text-left disabled:cursor-default"
+				className="group flex min-w-0 items-center gap-4 text-left disabled:cursor-default"
 			>
 				<MerchantLogo
 					name={record.merchantName}
@@ -221,7 +221,7 @@ function OccurrenceRow({
 					size="lg"
 				/>
 				<span className="min-w-0">
-					<span className="block truncate text-base font-bold text-gray-900 dark:text-white">
+					<span className="block truncate text-base font-bold text-gray-900 transition-colors group-hover:text-cyan-600 group-focus-visible:text-cyan-600 dark:text-white dark:group-hover:text-cyan-400 dark:group-focus-visible:text-cyan-400">
 						{record.merchantName}
 					</span>
 					<span className="mt-1 block text-sm text-gray-500 dark:text-gray-400">
@@ -241,7 +241,7 @@ function OccurrenceRow({
 				title={`${formatLongDate(occurrence.date)} (${formatRelativeDays(
 					occurrence.date,
 				)})`}
-				className={`text-left text-base font-semibold ${
+				className={`text-left text-base font-semibold transition-colors hover:text-cyan-600 focus-visible:text-cyan-600 dark:hover:text-cyan-400 dark:focus-visible:text-cyan-400 ${
 					occurrence.status === "overdue"
 						? "text-orange-500"
 						: "text-gray-900 dark:text-white"
@@ -264,7 +264,7 @@ function OccurrenceRow({
 					else viewMerchant();
 				}}
 				title={`Amount: ${formatMoney(record.amount)}`}
-				className="flex items-center justify-end gap-2 text-right text-base font-bold text-gray-900 dark:text-white"
+				className="flex items-center justify-end gap-2 text-right text-base font-bold text-gray-900 transition-colors hover:text-cyan-600 focus-visible:text-cyan-600 dark:text-white dark:hover:text-cyan-400 dark:focus-visible:text-cyan-400"
 			>
 				{occurrence.status === "complete" && (
 					<span className="grid size-5 place-items-center rounded-full bg-emerald-700/30 text-emerald-400">
@@ -297,12 +297,12 @@ function LinkedAccount({ record }: { record: RecurringRecord }) {
 				}
 			}}
 			title={record.accountName || "No payment account"}
-			className="flex min-w-0 items-center gap-3 text-left disabled:cursor-default"
+			className="group flex min-w-0 items-center gap-3 text-left disabled:cursor-default"
 		>
 			<span className="grid size-5 shrink-0 place-items-center rounded-full bg-blue-600 text-white">
 				<Landmark size={11} />
 			</span>
-			<span className="truncate text-base font-medium text-gray-900 dark:text-white">
+			<span className="truncate text-base font-medium text-gray-900 transition-colors group-hover:text-cyan-600 group-focus-visible:text-cyan-600 dark:text-white dark:group-hover:text-cyan-400 dark:group-focus-visible:text-cyan-400">
 				{record.accountName || "No payment account"}
 			</span>
 		</button>
@@ -321,10 +321,10 @@ function LinkedCategory({ record }: { record: RecurringRecord }) {
 				}
 			}}
 			title={record.categoryName || "Uncategorized"}
-			className="flex min-w-0 items-center gap-3 text-left disabled:cursor-default"
+			className="group flex min-w-0 items-center gap-3 text-left disabled:cursor-default"
 		>
 			<CategoryIcon name={record.categoryName || "Uncategorized"} size={19} />
-			<span className="truncate text-base font-medium text-gray-900 dark:text-white">
+			<span className="truncate text-base font-medium text-gray-900 transition-colors group-hover:text-cyan-600 group-focus-visible:text-cyan-600 dark:text-white dark:group-hover:text-cyan-400 dark:group-focus-visible:text-cyan-400">
 				{record.categoryName || "Uncategorized"}
 			</span>
 		</button>
@@ -497,7 +497,7 @@ function AllRecurringRow({
 				disabled={!record.merchantId}
 				onClick={viewMerchant}
 				title={record.merchantName || "Merchant"}
-				className="flex min-w-0 items-center gap-5 text-left disabled:cursor-default"
+				className="group flex min-w-0 items-center gap-5 text-left disabled:cursor-default"
 			>
 				<MerchantLogo
 					name={record.merchantName}
@@ -506,7 +506,7 @@ function AllRecurringRow({
 					className="!size-14"
 				/>
 				<span className="min-w-0">
-					<span className="block truncate text-lg font-bold">
+					<span className="block truncate text-lg font-bold transition-colors group-hover:text-cyan-600 group-focus-visible:text-cyan-600 dark:group-hover:text-cyan-400 dark:group-focus-visible:text-cyan-400">
 						{record.merchantName}
 					</span>
 					<span className="mt-1 block text-base text-gray-500 dark:text-gray-400">
@@ -524,7 +524,7 @@ function AllRecurringRow({
 					);
 				}}
 				title={`${formatLongDate(nextDate)} (${formatRelativeDays(nextDate)})`}
-				className="text-left text-lg font-medium"
+				className="text-left text-lg font-medium transition-colors hover:text-cyan-600 focus-visible:text-cyan-600 dark:hover:text-cyan-400 dark:focus-visible:text-cyan-400"
 			>
 				{formatLongDate(nextDate)}{" "}
 				<span className="text-gray-500 dark:text-gray-400">
@@ -537,7 +537,7 @@ function AllRecurringRow({
 				type="button"
 				onClick={viewMerchant}
 				title={`Amount: ${formatMoney(record.amount)}`}
-				className="text-right text-lg font-bold"
+				className="text-right text-lg font-bold transition-colors hover:text-cyan-600 focus-visible:text-cyan-600 dark:hover:text-cyan-400 dark:focus-visible:text-cyan-400"
 			>
 				{formatMoney(record.amount)}
 			</button>
