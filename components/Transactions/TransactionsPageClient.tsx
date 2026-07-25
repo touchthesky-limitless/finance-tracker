@@ -128,6 +128,92 @@ function normalizeMerchantName(name: string): string {
 	return name.trim().toLocaleLowerCase();
 }
 
+interface AccountFilterRecord {
+	name: string;
+	type?: string | null;
+	account_type?: string | null;
+	balance?: number | null;
+	current_balance?: number | null;
+}
+
+function getAccountFilterGroup(
+	account: AccountFilterRecord | undefined,
+	accountName: string,
+): string {
+	const searchable = [accountName, account?.type, account?.account_type]
+		.filter(Boolean)
+		.join(" ")
+		.toLowerCase();
+
+	if (
+		searchable.includes("credit") ||
+		searchable.includes("card") ||
+		searchable.includes("amex") ||
+		searchable.includes("sapphire") ||
+		searchable.includes("venture") ||
+		searchable.includes("unlimited") ||
+		searchable.includes("freedom")
+	) {
+		return "Liabilities::Credit Cards";
+	}
+
+	if (searchable.includes("mortgage")) {
+		return "Liabilities::Mortgage";
+	}
+
+	if (searchable.includes("loan")) {
+		return "Liabilities::Loans";
+	}
+
+	if (
+		searchable.includes("401") ||
+		searchable.includes("ira") ||
+		searchable.includes("investment") ||
+		searchable.includes("broker") ||
+		searchable.includes("stock") ||
+		searchable.includes("fidelity") ||
+		searchable.includes("vanguard")
+	) {
+		return "Assets::Investments";
+	}
+
+	if (
+		searchable.includes("real estate") ||
+		searchable.includes("property") ||
+		searchable.includes("home")
+	) {
+		return "Assets::Real Estate";
+	}
+
+	if (
+		searchable.includes("vehicle") ||
+		searchable.includes("car") ||
+		searchable.includes("auto")
+	) {
+		return "Assets::Vehicles";
+	}
+
+	if (
+		searchable.includes("valuable") ||
+		searchable.includes("jewelry") ||
+		searchable.includes("collectible")
+	) {
+		return "Assets::Valuables";
+	}
+
+	if (
+		searchable.includes("checking") ||
+		searchable.includes("saving") ||
+		searchable.includes("cash")
+	) {
+		return "Assets::Cash";
+	}
+
+	const balance = account?.current_balance ?? account?.balance ?? 0;
+
+	return balance < 0 ? "Liabilities::Other Liabilities" : "Assets::Cash";
+}
+
 function getTransactionIdFromPathname(pathname: string): string | null {
 	const match = pathname.match(/^\/transactions\/([^/?#]+)\/?$/);
 
@@ -665,34 +751,59 @@ export default function TransactionsPageClient({
 		}
 
 		const accountNameByKey = new Map<string, string>();
+		const accountRecordByKey = new Map<string, AccountFilterRecord>();
+		const transactionCountByAccountKey = new Map<string, number>();
 
 		for (const account of accounts) {
-			const accountName = account.name.trim();
+			const accountRecord = account as AccountFilterRecord;
+			const accountName = accountRecord.name.trim();
 
-			if (accountName) {
-				accountNameByKey.set(accountName.toLowerCase(), accountName);
+			if (!accountName) {
+				continue;
 			}
+
+			const accountKey = accountName.toLowerCase();
+
+			accountNameByKey.set(accountKey, accountName);
+			accountRecordByKey.set(accountKey, accountRecord);
 		}
 
 		for (const transaction of transactions) {
 			const accountName = transaction.account?.trim();
 
-			if (accountName) {
-				accountNameByKey.set(
-					accountName.toLowerCase(),
-					accountNameByKey.get(accountName.toLowerCase()) ?? accountName,
-				);
+			if (!accountName) {
+				continue;
 			}
+
+			const accountKey = accountName.toLowerCase();
+
+			accountNameByKey.set(
+				accountKey,
+				accountNameByKey.get(accountKey) ?? accountName,
+			);
+			transactionCountByAccountKey.set(
+				accountKey,
+				(transactionCountByAccountKey.get(accountKey) ?? 0) + 1,
+			);
 		}
 
-		const accountOptions = [...accountNameByKey.values()]
-			.sort((first, second) => first.localeCompare(second))
-			.map((accountName) => {
+		const accountOptions = [...accountNameByKey.entries()]
+			.map(([accountKey, accountName]) => {
 				return {
 					value: accountName,
 					label: accountName,
-					group: "Accounts",
+					group: getAccountFilterGroup(
+						accountRecordByKey.get(accountKey),
+						accountName,
+					),
+					count: transactionCountByAccountKey.get(accountKey) ?? 0,
 				};
+			})
+			.sort((first, second) => {
+				return (
+					String(first.group).localeCompare(String(second.group)) ||
+					first.label.localeCompare(second.label)
+				);
 			});
 
 		const tagNameByKey = new Map<string, string>();

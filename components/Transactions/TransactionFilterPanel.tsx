@@ -9,7 +9,20 @@ import {
 	type SetStateAction,
 	type ReactNode,
 } from "react";
-import { CircleX, Search, Tag, X } from "lucide-react";
+import {
+	Building2,
+	Car,
+	CircleX,
+	CreditCard,
+	Home,
+	Landmark,
+	LineChart,
+	Search,
+	Sparkles,
+	Tag,
+	WalletCards,
+	X,
+} from "lucide-react";
 
 import { CATEGORY_HIERARCHY, getCategoryTheme } from "@/constants";
 import { CUSTOM_ICON_MAP, SYSTEM_ICON_MAP } from "@/constants/icons";
@@ -80,6 +93,148 @@ function normalize(value: string): string {
 interface CategoryGroup {
 	parent: TransactionFilterOption;
 	children: TransactionFilterOption[];
+}
+
+interface AccountSubgroup {
+	name: string;
+	options: TransactionFilterOption[];
+}
+
+interface AccountRootGroup {
+	name: "Assets" | "Liabilities";
+	subgroups: AccountSubgroup[];
+}
+
+const ACCOUNT_ROOT_ORDER = ["Assets", "Liabilities"] as const;
+
+const ACCOUNT_SUBGROUP_ORDER: Record<
+	(typeof ACCOUNT_ROOT_ORDER)[number],
+	string[]
+> = {
+	Assets: [
+		"Cash",
+		"Investments",
+		"Real Estate",
+		"Vehicles",
+		"Valuables",
+		"Other Assets",
+	],
+	Liabilities: ["Credit Cards", "Mortgage", "Loans", "Other Liabilities"],
+};
+
+function parseAccountGroup(option: TransactionFilterOption): {
+	root: "Assets" | "Liabilities";
+	subgroup: string;
+} {
+	const rawGroup = option.group?.trim() ?? "";
+	const [rawRoot, rawSubgroup] = rawGroup.split("::");
+	const normalizedRoot = normalize(rawRoot);
+	const normalizedSubgroup = normalize(rawSubgroup || rawRoot);
+
+	const liabilitySubgroups = new Set([
+		"credit cards",
+		"credit card",
+		"mortgage",
+		"loans",
+		"loan",
+		"other liabilities",
+	]);
+
+	const root: "Assets" | "Liabilities" =
+		normalizedRoot === "liabilities" ||
+		liabilitySubgroups.has(normalizedSubgroup)
+			? "Liabilities"
+			: "Assets";
+
+	let subgroup =
+		rawSubgroup?.trim() ||
+		rawRoot.trim() ||
+		(root === "Assets" ? "Cash" : "Credit Cards");
+
+	if (normalize(subgroup) === "accounts") {
+		subgroup = root === "Assets" ? "Cash" : "Credit Cards";
+	}
+
+	return {
+		root,
+		subgroup,
+	};
+}
+
+function buildAccountGroups(
+	options: TransactionFilterOption[],
+): AccountRootGroup[] {
+	const grouped = new Map<
+		"Assets" | "Liabilities",
+		Map<string, TransactionFilterOption[]>
+	>();
+
+	for (const rootName of ACCOUNT_ROOT_ORDER) {
+		grouped.set(rootName, new Map());
+	}
+
+	for (const option of options) {
+		const { root, subgroup } = parseAccountGroup(option);
+		const subgroupMap = grouped.get(root) ?? new Map();
+		const subgroupOptions = subgroupMap.get(subgroup) ?? [];
+
+		subgroupOptions.push(option);
+		subgroupMap.set(subgroup, subgroupOptions);
+		grouped.set(root, subgroupMap);
+	}
+
+	return ACCOUNT_ROOT_ORDER.map((rootName) => {
+		const subgroupMap = grouped.get(rootName) ?? new Map();
+		const preferredOrder = ACCOUNT_SUBGROUP_ORDER[rootName];
+		const subgroupNames = [
+			...preferredOrder.filter((name) => {
+				return subgroupMap.has(name);
+			}),
+			...[...subgroupMap.keys()].filter((name) => {
+				return !preferredOrder.includes(name);
+			}),
+		];
+
+		return {
+			name: rootName,
+			subgroups: subgroupNames.map((name) => {
+				return {
+					name,
+					options: [...(subgroupMap.get(name) ?? [])].sort((first, second) => {
+						return first.label.localeCompare(second.label);
+					}),
+				};
+			}),
+		};
+	}).filter((group) => {
+		return group.subgroups.length > 0;
+	});
+}
+
+function AccountOptionIcon({ subgroup }: { subgroup: string }) {
+	const normalized = normalize(subgroup);
+	const Icon =
+		normalized === "cash"
+			? Landmark
+			: normalized === "investments"
+				? LineChart
+				: normalized === "real estate" || normalized === "mortgage"
+					? Home
+					: normalized === "vehicles"
+						? Car
+						: normalized === "valuables"
+							? Sparkles
+							: normalized === "credit cards"
+								? CreditCard
+								: normalized === "loans"
+									? Building2
+									: WalletCards;
+
+	return (
+		<span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white">
+			<Icon size={11} strokeWidth={2} />
+		</span>
+	);
 }
 
 function getOption(
@@ -235,6 +390,8 @@ export function TransactionFilterPanel({
 	const [activeSection, setActiveSection] =
 		useState<FilterSection>("categories");
 	const [query, setQuery] = useState("");
+	const [explicitAccountSelectionKeys, setExplicitAccountSelectionKeys] =
+		useState<Set<string>>(() => new Set());
 
 	const activeCount = countActiveTransactionFilters(filters);
 
@@ -551,6 +708,278 @@ export function TransactionFilterPanel({
 		);
 	};
 
+	const renderAccountSection = () => {
+		const normalizedQuery = normalize(query);
+		const accountGroups = buildAccountGroups(data.accounts);
+		const visibleGroups = accountGroups
+			.map((rootGroup) => {
+				const rootMatches = normalize(rootGroup.name).includes(normalizedQuery);
+
+				const subgroups = rootGroup.subgroups
+					.map((subgroup) => {
+						const subgroupMatches = normalize(subgroup.name).includes(
+							normalizedQuery,
+						);
+
+						const options =
+							!normalizedQuery || rootMatches || subgroupMatches
+								? subgroup.options
+								: subgroup.options.filter((option) => {
+										return [option.label, option.secondaryLabel].some(
+											(value) => {
+												return normalize(String(value ?? "")).includes(
+													normalizedQuery,
+												);
+											},
+										);
+									});
+
+						return {
+							...subgroup,
+							options,
+						};
+					})
+					.filter((subgroup) => {
+						return subgroup.options.length > 0;
+					});
+
+				return {
+					...rootGroup,
+					subgroups,
+				};
+			})
+			.filter((rootGroup) => {
+				return rootGroup.subgroups.length > 0;
+			});
+
+		const visibleOptions = visibleGroups.flatMap((rootGroup) => {
+			return rootGroup.subgroups.flatMap((subgroup) => {
+				return subgroup.options.filter((option) => {
+					return !option.disabled;
+				});
+			});
+		});
+		const selectedValues = filters.accountNames;
+		const selectAllKey = "account:all";
+		const getRootKey = (rootName: AccountRootGroup["name"]): string => {
+			return `account:root:${rootName}`;
+		};
+		const getSubgroupKey = (
+			rootName: AccountRootGroup["name"],
+			subgroupName: string,
+		): string => {
+			return `account:subgroup:${rootName}:${subgroupName}`;
+		};
+
+		const updateExplicitSelectionKeys = (
+			keys: string[],
+			shouldSelect: boolean,
+		): void => {
+			setExplicitAccountSelectionKeys((current) => {
+				const next = new Set(current);
+
+				for (const key of keys) {
+					if (shouldSelect) {
+						next.add(key);
+					} else {
+						next.delete(key);
+					}
+				}
+
+				return next;
+			});
+		};
+
+		const clearExplicitAncestorSelections = (
+			rootName: AccountRootGroup["name"],
+			subgroupName?: string,
+		): void => {
+			setExplicitAccountSelectionKeys((current) => {
+				const next = new Set(current);
+
+				next.delete(selectAllKey);
+				next.delete(getRootKey(rootName));
+
+				if (subgroupName) {
+					next.delete(getSubgroupKey(rootName, subgroupName));
+				}
+
+				return next;
+			});
+		};
+
+		const updateAccountOptions = (
+			options: TransactionFilterOption[],
+			shouldSelect: boolean,
+		): void => {
+			const optionValues = options
+				.filter((option) => {
+					return !option.disabled;
+				})
+				.map((option) => {
+					return option.value;
+				});
+
+			setFilters((current) => {
+				if (shouldSelect) {
+					return {
+						...current,
+						accountNames: [
+							...new Set([...current.accountNames, ...optionValues]),
+						],
+					};
+				}
+
+				const valuesToRemove = new Set(optionValues);
+
+				return {
+					...current,
+					accountNames: current.accountNames.filter((value) => {
+						return !valuesToRemove.has(value);
+					}),
+				};
+			});
+		};
+
+		if (visibleGroups.length === 0) {
+			return (
+				<div className="flex h-full items-center justify-center px-8 text-center text-sm text-gray-500 dark:text-gray-400">
+					No accounts match this search.
+				</div>
+			);
+		}
+
+		return (
+			<div className="px-3 py-2">
+				<CheckboxRow
+					checked={explicitAccountSelectionKeys.has(selectAllKey)}
+					label="Select all"
+					emphasized
+					indentLevel={0}
+					onChange={() => {
+						const shouldSelect =
+							!explicitAccountSelectionKeys.has(selectAllKey);
+						const hierarchyKeys = visibleGroups.flatMap((rootGroup) => {
+							return [
+								getRootKey(rootGroup.name),
+								...rootGroup.subgroups.map((subgroup) => {
+									return getSubgroupKey(rootGroup.name, subgroup.name);
+								}),
+							];
+						});
+
+						updateAccountOptions(visibleOptions, shouldSelect);
+						updateExplicitSelectionKeys(
+							[selectAllKey, ...hierarchyKeys],
+							shouldSelect,
+						);
+					}}
+				/>
+
+				<div className="mt-1 space-y-1">
+					{visibleGroups.map((rootGroup) => {
+						const rootOptions = rootGroup.subgroups.flatMap((subgroup) => {
+							return subgroup.options.filter((option) => {
+								return !option.disabled;
+							});
+						});
+
+						return (
+							<section key={rootGroup.name}>
+								<CheckboxRow
+									checked={explicitAccountSelectionKeys.has(
+										getRootKey(rootGroup.name),
+									)}
+									label={rootGroup.name}
+									emphasized
+									indentLevel={1}
+									onChange={() => {
+										const rootKey = getRootKey(rootGroup.name);
+										const shouldSelect =
+											!explicitAccountSelectionKeys.has(rootKey);
+										const subgroupKeys = rootGroup.subgroups.map((subgroup) => {
+											return getSubgroupKey(rootGroup.name, subgroup.name);
+										});
+
+										updateAccountOptions(rootOptions, shouldSelect);
+										updateExplicitSelectionKeys(
+											[rootKey, ...subgroupKeys],
+											shouldSelect,
+										);
+
+										if (!shouldSelect) {
+											updateExplicitSelectionKeys([selectAllKey], false);
+										}
+									}}
+								/>
+
+								{rootGroup.subgroups.map((subgroup) => {
+									const subgroupOptions = subgroup.options.filter((option) => {
+										return !option.disabled;
+									});
+
+									return (
+										<div key={`${rootGroup.name}:${subgroup.name}`}>
+											<CheckboxRow
+												checked={explicitAccountSelectionKeys.has(
+													getSubgroupKey(rootGroup.name, subgroup.name),
+												)}
+												label={subgroup.name}
+												emphasized
+												indentLevel={2}
+												onChange={() => {
+													const subgroupKey = getSubgroupKey(
+														rootGroup.name,
+														subgroup.name,
+													);
+													const shouldSelect =
+														!explicitAccountSelectionKeys.has(subgroupKey);
+
+													updateAccountOptions(subgroupOptions, shouldSelect);
+													updateExplicitSelectionKeys(
+														[subgroupKey],
+														shouldSelect,
+													);
+
+													if (!shouldSelect) {
+														clearExplicitAncestorSelections(rootGroup.name);
+													}
+												}}
+											/>
+
+											{subgroup.options.map((option) => {
+												return (
+													<CheckboxRow
+														key={option.value}
+														checked={selectedValues.includes(option.value)}
+														disabled={option.disabled}
+														label={option.label}
+														secondaryLabel={option.secondaryLabel}
+														icon={
+															<AccountOptionIcon subgroup={subgroup.name} />
+														}
+														indentLevel={3}
+														onChange={() => {
+															toggleValue("accountNames", option.value);
+															clearExplicitAncestorSelections(
+																rootGroup.name,
+																subgroup.name,
+															);
+														}}
+													/>
+												);
+											})}
+										</div>
+									);
+								})}
+							</section>
+						);
+					})}
+				</div>
+			</div>
+		);
+	};
+
 	const renderActiveSection = () => {
 		if (activeSection === "categories") {
 			return renderCategorySection();
@@ -566,12 +995,7 @@ export function TransactionFilterPanel({
 		}
 
 		if (activeSection === "accounts") {
-			return renderListSection({
-				key: "accountNames",
-				options: data.accounts,
-				showGroups: true,
-				emptyLabel: "No accounts match this search.",
-			});
+			return renderAccountSection();
 		}
 
 		if (activeSection === "tags") {
@@ -1061,7 +1485,10 @@ export function TransactionFilterPanel({
 			<div className="flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 dark:border-white/10 dark:bg-[#1B1B1B]">
 				<button
 					type="button"
-					onClick={onClear}
+					onClick={() => {
+						setExplicitAccountSelectionKeys(new Set());
+						onClear();
+					}}
 					disabled={activeCount === 0}
 					className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-45 dark:border-white/10 dark:bg-white/5 dark:text-gray-200 dark:hover:bg-white/10"
 				>
@@ -1100,6 +1527,7 @@ function CheckboxRow({
 	content,
 	disabled = false,
 	indent = false,
+	indentLevel,
 	indeterminate = false,
 	emphasized = false,
 }: {
@@ -1112,6 +1540,7 @@ function CheckboxRow({
 	content?: ReactNode;
 	disabled?: boolean;
 	indent?: boolean;
+	indentLevel?: 0 | 1 | 2 | 3;
 	indeterminate?: boolean;
 	emphasized?: boolean;
 }) {
@@ -1128,7 +1557,13 @@ function CheckboxRow({
 	return (
 		<label
 			className={`flex min-h-9 items-center gap-2 rounded-md py-1.5 pr-2 transition-colors ${
-				indent ? "pl-7" : "pl-2"
+				indentLevel === 3
+					? "pl-16"
+					: indentLevel === 2
+						? "pl-12"
+						: indentLevel === 1 || indent
+							? "pl-7"
+							: "pl-2"
 			} ${
 				disabled
 					? "cursor-not-allowed opacity-45"
