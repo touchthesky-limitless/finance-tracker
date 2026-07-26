@@ -12,6 +12,11 @@ import {
 	ListTree,
 	Calculator,
 	ChartCandlestick,
+	PiggyBank,
+	HandCoins,
+	LandPlot,
+	TrendingUp,
+	Sparkles,
 } from "lucide-react";
 
 export interface SidebarItemType {
@@ -53,13 +58,24 @@ export const NAV_GROUPS: SidebarItemType[] = [
 	createItem("Dashboard", "/dashboard", LayoutDashboard),
 	createItem("Accounts", "/accounts", Layers2),
 	createItem("Transactions", "/transactions", Receipt),
+	createItem("Cash Flow", "/cash-flow", HandCoins),
 	createItem("Reports", "/reports", ChartPie),
+	createItem("Budget", "/plan", PiggyBank),
 	createItem("Wallet", "/wallet", WalletCards),
-	createItem("Calculator", "/calculator", Calculator),
-	createItem("Stocks", "/stocks", ChartCandlestick),
-	createItem("Insights", "/insights", Compass),
-	createItem("Statistics", "/stats", BarChart3),
 	createItem("Recurring", "/recurring", Repeat),
+	createItem("Goals", "/goals", LandPlot),
+	createItem("Investments", "/investments", TrendingUp),
+	createItem("Forecasting", "/forecast", Sparkles),
+	createItem("Stocks", "/stocks", ChartCandlestick),
+	createItem("Statistics", "/stats", BarChart3, {
+		isLocked: true,
+	}),
+	createItem("Insights", "/insights", Compass, {
+		isLocked: true,
+	}),
+	createItem("Calculator", "/calculator", Calculator, {
+		isLocked: true,
+	}),
 	createItem("Tags", "/tags", ListTree, {
 		hasAdd: true, isLocked: true,
 	}),

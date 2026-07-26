@@ -1,9 +1,12 @@
 export type CategorySectionId = "income" | "expenses" | "transfers";
 export type GroupBudgetMode = "group" | "category";
+export type GroupBudgetType = "fixed" | "flexible" | "non-monthly";
 
 export interface GroupPreference {
 	name?: string;
 	budgetMode?: GroupBudgetMode;
+	budgetType?: GroupBudgetType;
+	monthlyRollover?: boolean;
 	sectionId?: CategorySectionId;
 	hidden?: boolean;
 	order?: number;
@@ -79,6 +82,18 @@ export function parseGroupPreferences(value: unknown): GroupPreferences {
 
 		if (candidate.budgetMode === "group" || candidate.budgetMode === "category") {
 			preference.budgetMode = candidate.budgetMode;
+		}
+
+		if (
+			candidate.budgetType === "fixed" ||
+			candidate.budgetType === "flexible" ||
+			candidate.budgetType === "non-monthly"
+		) {
+			preference.budgetType = candidate.budgetType;
+		}
+
+		if (typeof candidate.monthlyRollover === "boolean") {
+			preference.monthlyRollover = candidate.monthlyRollover;
 		}
 
 		if (

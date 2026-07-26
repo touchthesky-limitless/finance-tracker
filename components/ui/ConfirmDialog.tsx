@@ -3,13 +3,14 @@
 import {
 	type KeyboardEvent as ReactKeyboardEvent,
 	type ReactNode,
+	type PointerEvent as ReactPointerEvent,
 	useEffect,
 	useId,
 	useRef,
 	useSyncExternalStore,
 } from "react";
 import { createPortal } from "react-dom";
-import { Loader2 } from "lucide-react";
+import { Loader2, X } from "lucide-react";
 
 export type ConfirmDialogVariant = "primary" | "warning" | "danger";
 
@@ -26,6 +27,9 @@ export interface ConfirmDialogProps {
 	confirmDisabled?: boolean;
 	autoFocusConfirm?: boolean;
 	closeOnBackdrop?: boolean;
+	panelClassName?: string;
+	overlayClassName?: string;
+	showCloseButton?: boolean;
 }
 
 const VARIANT_STYLES: Record<
@@ -83,6 +87,9 @@ export function ConfirmDialog({
 	confirmDisabled = false,
 	autoFocusConfirm = true,
 	closeOnBackdrop = true,
+	panelClassName = "",
+	overlayClassName = "z-[1600]",
+	showCloseButton = false,
 }: ConfirmDialogProps) {
 	const isClient = useSyncExternalStore(
 		subscribeToClient,
@@ -166,6 +173,11 @@ export function ConfirmDialog({
 		const firstElement = focusableElements[0];
 		const lastElement = focusableElements[focusableElements.length - 1];
 
+		if (!firstElement || !lastElement) {
+			event.preventDefault();
+			return;
+		}
+
 		if (event.shiftKey && document.activeElement === firstElement) {
 			event.preventDefault();
 			lastElement.focus();
@@ -184,8 +196,8 @@ export function ConfirmDialog({
 
 	return createPortal(
 		<div
-			className="fixed inset-0 z-[1000] grid place-items-center overflow-y-auto bg-black/55 p-3 backdrop-blur-[2px] sm:p-4"
-			onPointerDown={(event) => {
+			className={`fixed inset-0 grid place-items-center overflow-y-auto bg-black/55 p-3 backdrop-blur-[2px] sm:p-4 ${overlayClassName}`}
+			onPointerDown={(event: ReactPointerEvent<HTMLDivElement>) => {
 				if (
 					closeOnBackdrop &&
 					!isLoading &&
@@ -203,33 +215,61 @@ export function ConfirmDialog({
 				aria-labelledby={titleId}
 				aria-describedby={descriptionId}
 				onKeyDown={handleDialogKeyDown}
-				className="relative my-auto w-full max-w-[520px] overflow-hidden rounded-2xl border border-black/10 bg-white text-[#282826] shadow-[0_28px_90px_rgba(0,0,0,0.34)] dark:border-white/10 dark:bg-[#242422] dark:text-white"
+				className={`relative my-auto w-full max-w-[520px] overflow-hidden rounded-2xl border border-black/10 bg-white text-[#282826] shadow-[0_28px_90px_rgba(0,0,0,0.34)] dark:border-white/10 dark:bg-[#242422] dark:text-white ${panelClassName}`}
 			>
-				<div className="flex items-start gap-3 px-4 pb-4 pt-5 sm:gap-4 sm:px-7 sm:pb-5 sm:pt-7">
-					{icon && (
-						<div
-							className={`grid size-11 shrink-0 place-items-center rounded-full ${styles.icon}`}
-							aria-hidden="true"
-						>
-							{icon}
-						</div>
-					)}
-
-					<div className="min-w-0">
-						<h2
-							id={titleId}
-							className="text-lg font-semibold tracking-[-0.01em] sm:text-xl"
-						>
-							{title}
-						</h2>
+				{showCloseButton ? (
+					<>
+						<header className="flex items-center justify-between gap-4 border-b border-black/[0.06] px-5 py-5 sm:px-7 dark:border-white/10">
+							<h2
+								id={titleId}
+								className="text-xl font-semibold tracking-[-0.01em] sm:text-2xl"
+							>
+								{title}
+							</h2>
+							<button
+								type="button"
+								onClick={onCancel}
+								disabled={isLoading}
+								aria-label="Close"
+								className="grid size-9 shrink-0 place-items-center rounded-full transition-colors hover:bg-black/5 disabled:opacity-50 dark:hover:bg-white/10"
+							>
+								<X size={24} />
+							</button>
+						</header>
 						<div
 							id={descriptionId}
-							className="mt-2 text-sm leading-6 text-[#686661] dark:text-[#b8b6b1]"
+							className="px-5 py-6 text-sm leading-6 text-[#686661] sm:px-7 sm:py-7 dark:text-[#b8b6b1]"
 						>
 							{description}
 						</div>
+					</>
+				) : (
+					<div className="flex items-start gap-3 px-4 pb-4 pt-5 sm:gap-4 sm:px-7 sm:pb-5 sm:pt-7">
+						{icon && (
+							<div
+								className={`grid size-11 shrink-0 place-items-center rounded-full ${styles.icon}`}
+								aria-hidden="true"
+							>
+								{icon}
+							</div>
+						)}
+
+						<div className="min-w-0">
+							<h2
+								id={titleId}
+								className="text-lg font-semibold tracking-[-0.01em] sm:text-xl"
+							>
+								{title}
+							</h2>
+							<div
+								id={descriptionId}
+								className="mt-2 text-sm leading-6 text-[#686661] dark:text-[#b8b6b1]"
+							>
+								{description}
+							</div>
+						</div>
 					</div>
-				</div>
+				) }
 
 				<footer className="flex flex-col-reverse items-stretch gap-3 border-t border-black/[0.06] px-4 py-4 sm:flex-row sm:items-center sm:justify-end sm:px-7 sm:py-5 dark:border-white/10">
 					<button

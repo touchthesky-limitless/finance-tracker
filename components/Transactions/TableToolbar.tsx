@@ -42,6 +42,7 @@ interface TableToolbarProps {
 	title?: string;
 	showViewSelector?: boolean;
 	showAddTransaction?: boolean;
+	showEditMultiple?: boolean;
 	columnOptions?: ReadonlyArray<ColumnOption>;
 	leadingContent?: ReactNode;
 }
@@ -76,7 +77,8 @@ export function TableToolbar({
 	onAddTransaction,
 	title,
 	showViewSelector = true,
-	showAddTransaction = Boolean(onAddTransaction),
+	showAddTransaction = false,
+	showEditMultiple = true,
 	columnOptions = DEFAULT_COLUMN_OPTIONS,
 	leadingContent,
 }: TableToolbarProps) {
@@ -96,6 +98,11 @@ export function TableToolbar({
 	});
 
 	const isViewModified = currentView !== "all";
+	const showPrimaryActions =
+		isEditMode ||
+		showEditMultiple ||
+		(showAddTransaction && Boolean(onAddTransaction)) ||
+		currentView === "review";
 
 	const allVisibleTransactionsSelected =
 		visibleTransactionIds.length > 0 &&
@@ -299,21 +306,33 @@ export function TableToolbar({
 					</>
 				) : (
 					<>
-						<button
-							type="button"
-							onClick={() => {
-								setIsEditMode(true);
-							}}
-							className="flex h-9 items-center gap-2 rounded-lg border border-gray-300 px-3 text-[14px] font-medium text-gray-900 transition-colors hover:bg-gray-100 dark:border-white/20 dark:text-white dark:hover:bg-white/5"
-						>
-							<PencilSparkles
-								size={16}
-								className="text-gray-500 dark:text-gray-400"
-								strokeWidth={2.5}
-							/>
-							Edit multiple
-						</button>
+						{showEditMultiple && (
+							<button
+								type="button"
+								onClick={() => {
+									setIsEditMode(true);
+								}}
+								className="flex h-9 items-center gap-2 rounded-lg border border-gray-300 px-3 text-[14px] font-medium text-gray-900 transition-colors hover:bg-gray-100 dark:border-white/20 dark:text-white dark:hover:bg-white/5"
+							>
+								<PencilSparkles
+									size={16}
+									className="text-gray-500 dark:text-gray-400"
+									strokeWidth={2.5}
+								/>
+								Edit multiple
+							</button>
+						)}
 
+						{showAddTransaction && onAddTransaction && (
+							<button
+								type="button"
+								onClick={onAddTransaction}
+								className="flex h-9 items-center gap-2 rounded-lg bg-[#FF5A35] px-4 text-[14px] font-bold text-white transition-colors hover:bg-[#E04825]"
+							>
+								<Plus size={16} strokeWidth={2.5} />
+								Add transaction
+							</button>
+						)}
 
 						{currentView === "review" && (
 							<button
@@ -326,18 +345,9 @@ export function TableToolbar({
 					</>
 				)}
 
-				{showAddTransaction && onAddTransaction && (
-					<button
-						type="button"
-						onClick={onAddTransaction}
-						className="flex h-9 items-center gap-2 rounded-lg bg-[#FF5A35] px-4 text-[14px] font-bold text-white transition-colors hover:bg-[#E04825]"
-					>
-						<Plus size={16} strokeWidth={2.5} />
-						Add transaction
-					</button>
+				{showPrimaryActions && (
+					<div className="mx-1 h-6 w-px bg-gray-300 dark:bg-white/20" />
 				)}
-
-				<div className="mx-1 h-6 w-px bg-gray-300 dark:bg-white/20" />
 
 				<DropdownMenu.Root modal={false}>
 					<DropdownMenu.Trigger asChild>
@@ -439,7 +449,7 @@ export function TableToolbar({
 								return (
 									<DropdownMenu.Item
 										key={column.id}
-										onSelect={(event) => {
+										onSelect={(event: Event) => {
 											event.preventDefault();
 											setColumnVisibility((current) => {
 												return {
