@@ -12,14 +12,10 @@ import {
 	Tooltip,
 	XAxis,
 	YAxis,
-	type TooltipProps,
 } from "recharts";
 
 import type { CashFlowPeriod } from "@/components/CashFlow/types";
-import {
-	compactCurrency,
-	formatSignedCurrency,
-} from "@/utils/formatters";
+import { compactCurrency, formatSignedCurrency } from "@/utils/formatters";
 
 export function CashFlowTrendChart({
 	periods,
@@ -51,12 +47,14 @@ export function CashFlowTrendChart({
 						stroke="currentColor"
 						className="text-gray-200 dark:text-white/10"
 					/>
+
 					<XAxis
 						dataKey="shortLabel"
 						axisLine={false}
 						tickLine={false}
 						tick={{ fill: "#999", fontSize: 12 }}
 					/>
+
 					<YAxis
 						axisLine={false}
 						tickLine={false}
@@ -66,11 +64,13 @@ export function CashFlowTrendChart({
 						}}
 						width={56}
 					/>
+
 					<ReferenceLine
 						y={0}
 						stroke="currentColor"
 						className="text-gray-300 dark:text-white/15"
 					/>
+
 					<Bar
 						dataKey="income"
 						stackId="cash"
@@ -95,11 +95,14 @@ export function CashFlowTrendChart({
 									key={`income:${period.key}`}
 									fill="#38ad78"
 									fillOpacity={isActive ? 0.95 : 0.48}
-									style={{ transition: "fill-opacity 150ms ease" }}
+									style={{
+										transition: "fill-opacity 150ms ease",
+									}}
 								/>
 							);
 						})}
 					</Bar>
+
 					<Bar
 						dataKey={(period: CashFlowPeriod) => {
 							return -period.expenses;
@@ -126,11 +129,14 @@ export function CashFlowTrendChart({
 									key={`expense:${period.key}`}
 									fill="#eb4d55"
 									fillOpacity={isActive ? 0.95 : 0.48}
-									style={{ transition: "fill-opacity 150ms ease" }}
+									style={{
+										transition: "fill-opacity 150ms ease",
+									}}
 								/>
 							);
 						})}
 					</Bar>
+
 					<Line
 						type="linear"
 						dataKey="savings"
@@ -140,6 +146,7 @@ export function CashFlowTrendChart({
 						activeDot={{ r: 5, fill: "#fff" }}
 						connectNulls
 					/>
+
 					<Tooltip
 						cursor={false}
 						content={<TrendTooltip />}
@@ -151,8 +158,15 @@ export function CashFlowTrendChart({
 	);
 }
 
-function TrendTooltip({ active, payload }: TooltipProps<number, string>) {
-	const period = payload?.[0]?.payload as CashFlowPeriod | undefined;
+type TrendTooltipProps = {
+	active?: boolean;
+	payload?: ReadonlyArray<{
+		payload?: CashFlowPeriod;
+	}>;
+};
+
+function TrendTooltip({ active, payload }: TrendTooltipProps) {
+	const period = payload?.[0]?.payload;
 
 	if (!active || !period) {
 		return null;
@@ -163,22 +177,26 @@ function TrendTooltip({ active, payload }: TooltipProps<number, string>) {
 			<div className="border-b border-white/10 px-4 py-3 text-sm font-bold">
 				{period.label}
 			</div>
+
 			<div className="space-y-2 px-4 py-3 text-sm">
 				<TooltipRow
 					color="#38ad78"
 					label="Income"
 					value={formatSignedCurrency(period.income)}
 				/>
+
 				<TooltipRow
 					color="#eb4d55"
 					label="Expenses"
 					value={formatSignedCurrency(period.expenses)}
 				/>
+
 				<TooltipRow
 					color="#fff"
 					label="Savings"
 					value={formatSignedCurrency(period.savings)}
 				/>
+
 				<TooltipRow
 					color="#999"
 					label="Savings Rate"
@@ -200,8 +218,13 @@ function TooltipRow({
 }) {
 	return (
 		<div className="flex items-center gap-2">
-			<span className="size-2 rounded-full" style={{ backgroundColor: color }} />
+			<span
+				className="size-2 rounded-full"
+				style={{ backgroundColor: color }}
+			/>
+
 			<span className="font-semibold">{label}:</span>
+
 			<span className="ml-auto">{value}</span>
 		</div>
 	);
