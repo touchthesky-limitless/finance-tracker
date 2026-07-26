@@ -23,7 +23,7 @@ export interface MerchantEditorValue extends MerchantListItem {
 	isSystem: boolean;
 }
 
-interface MerchantEditorSaveValue {
+export interface MerchantEditorSaveValue {
 	name: string;
 	logoUrl: string | null;
 	isRecurring: boolean;
@@ -32,6 +32,7 @@ interface MerchantEditorSaveValue {
 interface MerchantEditorModalProps {
 	merchant: MerchantEditorValue;
 	isRecurring: boolean;
+	childDialogOpen?: boolean;
 	onClose: () => void;
 	onSave: (value: MerchantEditorSaveValue) => Promise<void>;
 	onRequestMerge: () => void;
@@ -130,6 +131,7 @@ function MerchantAvatar({
 export function MerchantEditorModal({
 	merchant,
 	isRecurring: initialRecurring,
+	childDialogOpen = false,
 	onClose,
 	onSave,
 	onRequestMerge,
@@ -146,7 +148,7 @@ export function MerchantEditorModal({
 	const [isSaving, setIsSaving] = useState(false);
 	const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-	useModalEffects(isSaving, onClose, nameInputRef);
+	useModalEffects(isSaving || childDialogOpen, onClose, nameInputRef);
 
 	const cleanName = name.trim();
 	const hasChanges =
@@ -220,7 +222,11 @@ export function MerchantEditorModal({
 			<div
 				className="fixed inset-0 z-[900] grid place-items-center overflow-y-auto bg-black/60 p-3 backdrop-blur-[2px] sm:p-5"
 				onPointerDown={(event) => {
-					if (event.target === event.currentTarget && !isSaving) {
+					if (
+						event.target === event.currentTarget &&
+						!isSaving &&
+						!childDialogOpen
+					) {
 						onClose();
 					}
 				}}
@@ -238,7 +244,7 @@ export function MerchantEditorModal({
 						<button
 							type="button"
 							onClick={onClose}
-							disabled={isSaving}
+							disabled={isSaving || childDialogOpen}
 							aria-label="Close merchant editor"
 							className="grid size-10 place-items-center rounded-xl transition hover:bg-black/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/35 disabled:opacity-50 dark:hover:bg-white/8"
 						>
@@ -347,7 +353,7 @@ export function MerchantEditorModal({
 						<button
 							type="button"
 							onClick={onRequestMerge}
-							disabled={isSaving}
+							disabled={isSaving || childDialogOpen}
 							className="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-red-300 px-4 font-semibold text-red-600 transition hover:bg-red-50 disabled:opacity-50 dark:border-red-500/35 dark:text-red-400 dark:hover:bg-red-500/10"
 						>
 							<Merge size={18} />
@@ -358,7 +364,7 @@ export function MerchantEditorModal({
 							<button
 								type="button"
 								onClick={onClose}
-								disabled={isSaving}
+								disabled={isSaving || childDialogOpen}
 								className="h-12 rounded-xl border border-[#d8d6d2] px-5 font-semibold transition hover:bg-black/4 disabled:opacity-50 dark:border-white/15 dark:hover:bg-white/6"
 							>
 								Cancel
@@ -366,7 +372,7 @@ export function MerchantEditorModal({
 							<button
 								type="button"
 								onClick={() => void handleSave()}
-								disabled={!canSave}
+								disabled={!canSave || childDialogOpen}
 								className="inline-flex h-12 min-w-25 items-center justify-center gap-2 rounded-xl bg-[#ff5a35] px-5 font-semibold text-white transition hover:bg-[#e94c28] disabled:cursor-not-allowed disabled:bg-[#ffad91]"
 							>
 								{isSaving && <Loader2 size={18} className="animate-spin" />}
