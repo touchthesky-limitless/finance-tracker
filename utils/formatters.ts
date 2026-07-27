@@ -51,6 +51,13 @@ export function formatSignedCurrency(value: number): string {
 	return moneyFormatter.format(value);
 }
 
+// Helper to format positive/negative currency values (like +$1,000.00 or -$1,000.00)
+export function formatPositiveSignedCurrency(value: number): string {
+	if (!Number.isFinite(value) || value === 0) return "$0.00";
+	const sign = value > 0 ? "+" : "-";
+	return `${sign}${formatCurrency(Math.abs(value))}`;
+}
+
 /**
  * Formats signed currency values using K and M suffixes for chart axes.
  *

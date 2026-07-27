@@ -413,6 +413,17 @@ export default function TransactionsPageClient({
 
 	const [isBulkEditOpen, setIsBulkEditOpen] = useState(false);
 
+	// const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(
+	// 	() => {
+	// 		// On small screens, hide account column by default; respect localStorage if exists.
+	// 		const stored = readLocalStorage<VisibilityState>("sort_cols", {});
+	// 		if (typeof window !== "undefined" && window.innerWidth < 768) {
+	// 			return { ...stored, account: false };
+	// 		}
+	// 		return stored;
+	// 	},
+	// );
+
 	const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(
 		() => {
 			return readLocalStorage<VisibilityState>("sort_cols", {});
@@ -940,25 +951,69 @@ export default function TransactionsPageClient({
 	const summaryStats = useMemo(() => {
 		let largestTransaction = 0;
 		let largestExpense = 0;
+		let totalIncome = 0;
+		let totalSpending = 0;
+		let firstDate = "";
+		let lastDate = "";
 
 		for (let index = 0; index < transactions.length; index++) {
 			const transaction = transactions[index];
+			const absAmount = Math.abs(transaction.amount);
+			const date = transaction.date;
 
-			const absoluteAmount = Math.abs(transaction.amount);
-
-			if (absoluteAmount > largestTransaction) {
-				largestTransaction = absoluteAmount;
+			// Largest overall amount
+			if (absAmount > largestTransaction) {
+				largestTransaction = absAmount;
 			}
 
-			if (transaction.amount < 0 && absoluteAmount > largestExpense) {
-				largestExpense = absoluteAmount;
+			// Largest expense (most negative amount as positive)
+			if (transaction.amount < 0 && absAmount > largestExpense) {
+				largestExpense = absAmount;
+			}
+
+			// Income and Spending totals
+			if (transaction.amount > 0) {
+				totalIncome += transaction.amount;
+			} else {
+				totalSpending += Math.abs(transaction.amount);
+			}
+
+			// First and last dates
+			if (!firstDate || date < firstDate) {
+				firstDate = date;
+			}
+			if (!lastDate || date > lastDate) {
+				lastDate = date;
 			}
 		}
+
+		const avgTransaction =
+			transactions.length > 0
+				? (totalIncome + totalSpending) / transactions.length
+				: 0;
+
+		const formatDate = (dateStr: string) => {
+			if (!dateStr) return "N/A";
+			try {
+				return new Intl.DateTimeFormat("en-US", {
+					month: "short",
+					day: "numeric",
+					year: "numeric",
+				}).format(new Date(dateStr));
+			} catch {
+				return dateStr;
+			}
+		};
 
 		return {
 			total: transactions.length,
 			largestTx: largestTransaction,
 			largestEx: largestExpense,
+			avgTx: avgTransaction,
+			totalIncome,
+			totalSpending,
+			firstDate: formatDate(firstDate),
+			lastDate: formatDate(lastDate),
 		};
 	}, [transactions]);
 
@@ -1148,7 +1203,15 @@ export default function TransactionsPageClient({
 				showAddTransaction
 			/>
 
-			<div className="flex flex-1 min-h-0 overflow-hidden p-6 gap-6">
+			<div className="flex flex-1 min-h-0 overflow-hidden p-4 md:p-6 gap-4 md:gap-6 flex-col md:flex-row-reverse">
+				{/* Summary Sidebar - Top on mobile, Right on desktop (no order/auto-margin needed) */}
+				<SummarySidebar
+					isVisible={isSummaryVisible}
+					stats={summaryStats}
+					className="w-full md:w-80 shrink-0"
+				/>
+
+				{/* Table Container - Bottom on mobile, Left on desktop */}
 				<div className="flex-1 flex flex-col min-w-0 bg-white dark:bg-[#191919] border border-gray-200 dark:border-white/5 rounded-2xl shadow-sm overflow-hidden transition-colors duration-200">
 					<TableToolbar
 						isEditMode={isEditMode}
@@ -1188,8 +1251,6 @@ export default function TransactionsPageClient({
 						/>
 					</div>
 				</div>
-
-				<SummarySidebar isVisible={isSummaryVisible} stats={summaryStats} />
 			</div>
 
 			{showUploader && (

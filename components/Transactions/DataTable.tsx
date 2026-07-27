@@ -358,6 +358,7 @@ export function DataTable({
 
 			columnHelper.accessor("merchant", {
 				size: 360,
+				minSize: 160, // allow shrink on small screens
 				cell: (info) => {
 					const transaction = info.row.original;
 					const merchantName = String(info.getValue() || "Unknown merchant");
@@ -394,6 +395,7 @@ export function DataTable({
 
 			columnHelper.accessor("category", {
 				size: 360,
+				minSize: 120,
 				cell: (info) => {
 					const categoryName = String(info.getValue() || "Uncategorized");
 					const targetId = getCategoryId?.(categoryName);
@@ -458,6 +460,7 @@ export function DataTable({
 
 			columnHelper.accessor("account", {
 				size: 300,
+				minSize: 100,
 				cell: (info) => {
 					const transaction = info.row.original;
 					const accountName = transaction.account?.trim() || "Unknown account";
@@ -892,6 +895,7 @@ export function DataTable({
 												style={{
 													width: isAmount ? "auto" : cell.column.getSize(),
 													flex: isAmount ? 1 : "none",
+													minWidth: cell.column.columnDef.minSize ?? 0,
 												}}
 												className={`min-w-0 truncate ${
 													index === 0 ? "pl-6 pr-2" : "px-2"

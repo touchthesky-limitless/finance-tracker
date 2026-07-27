@@ -1,10 +1,6 @@
 "use client";
 
-import type {
-	Dispatch,
-	ReactNode,
-	SetStateAction,
-} from "react";
+import type { Dispatch, ReactNode, SetStateAction } from "react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import {
 	ChevronDown,
@@ -13,10 +9,7 @@ import {
 	PencilSparkles,
 	Plus,
 } from "lucide-react";
-import type {
-	SortingState,
-	VisibilityState,
-} from "@tanstack/react-table";
+import type { SortingState, VisibilityState } from "@tanstack/react-table";
 
 interface ColumnOption {
 	id: string;
@@ -83,10 +76,7 @@ export function TableToolbar({
 	leadingContent,
 }: TableToolbarProps) {
 	const activeSortLabel = SORT_OPTIONS.find((option) => {
-		return (
-			option.id === sorting[0]?.id &&
-			option.desc === sorting[0]?.desc
-		);
+		return option.id === sorting[0]?.id && option.desc === sorting[0]?.desc;
 	})?.label;
 
 	const isSortModified =
@@ -144,7 +134,7 @@ export function TableToolbar({
 					type="button"
 					onClick={onEditMultiple}
 					disabled={selectedIds.length === 0}
-					className="h-9 rounded-lg bg-[#FF5A35] px-4 text-[14px] font-bold text-white transition-colors hover:bg-[#E04825] disabled:cursor-not-allowed disabled:opacity-45"
+					className="h-8 md:h-9 rounded-lg bg-[#FF5A35] px-3 md:px-4 text-[13px] md:text-[14px] font-bold text-white transition-colors hover:bg-[#E04825] disabled:cursor-not-allowed disabled:opacity-45"
 				>
 					Edit {selectedIds.length}
 				</button>
@@ -157,10 +147,10 @@ export function TableToolbar({
 					<button
 						type="button"
 						disabled={selectedIds.length === 0}
-						className="flex h-9 items-center gap-2 rounded-lg bg-[#FF5A35] px-4 text-[14px] font-bold text-white outline-none transition-colors hover:bg-[#E04825] disabled:cursor-not-allowed disabled:opacity-45"
+						className="flex h-8 md:h-9 items-center gap-2 rounded-lg bg-[#FF5A35] px-3 md:px-4 text-[13px] md:text-[14px] font-bold text-white outline-none transition-colors hover:bg-[#E04825] disabled:cursor-not-allowed disabled:opacity-45"
 					>
 						Edit {selectedIds.length}
-						<ChevronDown size={15} />
+						<ChevronDown size={14} />
 					</button>
 				</DropdownMenu.Trigger>
 
@@ -191,8 +181,10 @@ export function TableToolbar({
 	};
 
 	return (
-		<div className="relative z-40 flex min-h-14 flex-wrap items-center justify-between gap-3 border-b border-gray-200 px-5 py-3 dark:border-white/5">
-			<div className="flex min-w-0 items-center gap-4">
+		<div className="relative z-40 flex flex-row flex-wrap items-center justify-start gap-2 border-b border-gray-200 px-4 py-3 dark:border-white/5">
+			{" "}
+			{/* TOP ROW (Mobile) | LEFT GROUP (Desktop) */}
+			<div className="flex flex-row min-w-0 items-center gap-2 w-auto shrink-0">
 				{isEditMode ? (
 					<div className="flex items-center gap-3">
 						<button
@@ -213,11 +205,15 @@ export function TableToolbar({
 							{hasVisibleSelection && <Minus size={16} strokeWidth={3} />}
 						</button>
 
-						<span className="text-[15px] font-bold text-gray-900 dark:text-white">
-							{selectedIds.length} transaction
-							{selectedIds.length === 1 ? "" : "s"} selected{" "}
-							<span className="ml-1 font-normal text-gray-500">(ESC)</span>
-						</span>
+						<span className="text-[15px] font-bold text-gray-900 dark:text-white whitespace-nowrap flex items-center gap-1">
+	{/* ✅ Mobile: completely hidden. Desktop: Shows "N selected" */}
+	<span className="hidden sm:inline">{selectedIds.length} selected</span>
+	
+	{/* Mobile: hidden. Desktop: Shows "(ESC)" */}
+	<span className="ml-1 font-normal text-gray-500 hidden sm:inline">
+		(ESC)
+	</span>
+</span>
 					</div>
 				) : (
 					<>
@@ -234,7 +230,7 @@ export function TableToolbar({
 								<DropdownMenu.Trigger asChild>
 									<button
 										type="button"
-										className="relative flex h-9 min-w-45 items-center justify-between gap-2 rounded-lg border border-gray-300 px-3 text-[14px] font-medium text-gray-900 outline-none transition-colors hover:bg-gray-100 data-[state=open]:border-blue-600 dark:border-white/20 dark:text-white dark:hover:bg-white/5 dark:data-[state=open]:border-[#38bdf8]"
+										className="relative flex h-9 w-auto min-w-[90px] sm:min-w-0 items-center justify-between gap-2 rounded-lg border border-gray-300 bg-gray-50 px-2.5 text-[14px] font-medium text-gray-900 outline-none transition-colors hover:bg-gray-200 dark:border-white/20 dark:bg-[#1E1E1E] dark:text-white dark:hover:bg-[#2A2A2A] data-[state=open]:border-blue-600 dark:data-[state=open]:border-[#38bdf8] whitespace-nowrap shrink-0"
 									>
 										{currentView === "all" ? "All transactions" : "Anyone"}
 										<ChevronDown
@@ -290,14 +286,14 @@ export function TableToolbar({
 					</>
 				)}
 			</div>
-
-			<div className="flex flex-wrap items-center gap-2">
+			{/* BOTTOM ROW (Mobile) | RIGHT GROUP (Desktop) */}
+			<div className="flex flex-wrap items-center gap-2 ml-auto w-auto shrink-0 justify-end">
 				{isEditMode ? (
 					<>
 						<button
 							type="button"
 							onClick={exitEditMode}
-							className="h-9 rounded-lg border border-gray-300 px-4 text-[14px] font-medium text-gray-900 transition-colors hover:bg-gray-100 dark:border-white/20 dark:text-white dark:hover:bg-white/5"
+							className="h-8 md:h-9 rounded-lg border border-gray-300 px-3 text-[13px] md:text-[14px] font-medium text-gray-900 transition-colors hover:bg-gray-100 dark:border-white/20 dark:text-white dark:hover:bg-white/5"
 						>
 							Cancel
 						</button>
@@ -312,14 +308,14 @@ export function TableToolbar({
 								onClick={() => {
 									setIsEditMode(true);
 								}}
-								className="flex h-9 items-center gap-2 rounded-lg border border-gray-300 px-3 text-[14px] font-medium text-gray-900 transition-colors hover:bg-gray-100 dark:border-white/20 dark:text-white dark:hover:bg-white/5"
+								className="flex h-8 md:h-9 items-center gap-1.5 rounded-lg border border-gray-300 px-3 text-[13px] md:text-[14px] font-medium text-gray-900 transition-colors hover:bg-gray-100 dark:border-white/20 dark:text-white dark:hover:bg-white/5"
 							>
 								<PencilSparkles
-									size={16}
+									size={15}
 									className="text-gray-500 dark:text-gray-400"
 									strokeWidth={2.5}
 								/>
-								Edit multiple
+								<span className="hidden sm:inline">Edit multiple</span>
 							</button>
 						)}
 
@@ -327,57 +323,45 @@ export function TableToolbar({
 							<button
 								type="button"
 								onClick={onAddTransaction}
-								className="flex h-9 items-center gap-2 rounded-lg bg-[#FF5A35] px-4 text-[14px] font-bold text-white transition-colors hover:bg-[#E04825]"
+								className="flex h-8 md:h-9 items-center gap-1.5 rounded-lg bg-[#FF5A35] px-3 text-[13px] md:text-[14px] font-bold text-white transition-colors hover:bg-[#E04825]"
 							>
-								<Plus size={16} strokeWidth={2.5} />
-								Add transaction
+								<Plus size={15} strokeWidth={2.5} />
+								<span className="hidden sm:inline">Add</span>
 							</button>
 						)}
 
 						{currentView === "review" && (
 							<button
 								type="button"
-								className="h-9 rounded-lg bg-[#FF5A35] px-4 text-[14px] font-bold text-white transition-colors hover:bg-[#E04825]"
+								className="h-8 md:h-9 rounded-lg bg-[#FF5A35] px-3 text-[13px] md:text-[14px] font-bold text-white transition-colors hover:bg-[#E04825]"
 							>
-								Mark all {filteredLength} as reviewed
+								<span className="hidden sm:inline">Mark all</span>{" "}
+								{filteredLength}
 							</button>
 						)}
 					</>
 				)}
 
 				{showPrimaryActions && (
-					<div className="mx-1 h-6 w-px bg-gray-300 dark:bg-white/20" />
+					<div className="mx-1 h-5 w-px bg-gray-300 dark:bg-white/20 hidden sm:block" />
 				)}
 
 				<DropdownMenu.Root modal={false}>
 					<DropdownMenu.Trigger asChild>
 						<button
 							type="button"
-							className="relative flex h-9 items-center gap-2 whitespace-nowrap rounded-lg border border-gray-300 px-3 text-[14px] font-medium text-gray-900 outline-none transition-colors hover:bg-gray-100 data-[state=open]:bg-gray-100 dark:border-white/20 dark:text-white dark:hover:bg-white/5 dark:data-[state=open]:bg-white/5"
+							className="relative flex h-8 md:h-9 items-center gap-1.5 whitespace-nowrap rounded-lg border border-gray-300 px-2.5 md:px-3 text-[13px] md:text-[14px] font-medium text-gray-900 outline-none transition-colors hover:bg-gray-100 data-[state=open]:bg-gray-100 dark:border-white/20 dark:text-white dark:hover:bg-white/5 dark:data-[state=open]:bg-white/5"
 						>
-							{isSortModified && activeSortLabel ? (
-								<span className="flex items-center gap-1.5">
-									Sort
-									<span className="text-gray-300 dark:text-gray-600">|</span>
-									<span className="text-blue-600 dark:text-[#38bdf8]">
-										{activeSortLabel}
-									</span>
-								</span>
-							) : (
-								"Sort"
-							)}
-
+							<span className="sr-only sm:not-sr-only">Sort</span>
 							<ChevronDown
-								size={16}
+								size={15}
 								className="shrink-0 text-gray-500 dark:text-gray-400"
 							/>
-
 							{isSortModified && (
 								<span className="absolute -right-1 -top-1 size-2.5 rounded-full border-2 border-white bg-blue-500 dark:border-[#191919] dark:bg-[#38bdf8]" />
 							)}
 						</button>
 					</DropdownMenu.Trigger>
-
 					<DropdownMenu.Portal>
 						<DropdownMenu.Content
 							align="end"
@@ -386,7 +370,6 @@ export function TableToolbar({
 						>
 							{SORT_OPTIONS.map((option) => {
 								const isActive = activeSortLabel === option.label;
-
 								return (
 									<DropdownMenu.Item
 										key={option.label}
@@ -416,20 +399,15 @@ export function TableToolbar({
 					<DropdownMenu.Trigger asChild>
 						<button
 							type="button"
-							className="relative flex h-9 items-center gap-2 rounded-lg border border-gray-300 px-3 text-[14px] font-medium text-gray-900 outline-none transition-colors hover:bg-gray-100 data-[state=open]:bg-gray-100 dark:border-white/20 dark:text-white dark:hover:bg-white/5 dark:data-[state=open]:bg-white/5"
+							className="relative flex h-8 md:h-9 items-center gap-1.5 rounded-lg border border-gray-300 px-2.5 md:px-3 text-[13px] md:text-[14px] font-medium text-gray-900 outline-none transition-colors hover:bg-gray-100 data-[state=open]:bg-gray-100 dark:border-white/20 dark:text-white dark:hover:bg-white/5 dark:data-[state=open]:bg-white/5"
 						>
-							<Columns
-								size={16}
-								className="text-gray-500 dark:text-gray-400"
-							/>
-							Columns
-
+							<Columns size={15} className="text-gray-500 dark:text-gray-400" />
+							<span className="hidden sm:inline">Columns</span>
 							{isColumnsModified && (
 								<span className="absolute -right-1 -top-1 size-2.5 rounded-full border-2 border-white bg-blue-500 dark:border-[#191919] dark:bg-[#38bdf8]" />
 							)}
 						</button>
 					</DropdownMenu.Trigger>
-
 					<DropdownMenu.Portal>
 						<DropdownMenu.Content
 							align="end"
@@ -437,15 +415,15 @@ export function TableToolbar({
 							className="z-[120] flex w-60 flex-col gap-4 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-2xl outline-none dark:border-white/10 dark:bg-[#1E1E1E]"
 						>
 							<div className="text-xs font-bold text-gray-500">
-								{columnOptions.filter((column) => {
-									return columnVisibility[column.id] !== false;
-								}).length}{" "}
+								{
+									columnOptions.filter((column) => {
+										return columnVisibility[column.id] !== false;
+									}).length
+								}{" "}
 								of {columnOptions.length} visible
 							</div>
-
 							{columnOptions.map((column) => {
 								const isChecked = columnVisibility[column.id] !== false;
-
 								return (
 									<DropdownMenu.Item
 										key={column.id}
@@ -463,7 +441,6 @@ export function TableToolbar({
 										<span className="text-[15px] text-gray-900 dark:text-white">
 											{column.label}
 										</span>
-
 										<span
 											className={`relative h-5 w-10 rounded-full transition-colors ${
 												isChecked

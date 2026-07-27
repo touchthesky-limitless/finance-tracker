@@ -92,12 +92,7 @@ interface SearchParamReader {
 
 function readStringList(
 	searchParams: SearchParamReader,
-	key:
-		| "categoryNames"
-		| "merchantNames"
-		| "accountNames"
-		| "tags"
-		| "goalIds",
+	key: "categoryNames" | "merchantNames" | "accountNames" | "tags" | "goalIds",
 ): string[] {
 	const seen = new Set<string>();
 	const values: string[] = [];
@@ -141,18 +136,11 @@ function readTransactionFiltersFromUrl(
 		amountMode: readEnumParam(
 			searchParams,
 			"amountMode",
-			[
-				"none",
-				"greater-than",
-				"less-than",
-				"equal-to",
-				"between",
-			] as const,
+			["none", "greater-than", "less-than", "equal-to", "between"] as const,
 			"none",
 		),
 		amountValue: searchParams.get("amountValue")?.trim() ?? "",
-		amountMaxValue:
-			searchParams.get("amountMaxValue")?.trim() ?? "",
+		amountMaxValue: searchParams.get("amountMaxValue")?.trim() ?? "",
 		transactionType: readEnumParam(
 			searchParams,
 			"transactionType",
@@ -188,12 +176,7 @@ function readTransactionFiltersFromUrl(
 
 function appendStringList(
 	searchParams: URLSearchParams,
-	key:
-		| "categoryNames"
-		| "merchantNames"
-		| "accountNames"
-		| "tags"
-		| "goalIds",
+	key: "categoryNames" | "merchantNames" | "accountNames" | "tags" | "goalIds",
 	values: string[],
 ): void {
 	for (const rawValue of values) {
@@ -229,21 +212,9 @@ function writeTransactionStateToUrl(
 		searchParams.set("endDate", dateRange.endDate);
 	}
 
-	appendStringList(
-		searchParams,
-		"categoryNames",
-		filters.categoryNames,
-	);
-	appendStringList(
-		searchParams,
-		"merchantNames",
-		filters.merchantNames,
-	);
-	appendStringList(
-		searchParams,
-		"accountNames",
-		filters.accountNames,
-	);
+	appendStringList(searchParams, "categoryNames", filters.categoryNames);
+	appendStringList(searchParams, "merchantNames", filters.merchantNames);
+	appendStringList(searchParams, "accountNames", filters.accountNames);
 	appendStringList(searchParams, "tags", filters.tags);
 	appendStringList(searchParams, "goalIds", filters.goalIds);
 
@@ -252,24 +223,15 @@ function writeTransactionStateToUrl(
 	}
 
 	if (filters.amountValue.trim()) {
-		searchParams.set(
-			"amountValue",
-			filters.amountValue.trim(),
-		);
+		searchParams.set("amountValue", filters.amountValue.trim());
 	}
 
 	if (filters.amountMaxValue.trim()) {
-		searchParams.set(
-			"amountMaxValue",
-			filters.amountMaxValue.trim(),
-		);
+		searchParams.set("amountMaxValue", filters.amountMaxValue.trim());
 	}
 
 	if (filters.transactionType !== "all") {
-		searchParams.set(
-			"transactionType",
-			filters.transactionType,
-		);
+		searchParams.set("transactionType", filters.transactionType);
 	}
 
 	if (filters.needsReview !== "any") {
@@ -290,6 +252,7 @@ function writeTransactionStateToUrl(
 
 	searchParams.sort();
 }
+
 export function TopToolbar({
 	searchQuery,
 	setSearchQuery,
@@ -395,7 +358,6 @@ export function TopToolbar({
 		setOpenPopover((current) => (current === "search" ? null : "search"));
 	};
 
-
 	const toggleFilterPopover = () => {
 		setDraftFilters(filters);
 		setOpenPopover((current) => (current === "filter" ? null : "filter"));
@@ -410,11 +372,6 @@ export function TopToolbar({
 			originalTarget instanceof Element &&
 			originalTarget.closest("[data-toolbar-popover-trigger]")
 		) {
-			/*
-			 * Let the clicked Search/Date button toggle the shared state itself.
-			 * Without this, Radix closes the current popover on pointerdown and
-			 * the following click can reopen the wrong popover.
-			 */
 			event.preventDefault();
 		}
 	};
@@ -440,21 +397,10 @@ export function TopToolbar({
 			return;
 		}
 
-		/*
-		 * React events from Radix's portal still propagate through this
-		 * component tree even though the popover is rendered under <body>.
-		 * Only dismiss when the clicked element is an actual DOM descendant
-		 * of the toolbar. This keeps clicks inside the portaled modal open.
-		 */
 		if (!toolbar.contains(target)) {
 			return;
 		}
 
-		/*
-		 * Search and Date triggers manage their own toggle/switch behavior.
-		 * Every other pointer interaction inside TopToolbar dismisses the
-		 * currently open popover before the clicked toolbar control runs.
-		 */
 		if (target.closest("[data-toolbar-popover-trigger]")) {
 			return;
 		}
@@ -466,37 +412,39 @@ export function TopToolbar({
 		<div
 			onPointerDownCapture={handleToolbarPointerDownCapture}
 			className="
-	relative z-30
-	flex items-center justify-between
-	overflow-visible
-	border-b border-gray-200
-	bg-white px-6 pt-5 pb-0
-	transition-colors duration-200
-	dark:border-white/5 dark:bg-[#191919]
-"
+				relative z-30
+				flex flex-col md:flex-row items-start md:items-center justify-between
+				overflow-visible
+				border-b border-gray-200
+				bg-white px-3 py-3 md:px-6 md:pt-5
+				transition-colors duration-200
+				dark:border-white/5 dark:bg-[#191919]
+			"
 		>
-			<div className="flex items-center gap-8">
-				<h1 className="pb-4 text-[22px] font-bold tracking-tight text-gray-900 dark:text-white">
+			{/* LEFT GROUP: Title + Tabs */}
+			<div className="flex items-center gap-3 md:gap-8 w-full md:w-auto pb-2 md:pb-0">
+				<h1 className="text-[20px] md:text-[22px] font-bold tracking-tight text-gray-900 dark:text-white">
 					Transactions
 				</h1>
-
-				<div className="flex h-full gap-6 text-[15px] font-medium">
+				<div className="flex h-full gap-3 md:gap-6 text-[14px] md:text-[15px] font-medium">
 					<button
 						type="button"
-						className="border-b-[3px] border-[#FF5A35] pb-4 text-[#FF5A35]"
+						className="border-b-[3px] border-[#FF5A35] pb-2 md:pb-4 text-[#FF5A35]"
 					>
 						All
 					</button>
 					<button
 						type="button"
-						className="pb-4 text-gray-500 transition-colors hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200"
+						className="pb-2 md:pb-4 text-gray-500 transition-colors hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200"
 					>
 						Receipts
 					</button>
 				</div>
 			</div>
 
-			<div className="flex items-center gap-3 pb-4">
+			{/* RIGHT GROUP: Actions + Filters */}
+			<div className="flex items-center flex-wrap gap-1.5 md:gap-3 w-full md:w-auto justify-end md:justify-end pb-1 md:pb-4">
+				{" "}
 				{hasActiveFilters && (
 					<button
 						type="button"
@@ -507,12 +455,12 @@ export function TopToolbar({
 							setDraftFilters(EMPTY_TRANSACTION_FILTERS);
 							replaceUrlState("", EMPTY_DATE_RANGE, EMPTY_TRANSACTION_FILTERS);
 						}}
-						className="mr-2 text-sm font-medium text-cyan-600 hover:text-cyan-700 dark:text-cyan-400"
+						className="mr-1 md:mr-2 text-[13px] md:text-sm font-medium text-cyan-600 hover:text-cyan-700 dark:text-cyan-400 whitespace-nowrap"
 					>
 						Clear
 					</button>
 				)}
-
+				{/* Toolbar Buttons (Scaled down on mobile) */}
 				<Popover.Root
 					modal={false}
 					open={openPopover === "search"}
@@ -529,8 +477,9 @@ export function TopToolbar({
 							aria-haspopup="dialog"
 							onClick={toggleSearchPopover}
 							active={isSearchActive}
-							icon={<Search size={18} strokeWidth={2.2} />}
-							label="Search"
+							icon={<Search size={17} strokeWidth={2.2} />}
+							label={<span className="hidden sm:inline">Search</span>}
+							mobileCompact
 						/>
 					</Popover.Anchor>
 
@@ -543,7 +492,6 @@ export function TopToolbar({
 							onPointerDownOutside={handlePopoverPointerDownOutside}
 							onOpenAutoFocus={(event) => {
 								event.preventDefault();
-
 								window.requestAnimationFrame(() => {
 									searchInputRef.current?.focus();
 								});
@@ -554,7 +502,6 @@ export function TopToolbar({
 								<h2 className="text-xl font-semibold text-gray-900 dark:text-white">
 									Search
 								</h2>
-
 								<input
 									ref={searchInputRef}
 									value={draftSearch}
@@ -565,11 +512,8 @@ export function TopToolbar({
 										if (event.key !== "Enter" || !canApplySearch) {
 											return;
 										}
-
 										event.preventDefault();
-
 										const nextSearchQuery = draftSearch.trim();
-
 										setSearchQuery(nextSearchQuery);
 										replaceUrlState(nextSearchQuery, dateRange, filters);
 										setOpenPopover(null);
@@ -577,13 +521,11 @@ export function TopToolbar({
 									placeholder="Enter a search term..."
 									className="mt-4 h-16 w-full rounded-xl border-2 border-cyan-500 bg-transparent px-5 text-xl text-gray-900 outline-none placeholder:text-gray-400 focus:ring-2 focus:ring-cyan-500/20 dark:text-white"
 								/>
-
 								<p className="mt-3 text-base leading-7 text-gray-500 dark:text-gray-400">
 									We&apos;ll match your search term to merchant names,
 									categories, original statements, amounts, notes, and tags.
 								</p>
 							</div>
-
 							<PopoverFooter
 								onClear={() => {
 									setDraftSearch("");
@@ -597,7 +539,6 @@ export function TopToolbar({
 								}}
 								onApply={() => {
 									const nextSearchQuery = draftSearch.trim();
-
 									setSearchQuery(nextSearchQuery);
 									replaceUrlState(nextSearchQuery, dateRange, filters);
 									setOpenPopover(null);
@@ -608,7 +549,6 @@ export function TopToolbar({
 						</Popover.Content>
 					</Popover.Portal>
 				</Popover.Root>
-
 				<DateRangeButton
 					value={dateRange}
 					onChange={(nextDateRange) => {
@@ -620,8 +560,8 @@ export function TopToolbar({
 					onBeforeOpen={() => {
 						setOpenPopover(null);
 					}}
+					className="h-8 md:h-10 px-2.5 md:px-4"
 				/>
-
 				<Popover.Root
 					modal={false}
 					open={openPopover === "filter"}
@@ -638,12 +578,18 @@ export function TopToolbar({
 							aria-haspopup="dialog"
 							onClick={toggleFilterPopover}
 							active={isFilterActive}
-							icon={<Filter size={17} strokeWidth={2} />}
+							icon={<Filter size={16} strokeWidth={2} />}
 							label={
-								activeFilterCount > 0
-									? `Filters (${activeFilterCount})`
-									: "Filters"
+								activeFilterCount > 0 ? (
+									<>
+										<span className="hidden sm:inline">Filters</span>
+										<span className="sm:hidden">{activeFilterCount}</span>
+									</>
+								) : (
+									<span className="hidden sm:inline">Filters</span>
+								)
 							}
+							mobileCompact
 						/>
 					</Popover.Anchor>
 
@@ -684,43 +630,39 @@ export function TopToolbar({
 						</Popover.Content>
 					</Popover.Portal>
 				</Popover.Root>
-
-				<div className="mx-1 h-6 w-px bg-gray-300 dark:bg-white/20" />
-
+				<div className="mx-1 h-5 w-px bg-gray-300 dark:bg-white/20 hidden sm:block" />
 				<button
 					type="button"
 					onClick={() => {
 						setShowUploader(true);
 					}}
-					className="flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-bold text-gray-700 shadow-sm transition-all hover:bg-gray-50 active:scale-95 dark:border-white/10 dark:bg-[#121212] dark:text-gray-300 dark:hover:bg-white/5"
+					className="flex items-center justify-center gap-1.5 rounded-xl border border-gray-200 bg-white px-2.5 md:px-4 py-1.5 md:py-2 text-[13px] md:text-sm font-bold text-gray-700 shadow-sm transition-all hover:bg-gray-50 active:scale-95 dark:border-white/10 dark:bg-[#121212] dark:text-gray-300 dark:hover:bg-white/5"
 				>
-					<Import size={16} />
-					Import
+					<Import size={15} />
+					<span className="hidden sm:inline">Import</span>
 				</button>
-
 				{showAddTransaction && (
 					<button
 						type="button"
 						onClick={onAddTransaction}
-						className="flex h-10 items-center justify-center gap-1.5 rounded-xl bg-[#FF5A35] px-4 text-sm font-bold text-white shadow-sm transition-colors hover:bg-[#E04825]"
+						className="flex h-8 md:h-10 items-center justify-center gap-1.5 rounded-xl bg-[#FF5A35] px-2.5 md:px-4 text-[13px] md:text-sm font-bold text-white shadow-sm transition-colors hover:bg-[#E04825]"
 					>
-						<Plus size={18} strokeWidth={2.5} />
-						Add transaction
+						<Plus size={16} strokeWidth={2.5} />
+						<span className="hidden sm:inline">Add</span>
 					</button>
 				)}
-
 				<button
 					type="button"
 					onClick={() => {
 						setIsSummaryVisible((previous) => !previous);
 					}}
-					className={`ml-1 flex h-10 w-10 items-center justify-center rounded-xl border transition-colors ${
+					className={`flex h-8 md:h-10 w-8 md:w-10 items-center justify-center rounded-xl border transition-colors ${
 						isSummaryVisible
 							? "border-blue-600 bg-blue-50 text-blue-600 dark:border-[#38bdf8] dark:bg-[#0B4D56] dark:text-[#38bdf8]"
 							: "border-gray-300 text-gray-500 hover:bg-gray-100 hover:text-gray-900 dark:border-white/20 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-white"
 					}`}
 				>
-					<SidebarIcon size={18} strokeWidth={2} />
+					<SidebarIcon size={17} strokeWidth={2} />
 				</button>
 			</div>
 		</div>
@@ -730,7 +672,8 @@ export function TopToolbar({
 interface ToolbarButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 	active?: boolean;
 	icon: ReactNode;
-	label: string;
+	label: ReactNode;
+	mobileCompact?: boolean;
 }
 
 const ToolbarButton = forwardRef<HTMLButtonElement, ToolbarButtonProps>(
@@ -741,6 +684,7 @@ const ToolbarButton = forwardRef<HTMLButtonElement, ToolbarButtonProps>(
 			label,
 			className = "",
 			type = "button",
+			mobileCompact = false,
 			...buttonProps
 		},
 		ref,
@@ -750,7 +694,7 @@ const ToolbarButton = forwardRef<HTMLButtonElement, ToolbarButtonProps>(
 				ref={ref}
 				type={type}
 				{...buttonProps}
-				className={`relative flex h-10 items-center gap-2 rounded-xl border px-4 text-sm font-semibold shadow-sm transition-colors ${
+				className={`relative flex h-8 md:h-10 items-center gap-1.5 md:gap-2 rounded-xl border px-2.5 md:px-4 text-[13px] md:text-sm font-semibold shadow-sm transition-colors ${
 					active
 						? "border-[#FF5A35]/50 bg-[#FF5A35]/5 text-[#FF5A35]"
 						: "border-gray-300 text-gray-900 hover:bg-gray-100 dark:border-white/20 dark:text-white dark:hover:bg-white/5"
@@ -758,7 +702,6 @@ const ToolbarButton = forwardRef<HTMLButtonElement, ToolbarButtonProps>(
 			>
 				{icon}
 				{label}
-
 				{active && (
 					<span
 						aria-hidden="true"
@@ -786,20 +729,20 @@ function PopoverFooter({
 	applyDisabled: boolean;
 }) {
 	return (
-		<div className="flex items-center justify-between border-t border-gray-200 bg-gray-50/40 px-7 py-5 dark:border-white/10 dark:bg-black/10">
+		<div className="flex items-center justify-between border-t border-gray-200 bg-gray-50/40 px-4 md:px-7 py-4 md:py-5 flex-wrap gap-2 dark:border-white/10 dark:bg-black/10">
 			<button
 				type="button"
 				onClick={onClear}
 				disabled={clearDisabled}
-				className="rounded-xl border border-gray-200 bg-white px-5 py-3 text-base font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/10 dark:bg-[#222] dark:text-gray-200 dark:hover:bg-white/5"
+				className="rounded-xl border border-gray-200 bg-white px-4 md:px-5 py-2 md:py-3 text-sm md:text-base font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/10 dark:bg-[#222] dark:text-gray-200 dark:hover:bg-white/5"
 			>
 				Clear
 			</button>
-			<div className="flex items-center gap-4">
+			<div className="flex items-center gap-3 md:gap-4">
 				<button
 					type="button"
 					onClick={onCancel}
-					className="rounded-xl border border-gray-200 bg-white px-5 py-3 text-base font-semibold text-gray-900 shadow-sm transition-colors hover:bg-gray-50 dark:border-white/10 dark:bg-[#222] dark:text-white dark:hover:bg-white/5"
+					className="rounded-xl border border-gray-200 bg-white px-4 md:px-5 py-2 md:py-3 text-sm md:text-base font-semibold text-gray-900 shadow-sm transition-colors hover:bg-gray-50 dark:border-white/10 dark:bg-[#222] dark:text-white dark:hover:bg-white/5"
 				>
 					Cancel
 				</button>
@@ -807,7 +750,7 @@ function PopoverFooter({
 					type="button"
 					onClick={onApply}
 					disabled={applyDisabled}
-					className="rounded-xl bg-[#FF5A35] px-5 py-3 text-base font-bold text-white shadow-sm transition-colors hover:bg-[#E04825] disabled:cursor-not-allowed disabled:opacity-45"
+					className="rounded-xl bg-[#FF5A35] px-4 md:px-5 py-2 md:py-3 text-sm md:text-base font-bold text-white shadow-sm transition-colors hover:bg-[#E04825] disabled:cursor-not-allowed disabled:opacity-45"
 				>
 					Apply
 				</button>
