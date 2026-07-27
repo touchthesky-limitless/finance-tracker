@@ -416,7 +416,7 @@ export function TopToolbar({
 				flex flex-col md:flex-row items-start md:items-center justify-between
 				overflow-visible
 				border-b border-gray-200
-				bg-white px-3 py-3 md:px-6 md:pt-5
+				bg-white px-3 py-1 md:px-6 md:pt-5
 				transition-colors duration-200
 				dark:border-white/5 dark:bg-[#191919]
 			"
@@ -479,7 +479,6 @@ export function TopToolbar({
 							active={isSearchActive}
 							icon={<Search size={17} strokeWidth={2.2} />}
 							label={<span className="hidden sm:inline">Search</span>}
-							mobileCompact
 						/>
 					</Popover.Anchor>
 
@@ -589,7 +588,6 @@ export function TopToolbar({
 									<span className="hidden sm:inline">Filters</span>
 								)
 							}
-							mobileCompact
 						/>
 					</Popover.Anchor>
 
@@ -673,7 +671,6 @@ interface ToolbarButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 	active?: boolean;
 	icon: ReactNode;
 	label: ReactNode;
-	mobileCompact?: boolean;
 }
 
 const ToolbarButton = forwardRef<HTMLButtonElement, ToolbarButtonProps>(
@@ -684,7 +681,6 @@ const ToolbarButton = forwardRef<HTMLButtonElement, ToolbarButtonProps>(
 			label,
 			className = "",
 			type = "button",
-			mobileCompact = false,
 			...buttonProps
 		},
 		ref,

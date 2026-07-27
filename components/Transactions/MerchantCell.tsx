@@ -43,6 +43,8 @@ interface MerchantCellProps {
 	) => Promise<void> | void;
 }
 
+const CHARACTER_LENGTH = 13;
+
 function normalizeMerchantText(value: string): string {
 	return value
 		.trim()
@@ -375,6 +377,10 @@ export function MerchantCell({
 
 	const initial = merchantName.charAt(0).toUpperCase() || "?";
 
+	 const displayMerchantName= merchantName.length > CHARACTER_LENGTH 
+        ? merchantName.slice(0, CHARACTER_LENGTH) + '…' 
+        : merchantName;
+
 	return (
 		<div className="group flex h-full w-full items-center gap-1.5 pr-2">
 			<div className="min-w-0 flex-1">
@@ -429,7 +435,7 @@ export function MerchantCell({
 							text-gray-900 dark:text-white
 						"
 					>
-						{merchantName}
+						{displayMerchantName}
 					</span>
 
 					<ChevronDown

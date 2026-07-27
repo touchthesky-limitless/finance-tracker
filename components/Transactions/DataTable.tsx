@@ -898,7 +898,7 @@ export function DataTable({
 													minWidth: cell.column.columnDef.minSize ?? 0,
 												}}
 												className={`min-w-0 truncate ${
-													index === 0 ? "pl-6 pr-2" : "px-2"
+													index === 0 ? "pr-1" : "px-2"
 												}`}
 											>
 												{flexRender(
