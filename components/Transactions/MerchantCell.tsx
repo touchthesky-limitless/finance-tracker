@@ -377,9 +377,10 @@ export function MerchantCell({
 
 	const initial = merchantName.charAt(0).toUpperCase() || "?";
 
-	 const displayMerchantName= merchantName.length > CHARACTER_LENGTH 
-        ? merchantName.slice(0, CHARACTER_LENGTH) + '…' 
-        : merchantName;
+	const displayMerchantName =
+		merchantName.length > CHARACTER_LENGTH
+			? merchantName.slice(0, CHARACTER_LENGTH) + "…"
+			: merchantName;
 
 	return (
 		<div className="group flex h-full w-full items-center gap-1.5 pr-2">
@@ -399,9 +400,9 @@ export function MerchantCell({
 					aria-label={`Change ${merchantName} merchant`}
 					aria-expanded={canEditInline ? isOpen : undefined}
 					className="
-						flex h-10 w-full min-w-0 items-center gap-3
-						rounded-xl border border-transparent px-3 text-left
-						transition-all
+    flex h-10 w-full min-w-0 items-center gap-3
+    rounded-xl border border-transparent pl-1 pr-1 text-left
+    transition-all
 
 						group-hover:border-gray-300
 						group-hover:bg-gray-50
