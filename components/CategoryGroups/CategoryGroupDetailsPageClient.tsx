@@ -84,6 +84,7 @@ import { getReportSummary } from "@/components/Reports/reportUtils";
 import { findParentCategory } from "@/constants";
 import { type Transaction, useBudgetStore } from "@/store/useBudgetStore";
 import { compactCurrency, formatMoney } from "@/utils/formatters";
+import { getBreadcrumb, NavigationSource } from "@/lib/navigation/breadcrumb";
 
 const DEFAULT_SORTING: SortingState = [{ id: "date", desc: true }];
 const HIDDEN_MODES = ["visible", "hidden", "all"] as const;
@@ -293,6 +294,10 @@ export default function CategoryGroupDetailsPageClient() {
 		categoryPreferences,
 		groupPreferences,
 	});
+
+	const fromParam = searchParams.get("from");
+
+	const breadcrumb = getBreadcrumb(fromParam);
 
 	const [loading, setLoading] = useState(true);
 	const [isEditGroupOpen, setIsEditGroupOpen] = useState(false);
@@ -676,7 +681,8 @@ export default function CategoryGroupDetailsPageClient() {
 
 			setIsDeleteGroupOpen(false);
 			setIsEditGroupOpen(false);
-			router.push("/cash-flow?breakdown=group&view=bar");
+			const redirectUrl = breadcrumb.href + "?breakdown=group&view=bar";
+			router.push(redirectUrl);
 		} catch (error) {
 			setDeleteError(
 				error instanceof Error ? error.message : "Failed to delete the group.",
@@ -705,10 +711,10 @@ export default function CategoryGroupDetailsPageClient() {
 						No category group exists with ID {groupId}.
 					</p>
 					<Link
-						href="/cash-flow?breakdown=group&view=bar"
+						href={breadcrumb.href}
 						className="mt-5 inline-flex rounded-xl bg-[#FF6633] px-4 py-2.5 font-semibold text-white"
 					>
-						Back to Cash Flow
+						Back to {breadcrumb.label}
 					</Link>
 				</div>
 			</div>
@@ -720,10 +726,10 @@ export default function CategoryGroupDetailsPageClient() {
 			<header className="flex flex-wrap items-center gap-4">
 				<nav className="flex min-w-0 items-center gap-2 text-lg font-semibold">
 					<Link
-						href="/cash-flow?breakdown=group&view=bar"
+						href={breadcrumb.href}
 						className="text-gray-500 transition-colors hover:text-gray-900 dark:text-gray-400 dark:hover:text-white"
 					>
-						Cash Flow
+						{breadcrumb.label}
 					</Link>
 					<ChevronRight size={18} className="shrink-0 text-gray-400" />
 					<span className="truncate">{groupDisplayName}</span>
@@ -813,6 +819,7 @@ export default function CategoryGroupDetailsPageClient() {
 							isCategoryView
 							getCategoryId={getCategoryId}
 							isMerchantNavigationEnabled
+							navigationSource={(fromParam as NavigationSource) ?? undefined}
 						/>
 					</div>
 				</section>

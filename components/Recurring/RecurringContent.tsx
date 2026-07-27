@@ -27,6 +27,10 @@ import {
 } from "@/components/Recurring/recurringUtils";
 import type { Transaction } from "@/store/useBudgetStore";
 import { formatMoney } from "@/utils/formatters";
+import {
+	appendNavigationSource,
+	NavigationSource,
+} from "@/lib/navigation/breadcrumb";
 
 interface RecurringContentProps {
 	records: RecurringRecord[];
@@ -41,6 +45,8 @@ interface RecurringContentProps {
 	onManage: () => void;
 	onEdit: (record: RecurringRecord) => void;
 	onMarkNotRecurring: (record: RecurringRecord) => void;
+	onOpenTransaction: (id: string) => void;
+	navigationSource?: NavigationSource; // ✅ receives from parent
 }
 
 export function RecurringContent(props: RecurringContentProps) {
@@ -202,10 +208,18 @@ function OccurrenceRow({
 }) {
 	const router = useRouter();
 	const { record } = occurrence;
+
 	const viewMerchant = (): void => {
-		if (record.merchantId)
-			router.push(`/merchants/${encodeURIComponent(record.merchantId)}`);
+		if (record.merchantId) {
+			router.push(
+				appendNavigationSource(
+					`/merchants/${encodeURIComponent(record.merchantId)}`,
+					"recurring",
+				),
+			);
+		}
 	};
+
 	return (
 		<div className="grid min-h-[82px] grid-cols-[minmax(230px,1.1fr)_minmax(150px,.65fr)_minmax(220px,1fr)_minmax(220px,1fr)_140px_60px] items-center border-b border-gray-100 px-6 last:border-0 dark:border-white/5">
 			<button
@@ -292,7 +306,10 @@ function LinkedAccount({ record }: { record: RecurringRecord }) {
 			onClick={() => {
 				if (record.accountId) {
 					router.push(
-						`/accounts/details/${encodeURIComponent(record.accountId)}`,
+						appendNavigationSource(
+							`/accounts/details/${encodeURIComponent(record.accountId)}`,
+							"recurring",
+						),
 					);
 				}
 			}}
@@ -317,7 +334,12 @@ function LinkedCategory({ record }: { record: RecurringRecord }) {
 			disabled={!record.categoryId}
 			onClick={() => {
 				if (record.categoryId) {
-					router.push(`/categories/${encodeURIComponent(record.categoryId)}`);
+					router.push(
+						appendNavigationSource(
+							`/categories/${encodeURIComponent(record.categoryId)}`,
+							"recurring",
+						),
+					);
 				}
 			}}
 			title={record.categoryName || "Uncategorized"}
@@ -487,8 +509,14 @@ function AllRecurringRow({
 	const router = useRouter();
 	const nextDate = getNextOccurrenceDate(record);
 	const viewMerchant = (): void => {
-		if (record.merchantId)
-			router.push(`/merchants/${encodeURIComponent(record.merchantId)}`);
+		if (record.merchantId) {
+			router.push(
+				appendNavigationSource(
+					`/merchants/${encodeURIComponent(record.merchantId)}`,
+					"recurring",
+				),
+			);
+		}
 	};
 	return (
 		<div className="grid min-h-[104px] grid-cols-[minmax(250px,1fr)_minmax(210px,.8fr)_minmax(220px,1fr)_minmax(220px,1fr)_140px_60px] items-center border-b border-gray-100 px-7 last:border-0 dark:border-white/5">
@@ -557,6 +585,7 @@ function RecurringCalendarView({
 	month,
 	onEdit,
 	onMarkNotRecurring,
+	navigationSource,
 }: RecurringContentProps) {
 	const today = new Date();
 	const year = month.getUTCFullYear();
@@ -631,6 +660,7 @@ function RecurringCalendarView({
 												transactions={transactions}
 												onEdit={onEdit}
 												onMarkNotRecurring={onMarkNotRecurring}
+												navigationSource={navigationSource}
 											/>
 										);
 									})}

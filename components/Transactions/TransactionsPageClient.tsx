@@ -1184,6 +1184,7 @@ export default function TransactionsPageClient({
 							sorting={sorting}
 							onCategoryChange={handleCategoryChange}
 							getCategoryId={getSubcategoryId}
+							navigationSource="transactions"
 						/>
 					</div>
 				</div>

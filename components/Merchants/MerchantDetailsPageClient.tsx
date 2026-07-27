@@ -68,6 +68,12 @@ import {
 } from "@/lib/merchants/merchantRepository";
 import { type Transaction, useBudgetStore } from "@/store/useBudgetStore";
 import { compactCurrency, formatMoney } from "@/utils/formatters";
+import {
+	getBreadcrumb,
+	appendNavigationSource,
+	getNavigationSource,
+	type NavigationSource,
+} from "@/lib/navigation/breadcrumb";
 
 const DEFAULT_SORTING: SortingState = [{ id: "date", desc: true }];
 const HIDDEN_MODES = ["visible", "hidden", "all"] as const;
@@ -155,10 +161,7 @@ function getLatestTransactionDate(transactions: Transaction[]): Date | null {
 	return latest;
 }
 
-function getPeriodShortLabel(
-	date: Date,
-	timeframe: CashFlowTimeframe,
-): string {
+function getPeriodShortLabel(date: Date, timeframe: CashFlowTimeframe): string {
 	if (timeframe === "year") {
 		return String(date.getUTCFullYear());
 	}
@@ -279,16 +282,17 @@ export default function MerchantDetailsPageClient() {
 
 	const merchantItems = useMerchantOptions();
 	const { allUnifiedCategories } = useUnifiedCategories("Expense", "All");
-	const {
-		allUnifiedMerchants,
-		getMerchantById,
-		getMerchantId,
-	} = useUnifiedMerchants();
+	const { allUnifiedMerchants, getMerchantById, getMerchantId } =
+		useUnifiedMerchants();
 
 	const [loading, setLoading] = useState(true);
 	const [isEditOpen, setIsEditOpen] = useState(false);
-	const [mergeSource, setMergeSource] = useState<MerchantEditorValue | null>(null);
-	const [logoOverrides, setLogoOverrides] = useState<Record<string, string | null>>({});
+	const [mergeSource, setMergeSource] = useState<MerchantEditorValue | null>(
+		null,
+	);
+	const [logoOverrides, setLogoOverrides] = useState<
+		Record<string, string | null>
+	>({});
 	const [sorting, setSorting] = useState<SortingState>(DEFAULT_SORTING);
 	const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
 	const [selectionState, setSelectionState] = useState<{
@@ -323,12 +327,7 @@ export default function MerchantDetailsPageClient() {
 		return () => {
 			active = false;
 		};
-	}, [
-		fetchAccounts,
-		fetchCustomCategories,
-		fetchMerchants,
-		fetchTransactions,
-	]);
+	}, [fetchAccounts, fetchCustomCategories, fetchMerchants, fetchTransactions]);
 
 	const timeframe = parseEnum<CashFlowTimeframe>(
 		searchParams.get("timeframe"),
@@ -347,6 +346,37 @@ export default function MerchantDetailsPageClient() {
 			hidden,
 		};
 	}, [accountsParam, hidden, tagsParam]);
+
+	const fromParam = searchParams.get("from");
+	const breadcrumb = getBreadcrumb(fromParam);
+	const currentSource = getNavigationSource(fromParam);
+
+	const openTransaction = useCallback(
+		(transaction: Transaction): void => {
+			const basePath = `/transactions/${encodeURIComponent(transaction.id)}`;
+
+			// Pass the current context forward to the transaction detail page
+			const pathWithContext = appendNavigationSource(basePath, currentSource);
+
+			router.push(pathWithContext);
+		},
+		[router, currentSource],
+	);
+
+	// const cameFrom = searchParams.get("from");
+	// const breadcrumbLabel =
+	// 	cameFrom === "cash-flow"
+	// 		? "Cash Flow"
+	// 		: cameFrom === "transactions"
+	// 			? "Transactions"
+	// 			: "Accounts";
+
+	// const breadcrumbHref =
+	// 	cameFrom === "cash-flow"
+	// 		? "/cash-flow"
+	// 		: cameFrom === "transactions"
+	// 			? "/transactions"
+	// 			: "/accounts";
 
 	const updateUrl = useCallback(
 		(updates: Record<string, string | null>) => {
@@ -390,10 +420,9 @@ export default function MerchantDetailsPageClient() {
 
 		const query = searchParamsString ? `?${searchParamsString}` : "";
 
-		router.replace(
-			`/merchants/${encodeURIComponent(merchant.id)}${query}`,
-			{ scroll: false },
-		);
+		router.replace(`/merchants/${encodeURIComponent(merchant.id)}${query}`, {
+			scroll: false,
+		});
 	}, [merchant, merchantId, router, searchParamsString]);
 
 	const merchantName = merchant?.name ?? "Merchant";
@@ -472,8 +501,7 @@ export default function MerchantDetailsPageClient() {
 	}, [filteredMerchantTransactions, merchantTransactions]);
 
 	const selectedDate =
-		parseUtcDate(dateParam) ??
-		startOfPeriod(latestMerchantDate, timeframe);
+		parseUtcDate(dateParam) ?? startOfPeriod(latestMerchantDate, timeframe);
 
 	const chartPeriods = useMemo(() => {
 		return buildMerchantChartPeriods(
@@ -499,9 +527,7 @@ export default function MerchantDetailsPageClient() {
 			const date = parseUtcDate(transaction.date);
 
 			return Boolean(
-				date &&
-					date >= selectedPeriod.start &&
-					date <= selectedPeriod.end,
+				date && date >= selectedPeriod.start && date <= selectedPeriod.end,
 			);
 		});
 	}, [filteredMerchantTransactions, selectedPeriod]);
@@ -526,21 +552,15 @@ export default function MerchantDetailsPageClient() {
 	]);
 
 	const selectedIds =
-		selectionState.contextKey === selectionContextKey
-			? selectionState.ids
-			: [];
+		selectionState.contextKey === selectionContextKey ? selectionState.ids : [];
 
 	const setSelectedIds = useCallback(
 		(nextValue: SetStateAction<string[]>): void => {
 			setSelectionState((current) => {
 				const currentIds =
-					current.contextKey === selectionContextKey
-						? current.ids
-						: [];
+					current.contextKey === selectionContextKey ? current.ids : [];
 				const nextIds =
-					typeof nextValue === "function"
-						? nextValue(currentIds)
-						: nextValue;
+					typeof nextValue === "function" ? nextValue(currentIds) : nextValue;
 
 				return {
 					contextKey: selectionContextKey,
@@ -571,10 +591,7 @@ export default function MerchantDetailsPageClient() {
 		[categoryIdByName],
 	);
 
-	const handleSelectRow = (
-		id: string,
-		event: ReactMouseEvent,
-	): void => {
+	const handleSelectRow = (id: string, event: ReactMouseEvent): void => {
 		event.stopPropagation();
 
 		setSelectedIds((current) => {
@@ -584,9 +601,7 @@ export default function MerchantDetailsPageClient() {
 		});
 	};
 
-	const handleTimeframeChange = (
-		nextTimeframe: CashFlowTimeframe,
-	): void => {
+	const handleTimeframeChange = (nextTimeframe: CashFlowTimeframe): void => {
 		const anchor = selectedPeriod?.start ?? selectedDate;
 
 		updateUrl({
@@ -609,15 +624,13 @@ export default function MerchantDetailsPageClient() {
 		}
 
 		const nameChanged =
-			normalizeMerchantName(cleanName) !==
-			normalizeMerchantName(merchant.name);
+			normalizeMerchantName(cleanName) !== normalizeMerchantName(merchant.name);
 
 		if (nameChanged) {
 			const duplicate = allUnifiedMerchants.find((item) => {
 				return (
 					item.id !== merchant.id &&
-					normalizeMerchantName(item.name) ===
-						normalizeMerchantName(cleanName)
+					normalizeMerchantName(item.name) === normalizeMerchantName(cleanName)
 				);
 			});
 
@@ -648,11 +661,7 @@ export default function MerchantDetailsPageClient() {
 			);
 		}
 
-		setMerchantRecurringState(
-			merchant.name,
-			cleanName,
-			value.isRecurring,
-		);
+		setMerchantRecurringState(merchant.name, cleanName, value.isRecurring);
 
 		setLogoOverrides((current) => {
 			const next = { ...current };
@@ -727,10 +736,9 @@ export default function MerchantDetailsPageClient() {
 		setIsEditOpen(false);
 
 		const query = searchParamsString ? `?${searchParamsString}` : "";
-		router.replace(
-			`/merchants/${encodeURIComponent(target.id)}${query}`,
-			{ scroll: false },
-		);
+		router.replace(`/merchants/${encodeURIComponent(target.id)}${query}`, {
+			scroll: false,
+		});
 	};
 
 	if (loading) {
@@ -747,17 +755,15 @@ export default function MerchantDetailsPageClient() {
 		return (
 			<div className="grid min-h-[70vh] place-items-center p-6 text-center">
 				<div>
-					<h1 className="text-2xl font-bold">
-						Merchant not found
-					</h1>
+					<h1 className="text-2xl font-bold">Merchant not found</h1>
 					<p className="mt-2 text-gray-500 dark:text-gray-400">
 						No merchant exists with ID {merchantId}.
 					</p>
 					<Link
-						href="/transactions"
+						href={breadcrumb.href}
 						className="mt-5 inline-flex rounded-xl bg-[#FF6633] px-4 py-2.5 font-semibold text-white"
 					>
-						Back to Transactions
+						Back to {breadcrumb.label}
 					</Link>
 				</div>
 			</div>
@@ -769,15 +775,12 @@ export default function MerchantDetailsPageClient() {
 			<header className="flex flex-wrap items-center gap-4">
 				<nav className="flex min-w-0 items-center gap-2 text-lg font-semibold">
 					<Link
-						href="/transactions"
+						href={breadcrumb.href}
 						className="text-gray-500 transition-colors hover:text-gray-900 dark:text-gray-400 dark:hover:text-white"
 					>
-						Transactions
+						{breadcrumb.label}
 					</Link>
-					<ChevronRight
-						size={18}
-						className="shrink-0 text-gray-400"
-					/>
+					<ChevronRight size={18} className="shrink-0 text-gray-400" />
 					<span className="flex min-w-0 items-center gap-2">
 						<MerchantBreadcrumbIcon
 							name={merchantName}
@@ -788,10 +791,7 @@ export default function MerchantDetailsPageClient() {
 				</nav>
 
 				<div className="ml-auto flex flex-wrap items-center justify-end gap-3">
-					<TimeframeTabs
-						value={timeframe}
-						onChange={handleTimeframeChange}
-					/>
+					<TimeframeTabs value={timeframe} onChange={handleTimeframeChange} />
 					<button
 						type="button"
 						onClick={() => setIsEditOpen(true)}
@@ -815,9 +815,7 @@ export default function MerchantDetailsPageClient() {
 										? nextFilters.tags.join(",")
 										: null,
 								hidden:
-									nextFilters.hidden === "visible"
-										? null
-										: nextFilters.hidden,
+									nextFilters.hidden === "visible" ? null : nextFilters.hidden,
 							});
 						}}
 					/>
@@ -865,13 +863,7 @@ export default function MerchantDetailsPageClient() {
 							transactions={periodTransactions}
 							selectedIds={selectedIds}
 							onSelectRow={handleSelectRow}
-							onRowClick={(transaction: Transaction) => {
-								router.push(
-									`/transactions/${encodeURIComponent(
-										transaction.id,
-									)}`,
-								);
-							}}
+							onRowClick={openTransaction}
 							columnVisibility={columnVisibility}
 							isEditMode={isTableEditMode}
 							currentView="all"
@@ -886,6 +878,7 @@ export default function MerchantDetailsPageClient() {
 									category: newCategory,
 								});
 							}}
+							navigationSource={(fromParam as NavigationSource) ?? undefined}
 						/>
 					</div>
 				</section>
@@ -936,9 +929,7 @@ function MerchantTrendChart({
 }) {
 	const [hoverKey, setHoverKey] = useState<string | null>(null);
 	const periodByKey = useMemo(() => {
-		return new Map(
-			periods.map((period) => [period.key, period] as const),
-		);
+		return new Map(periods.map((period) => [period.key, period] as const));
 	}, [periods]);
 
 	return (
@@ -987,12 +978,8 @@ function MerchantTrendChart({
 							const period = periodByKey.get(periodKey);
 							const parsedX = Number(props.x ?? 0);
 							const parsedY = Number(props.y ?? 0);
-							const x = Number.isFinite(parsedX)
-								? parsedX
-								: 0;
-							const y = Number.isFinite(parsedY)
-								? parsedY
-								: 0;
+							const x = Number.isFinite(parsedX) ? parsedX : 0;
+							const y = Number.isFinite(parsedY) ? parsedY : 0;
 
 							return (
 								<text
@@ -1023,27 +1010,17 @@ function MerchantTrendChart({
 						cursor={{
 							fill: "rgba(255,255,255,0.035)",
 						}}
-						content={
-							<MerchantTrendTooltip
-								merchantName={merchantName}
-							/>
-						}
+						content={<MerchantTrendTooltip merchantName={merchantName} />}
 					/>
 
 					<Bar
 						dataKey="amount"
 						cursor="pointer"
 						minPointSize={2}
-						onMouseEnter={(
-							_entry: unknown,
-							index: number,
-						) => {
+						onMouseEnter={(_entry: unknown, index: number) => {
 							setHoverKey(periods[index]?.key ?? null);
 						}}
-						onClick={(
-							_entry: unknown,
-							index: number,
-						) => {
+						onClick={(_entry: unknown, index: number) => {
 							const period = periods[index];
 
 							if (period) {
@@ -1053,19 +1030,15 @@ function MerchantTrendChart({
 					>
 						{periods.map((period) => {
 							const active =
-								period.key === selectedKey ||
-								period.key === hoverKey;
+								period.key === selectedKey || period.key === hoverKey;
 
 							return (
 								<Cell
 									key={period.key}
 									fill="#a4383d"
-									fillOpacity={
-										active ? 0.96 : 0.52
-									}
+									fillOpacity={active ? 0.96 : 0.52}
 									style={{
-										transition:
-											"fill-opacity 150ms ease",
+										transition: "fill-opacity 150ms ease",
 									}}
 								/>
 							);
@@ -1096,9 +1069,7 @@ function MerchantTrendTooltip({
 			<div className="flex items-center gap-3 px-4 py-4 text-sm">
 				<span className="size-2.5 rounded-full bg-[#ef4b55]" />
 				<span className="font-semibold">{merchantName}:</span>
-				<span className="ml-auto font-bold">
-					{formatMoney(period.amount)}
-				</span>
+				<span className="ml-auto font-bold">{formatMoney(period.amount)}</span>
 			</div>
 		</div>
 	);
@@ -1129,9 +1100,7 @@ function EntityTransactionSummary({
 				];
 			}),
 		];
-		const csv = rows
-			.map((row) => row.map(escapeValue).join(","))
-			.join("\n");
+		const csv = rows.map((row) => row.map(escapeValue).join(",")).join("\n");
 		const url = URL.createObjectURL(
 			new Blob([csv], {
 				type: "text/csv;charset=utf-8",
@@ -1152,43 +1121,20 @@ function EntityTransactionSummary({
 			</h2>
 			<dl className="space-y-4 px-5 py-5 text-sm">
 				{[
-					[
-						"Total transactions",
-						String(transactions.length),
-					],
-					[
-						"Largest transaction",
-						formatMoney(summary.largestTransaction),
-					],
-					[
-						"Average transaction",
-						formatMoney(summary.averageTransaction),
-					],
-					[
-						"Total income",
-						formatMoney(summary.totalIncome),
-					],
-					[
-						"Total spending",
-						formatMoney(summary.totalExpenses),
-					],
-					[
-						"First transaction",
-						summary.firstTransaction?.date ?? "—",
-					],
-					[
-						"Last transaction",
-						summary.lastTransaction?.date ?? "—",
-					],
+					["Total transactions", String(transactions.length)],
+					["Largest transaction", formatMoney(summary.largestTransaction)],
+					["Average transaction", formatMoney(summary.averageTransaction)],
+					["Total income", formatMoney(summary.totalIncome)],
+					["Total spending", formatMoney(summary.totalExpenses)],
+					["First transaction", summary.firstTransaction?.date ?? "—"],
+					["Last transaction", summary.lastTransaction?.date ?? "—"],
 				].map(([label, value]) => {
 					return (
 						<div
 							key={label}
 							className="flex items-center justify-between gap-6"
 						>
-							<dt className="text-gray-500 dark:text-zinc-400">
-								{label}
-							</dt>
+							<dt className="text-gray-500 dark:text-zinc-400">{label}</dt>
 							<dd className="text-right font-semibold text-gray-900 dark:text-white">
 								{value}
 							</dd>

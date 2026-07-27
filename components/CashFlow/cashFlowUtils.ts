@@ -351,8 +351,7 @@ export function getSelectedPeriod(
 		return matchingPeriod;
 	}
 
-	const fallbackPeriod =
-		periods[Math.floor(periods.length / 2)] ?? periods[0];
+	const fallbackPeriod = periods[Math.floor(periods.length / 2)] ?? periods[0];
 
 	if (!fallbackPeriod) {
 		throw new Error("Cash flow periods cannot be empty.");
@@ -472,6 +471,16 @@ export function findCashFlowCategoryGroupById(
 	};
 }
 
+function addCashFlowSource(url: string | null): string | null {
+	if (!url) {
+		return null;
+	}
+
+	const separator = url.includes("?") ? "&" : "?";
+
+	return `${url}${separator}from=cash-flow`;
+}
+
 export function resolveCashFlowDetailUrl(
 	entity: Pick<
 		CashFlowBreakdownItem,
@@ -479,32 +488,31 @@ export function resolveCashFlowDetailUrl(
 	>,
 ): string | null {
 	if (entity.entityKind === "group") {
-		if (!entity.entityId) {
-			return entity.detailUrl;
-		}
+		const url = entity.entityId
+			? `/category-groups/${encodeURIComponent(entity.entityId)}`
+			: entity.detailUrl;
 
-		return `/category-groups/${encodeURIComponent(entity.entityId)}`;
+		return addCashFlowSource(url);
 	}
 
 	if (entity.entityKind === "category") {
-		if (!entity.entityId) {
-			return entity.detailUrl;
-		}
+		const url = entity.entityId
+			? `/categories/${encodeURIComponent(entity.entityId)}`
+			: entity.detailUrl;
 
-		return `/categories/${encodeURIComponent(entity.entityId)}`;
+		return addCashFlowSource(url);
 	}
 
 	if (entity.entityKind === "merchant") {
-		if (!entity.entityId) {
-			return entity.detailUrl;
-		}
+		const url = entity.entityId
+			? `/merchants/${encodeURIComponent(entity.entityId)}`
+			: entity.detailUrl;
 
-		return `/merchants/${encodeURIComponent(entity.entityId)}`;
+		return addCashFlowSource(url);
 	}
 
-	return entity.detailUrl ?? null;
+	return addCashFlowSource(entity.detailUrl ?? null);
 }
-
 export function buildBreakdownItems(
 	transactions: Transaction[],
 	period: CashFlowPeriod,
@@ -583,10 +591,7 @@ export function buildBreakdownItems(
 		);
 		const groupSourceName =
 			(categoryRecord
-				? getEffectiveCategoryParentName(
-					categoryRecord,
-					categoryPreferences,
-				)
+				? getEffectiveCategoryParentName(categoryRecord, categoryPreferences)
 				: null) ||
 			findParentCategory(category) ||
 			"Other";

@@ -1,17 +1,8 @@
 "use client";
 
-import {
-	useCallback,
-	useEffect,
-	useMemo,
-	useState,
-} from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import {
-	Filter,
-	Plus,
-	RefreshCw,
-} from "lucide-react";
+import { Filter, Plus, RefreshCw } from "lucide-react";
 
 import { AccountGroupCard } from "@/components/Accounts/AccountGroupCard";
 import { AccountsPageSkeleton } from "@/components/Accounts/AccountsPageSkeleton";
@@ -50,6 +41,7 @@ import {
 	saveManualAccounts,
 } from "@/components/Accounts/utils/storage";
 import { useBudgetStore } from "@/store/useBudgetStore";
+import { appendNavigationSource } from "@/lib/navigation/breadcrumb";
 
 export default function AccountsPageClient() {
 	const router = useRouter();
@@ -77,7 +69,6 @@ export default function AccountsPageClient() {
 	const chartType = normalizeChartType(searchParams.get("chartType"));
 	const dateRange = normalizeDateRange(searchParams.get("dateRange"));
 	const timeframe = normalizeTimeframe(searchParams.get("timeframe"));
-
 
 	useEffect(() => {
 		const hasRequiredQuery =
@@ -263,9 +254,7 @@ export default function AccountsPageClient() {
 				return !cutoff || date >= cutoff;
 			})
 			.sort((first, second) => {
-				return (
-					new Date(first.date).getTime() - new Date(second.date).getTime()
-				);
+				return new Date(first.date).getTime() - new Date(second.date).getTime();
 			});
 
 		const daily = new Map<string, number>();
@@ -314,13 +303,7 @@ export default function AccountsPageClient() {
 		}
 
 		return points;
-	}, [
-		dateRange,
-		selectedAccountIds,
-		summary,
-		timeframe,
-		transactions,
-	]);
+	}, [dateRange, selectedAccountIds, summary, timeframe, transactions]);
 
 	const filterTree = useMemo<FilterNode[]>(() => {
 		const allGroups = GROUP_ORDER.map((group) => {
@@ -337,9 +320,7 @@ export default function AccountsPageClient() {
 			return group.accounts.length > 0;
 		});
 
-		const convertGroup = (
-			group: (typeof allGroups)[number],
-		): FilterNode => ({
+		const convertGroup = (group: (typeof allGroups)[number]): FilterNode => ({
 			id: `group:${group.group}`,
 			label: group.group,
 			children: group.accounts.map((account) => ({
@@ -438,7 +419,6 @@ export default function AccountsPageClient() {
 					>
 						<Filter size={15} />
 						Filters
-
 						{selectedAccountIds.length > 0 && (
 							<span
 								aria-label={`${selectedAccountIds.length} account filters active`}
@@ -505,9 +485,11 @@ export default function AccountsPageClient() {
 									);
 								}}
 								onOpenAccount={(account) => {
-									router.push(
+									const url = appendNavigationSource(
 										`/accounts/details/${encodeURIComponent(account.id)}`,
+										"accounts",
 									);
+									router.push(url);
 								}}
 							/>
 						))

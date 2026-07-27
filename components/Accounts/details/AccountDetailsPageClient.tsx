@@ -50,6 +50,10 @@ import {
 import { useMerchantOptions } from "@/hooks/useMerchantOptions";
 import type { MerchantListItem } from "@/components/Merchants/types";
 import { relativeTime } from "@/utils/formatters";
+import {
+	getBreadcrumb,
+	type NavigationSource,
+} from "@/lib/navigation/breadcrumb";
 
 const AddTransactionModal = dynamic(
 	() => {
@@ -115,6 +119,8 @@ export default function AccountDetailsPageClient() {
 	const pathname = usePathname();
 	const searchParams = useSearchParams();
 	const queryString = searchParams.toString();
+	const fromParam = searchParams.get("from");
+	const breadcrumb = getBreadcrumb(fromParam);
 
 	const accountId = params.accountId
 		? decodeURIComponent(params.accountId)
@@ -711,11 +717,11 @@ export default function AccountDetailsPageClient() {
 					<button
 						type="button"
 						onClick={() => {
-							router.push("/accounts");
+							router.push(breadcrumb.href);
 						}}
 						className="text-base font-semibold text-gray-500 transition hover:text-gray-900 dark:text-gray-400 dark:hover:text-white"
 					>
-						Accounts
+						{breadcrumb.label}
 					</button>
 
 					<ChevronRight
@@ -882,6 +888,7 @@ export default function AccountDetailsPageClient() {
 								isCategoryView
 								getCategoryId={getCategoryId}
 								isMerchantNavigationEnabled
+								navigationSource={(fromParam as NavigationSource) ?? undefined}
 							/>
 						</div>
 					)}

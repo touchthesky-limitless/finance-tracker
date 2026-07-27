@@ -38,6 +38,8 @@ export interface CategoryEditorGroupOption {
 	hidden: boolean;
 }
 
+export type CategoryBudgetType = "fixed" | "flexible" | "non-monthly";
+
 export interface CategoryEditorValue {
 	id: string;
 	name: string;
@@ -45,6 +47,8 @@ export interface CategoryEditorValue {
 	parentName: string;
 	isSystem: boolean;
 	excludedFromBudget: boolean;
+	budgetType: CategoryBudgetType;
+	monthlyRollover: boolean;
 	hidden: boolean;
 }
 
@@ -53,6 +57,8 @@ export interface CategoryEditorSaveValue {
 	icon: string;
 	parentName: string;
 	excludedFromBudget: boolean;
+	budgetType: CategoryBudgetType;
+	monthlyRollover: boolean;
 }
 
 interface CategoryEditorModalProps {
@@ -109,6 +115,12 @@ export function CategoryEditorModal({
 	const [excludeFromBudget, setExcludeFromBudget] = useState(
 		category.excludedFromBudget,
 	);
+	const [budgetType, setBudgetType] = useState<CategoryBudgetType>(
+		category.budgetType,
+	);
+	const [monthlyRollover, setMonthlyRollover] = useState(
+		category.monthlyRollover,
+	);
 	const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
 	const [isSaving, setIsSaving] = useState(false);
 	const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -119,7 +131,9 @@ export function CategoryEditorModal({
 		cleanName !== category.name.trim() ||
 		icon !== category.icon ||
 		selectedParentName !== category.parentName ||
-		excludeFromBudget !== category.excludedFromBudget;
+		excludeFromBudget !== category.excludedFromBudget ||
+		budgetType !== category.budgetType ||
+		monthlyRollover !== category.monthlyRollover;
 
 	useEffect(() => {
 		const previousOverflow = document.body.style.overflow;
@@ -160,6 +174,8 @@ export function CategoryEditorModal({
 				icon,
 				parentName: selectedParentName,
 				excludedFromBudget: excludeFromBudget,
+				budgetType,
+				monthlyRollover,
 			});
 		} catch (error) {
 			setErrorMessage(
@@ -298,14 +314,69 @@ export function CategoryEditorModal({
 							/>
 						</div>
 
+						<div>
+							<span className="mb-3 block text-base font-semibold sm:text-lg lg:text-[23px]">
+								Type
+							</span>
+							<div className="overflow-hidden rounded-[15px] border border-[#dedbd7] dark:border-white/15">
+								<BudgetTypeOption
+									value="fixed"
+									selected={budgetType === "fixed"}
+									title="Fixed"
+									description="Spending is usually the same every month and cannot be easily reduced. Great for utilities, mortgage, bills, etc."
+									onSelect={setBudgetType}
+								/>
+								<BudgetTypeOption
+									value="flexible"
+									selected={budgetType === "flexible"}
+									title="Flexible"
+									description="Spending changes monthly, and can be reduced when you want to save more money. Great for restaurants, entertainment, etc."
+									onSelect={setBudgetType}
+								>
+									<div className="mt-4 flex items-center justify-between gap-4 rounded-xl bg-[#f5f4f2] px-4 py-4 dark:bg-white/5">
+										<div>
+											<p className="font-semibold">
+												Make this category a rollover fund
+											</p>
+											<p className="mt-1 text-sm leading-6 text-[#55534f] dark:text-[#c2c0bb]">
+												Carry over remaining balances or set due dates to better
+												plan for future expenses.
+											</p>
+										</div>
+										<button
+											type="button"
+											role="switch"
+											aria-checked={monthlyRollover}
+											onClick={(event) => {
+												event.stopPropagation();
+												setMonthlyRollover((current) => !current);
+											}}
+											className={`relative h-7 w-14 shrink-0 rounded-full transition ${monthlyRollover ? "bg-[#ff6633]" : "bg-[#989793] dark:bg-[#66645f]"}`}
+										>
+											<span
+												className={`absolute top-1 size-5 rounded-full bg-white shadow-sm transition-transform ${monthlyRollover ? "translate-x-8" : "translate-x-1"}`}
+											/>
+										</button>
+									</div>
+								</BudgetTypeOption>
+								<BudgetTypeOption
+									value="non-monthly"
+									selected={budgetType === "non-monthly"}
+									title="Non-Monthly"
+									description="Spending typically happens yearly, or less frequently than monthly. Great for annual bills, quarterly payments, etc."
+									onSelect={setBudgetType}
+								/>
+							</div>
+						</div>
+
 						<div className="flex min-w-0 flex-col items-stretch gap-4 rounded-[13px] border border-[#dedbd7] px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6 sm:rounded-[15px] sm:px-6 sm:py-6 lg:px-7 lg:py-7 dark:border-white/15">
 							<div className="min-w-0">
 								<h3 className="text-base font-semibold sm:text-lg lg:text-[22px]">
 									Exclude this category from the budget
 								</h3>
 								<p className="mt-2 max-w-[620px] text-sm leading-6 text-[#55534f] sm:text-base sm:leading-7 lg:text-[20px] lg:leading-8 dark:text-[#c2c0bb]">
-									This category and transactions linked to it will be hidden from
-									your budget.
+									This category and transactions linked to it will be hidden
+									from your budget.
 								</p>
 							</div>
 
@@ -401,6 +472,51 @@ export function CategoryEditorModal({
 				</section>
 			</div>
 		</ModalPortal>
+	);
+}
+
+function BudgetTypeOption({
+	value,
+	selected,
+	title,
+	description,
+	onSelect,
+	children,
+}: {
+	value: CategoryBudgetType;
+	selected: boolean;
+	title: string;
+	description: string;
+	onSelect: (value: CategoryBudgetType) => void;
+	children?: ReactNode;
+}) {
+	return (
+		<div
+			role="radio"
+			aria-checked={selected}
+			tabIndex={0}
+			onClick={() => onSelect(value)}
+			onKeyDown={(event) => {
+				if (event.key === "Enter" || event.key === " ") {
+					event.preventDefault();
+					onSelect(value);
+				}
+			}}
+			className="flex w-full cursor-pointer items-start gap-4 border-b border-[#eceae7] px-5 py-5 text-left outline-none last:border-b-0 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#ff6633]/40 dark:border-white/10"
+		>
+			<span
+				className={`mt-1 grid size-6 shrink-0 place-items-center rounded-full border ${selected ? "border-[#ff6633]" : "border-[#d8d6d2] dark:border-white/20"}`}
+			>
+				{selected && <span className="size-3 rounded-full bg-[#ff6633]" />}
+			</span>
+			<span className="min-w-0 flex-1">
+				<span className="block text-lg font-semibold">{title}</span>
+				<span className="mt-1 block text-sm leading-6 text-[#55534f] dark:text-[#c2c0bb]">
+					{description}
+				</span>
+				{children}
+			</span>
+		</div>
 	);
 }
 
@@ -568,10 +684,7 @@ function CategoryGroupSelect({
 					}
 				}}
 				onKeyDown={(event) => {
-					if (
-						(event.key === "ArrowDown" || event.key === "Enter") &&
-						!isOpen
-					) {
+					if ((event.key === "ArrowDown" || event.key === "Enter") && !isOpen) {
 						event.preventDefault();
 						openMenu();
 					}

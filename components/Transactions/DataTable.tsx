@@ -31,41 +31,34 @@ import {
 	getTransactionMerchantId,
 	useUnifiedMerchants,
 } from "@/hooks/useUnifiedMerchants";
+import {
+	appendNavigationSource,
+	type NavigationSource,
+	useNavigationSource,
+} from "@/lib/navigation/breadcrumb";
 
 interface DataTableProps {
 	transactions: Transaction[];
 	selectedIds: string[];
-
 	onSelectRow: (id: string, event: ReactMouseEvent) => void;
-
 	onRowClick: (transaction: Transaction) => void;
-
 	merchantItems?: MerchantListItem[];
-
 	onMerchantChange?: (
 		transactionId: string,
 		merchant: Pick<Merchant, "id" | "name">,
 	) => Promise<void> | void;
-
 	columnVisibility: VisibilityState;
 	isEditMode: boolean;
 	currentView: "all" | "review";
-
 	onMarkReviewed?: (id: string) => void;
-
 	sorting: SortingState;
-
 	onCategoryChange?: (id: string, newCategory: string) => Promise<void> | void;
-
 	isCategoryView?: boolean;
-
 	getCategoryId?: (categoryName: string) => string | undefined;
-
 	isMerchantNavigationEnabled?: boolean;
-
 	getMerchantId?: (merchantName: string) => string | undefined;
-
 	isLoading?: boolean;
+	navigationSource?: NavigationSource;
 }
 
 type DateHeaderItem = {
@@ -117,15 +110,10 @@ function getDateInfo(dateValue: string): {
 	}
 
 	const year = parsedDate.getUTCFullYear();
-
 	const month = parsedDate.getUTCMonth();
-
 	const day = parsedDate.getUTCDate();
-
 	const timestamp = Date.UTC(year, month, day);
-
 	const monthValue = String(month + 1).padStart(2, "0");
-
 	const dayValue = String(day).padStart(2, "0");
 
 	return {
@@ -134,7 +122,6 @@ function getDateInfo(dateValue: string): {
 		timestamp,
 	};
 }
-
 
 interface TransactionTableSkeletonProps {
 	showSelect: boolean;
@@ -166,70 +153,72 @@ function TransactionTableSkeleton({
 					<Shimmer className="h-4 w-24 rounded-md" />
 				</div>
 
-				{Array.from({ length: 9 }, (_, rowIndex) => (
-					<div
-						key={rowIndex}
-						className="flex h-14 items-center border-b border-gray-100 bg-white dark:border-white/5 dark:bg-[#191919]"
-					>
-						{showSelect && (
-							<div className="flex w-10 shrink-0 items-center justify-center">
-								<Shimmer className="size-5 rounded-md" />
-							</div>
-						)}
+				{Array.from({ length: 9 }, (_, rowIndex) => {
+					return (
+						<div
+							key={rowIndex}
+							className="flex h-14 items-center border-b border-gray-100 bg-white dark:border-white/5 dark:bg-[#191919]"
+						>
+							{showSelect && (
+								<div className="flex w-10 shrink-0 items-center justify-center">
+									<Shimmer className="size-5 rounded-md" />
+								</div>
+							)}
 
-						{showMerchant && (
-							<div className="flex w-[360px] shrink-0 items-center gap-3 px-2 first:pl-6">
-								<Shimmer className="size-8 shrink-0 rounded-full" />
-								<div className="min-w-0 flex-1 space-y-2">
+							{showMerchant && (
+								<div className="flex w-[360px] shrink-0 items-center gap-3 px-2 first:pl-6">
+									<Shimmer className="size-8 shrink-0 rounded-full" />
+									<div className="min-w-0 flex-1 space-y-2">
+										<Shimmer
+											className={`h-4 rounded-md ${
+												rowIndex % 3 === 0
+													? "w-40"
+													: rowIndex % 3 === 1
+														? "w-28"
+														: "w-48"
+											}`}
+										/>
+										<Shimmer className="h-3 w-20 rounded-md" />
+									</div>
+								</div>
+							)}
+
+							{showCategory && (
+								<div className="w-[360px] shrink-0 px-2">
+									<div className="flex items-center gap-2">
+										<Shimmer className="size-7 shrink-0 rounded-full" />
+										<Shimmer
+											className={`h-4 rounded-md ${
+												rowIndex % 2 === 0 ? "w-32" : "w-24"
+											}`}
+										/>
+									</div>
+								</div>
+							)}
+
+							{showAccount && (
+								<div className="w-[300px] shrink-0 px-2">
 									<Shimmer
 										className={`h-4 rounded-md ${
-											rowIndex % 3 === 0
-												? "w-40"
-												: rowIndex % 3 === 1
-													? "w-28"
-													: "w-48"
+											rowIndex % 2 === 0 ? "w-36" : "w-28"
 										}`}
 									/>
-									<Shimmer className="h-3 w-20 rounded-md" />
 								</div>
-							</div>
-						)}
+							)}
 
-						{showCategory && (
-							<div className="w-[360px] shrink-0 px-2">
-								<div className="flex items-center gap-2">
-									<Shimmer className="size-7 shrink-0 rounded-full" />
+							{showAmount && (
+								<div className="flex min-w-36 flex-1 items-center justify-end gap-3 px-4">
 									<Shimmer
 										className={`h-4 rounded-md ${
-											rowIndex % 2 === 0 ? "w-32" : "w-24"
+											rowIndex % 2 === 0 ? "w-20" : "w-16"
 										}`}
 									/>
+									<Shimmer className="size-6 rounded-full" />
 								</div>
-							</div>
-						)}
-
-						{showAccount && (
-							<div className="w-[300px] shrink-0 px-2">
-								<Shimmer
-									className={`h-4 rounded-md ${
-										rowIndex % 2 === 0 ? "w-36" : "w-28"
-									}`}
-								/>
-							</div>
-						)}
-
-						{showAmount && (
-							<div className="flex min-w-36 flex-1 items-center justify-end gap-3 px-4">
-								<Shimmer
-									className={`h-4 rounded-md ${
-										rowIndex % 2 === 0 ? "w-20" : "w-16"
-									}`}
-								/>
-								<Shimmer className="size-6 rounded-full" />
-							</div>
-						)}
-					</div>
-				))}
+							)}
+						</div>
+					);
+				})}
 			</div>
 		</div>
 	);
@@ -253,9 +242,9 @@ export function DataTable({
 	isMerchantNavigationEnabled = true,
 	getMerchantId: getMerchantIdOverride,
 	isLoading = false,
+	navigationSource,
 }: DataTableProps) {
 	const parentRef = useRef<HTMLDivElement>(null);
-
 	const router = useRouter();
 
 	const selectedIdSet = useMemo(() => {
@@ -265,17 +254,16 @@ export function DataTable({
 	const { getMerchantId: getUnifiedMerchantId } = useUnifiedMerchants();
 
 	const resolveMerchantId = getMerchantIdOverride ?? getUnifiedMerchantId;
+	const source = useNavigationSource();
 
 	const navigateToCategory = useCallback(
 		(categoryName: string, targetId: string | undefined) => {
 			if (!targetId) {
 				console.error(`No subcategory ID found for "${categoryName}"`);
-
 				return;
 			}
 
 			const currentYear = new Date().getFullYear();
-
 			const params = new URLSearchParams({
 				breakdown: "category",
 				categories: targetId,
@@ -286,11 +274,16 @@ export function DataTable({
 				view: "breakdown",
 			});
 
-			router.push(
-				`/categories/${encodeURIComponent(targetId)}?${params.toString()}`,
+			const basePath = `/categories/${encodeURIComponent(targetId)}`;
+			const existingQuery = params.toString();
+			const url = appendNavigationSource(
+				basePath,
+				navigationSource ?? source,
+				existingQuery,
 			);
+			router.push(url);
 		},
-		[router],
+		[router, navigationSource, source],
 	);
 
 	const columns = useMemo(() => {
@@ -302,10 +295,8 @@ export function DataTable({
 			columnHelper.display({
 				id: "select",
 				size: 40,
-
 				cell: (info) => {
 					const transactionId = info.row.original.id;
-
 					const isSelected = selectedIdSet.has(transactionId);
 
 					if (currentView === "review" && !isEditMode) {
@@ -315,7 +306,6 @@ export function DataTable({
 									type="button"
 									onClick={(event) => {
 										event.stopPropagation();
-
 										onMarkReviewed?.(transactionId);
 									}}
 									disabled={!onMarkReviewed}
@@ -340,7 +330,6 @@ export function DataTable({
 									type="button"
 									onClick={(event) => {
 										event.stopPropagation();
-
 										onSelectRow(transactionId, event);
 									}}
 									aria-label={
@@ -369,12 +358,9 @@ export function DataTable({
 
 			columnHelper.accessor("merchant", {
 				size: 360,
-
 				cell: (info) => {
 					const transaction = info.row.original;
-
 					const merchantName = String(info.getValue() || "Unknown merchant");
-
 					const merchantId =
 						getTransactionMerchantId(transaction) ??
 						resolveMerchantId(merchantName);
@@ -384,7 +370,10 @@ export function DataTable({
 							return;
 						}
 
-						router.push(`/merchants/${encodeURIComponent(merchantId)}`);
+						const activeSource = navigationSource || source;
+						router.push(
+							appendNavigationSource(`/merchants/${merchantId}`, activeSource),
+						);
 					};
 
 					return (
@@ -405,10 +394,8 @@ export function DataTable({
 
 			columnHelper.accessor("category", {
 				size: 360,
-
 				cell: (info) => {
 					const categoryName = String(info.getValue() || "Uncategorized");
-
 					const targetId = getCategoryId?.(categoryName);
 
 					return (
@@ -439,7 +426,6 @@ export function DataTable({
 									type="button"
 									onClick={(event) => {
 										event.stopPropagation();
-
 										navigateToCategory(categoryName, targetId);
 									}}
 									aria-disabled={!targetId}
@@ -472,14 +458,10 @@ export function DataTable({
 
 			columnHelper.accessor("account", {
 				size: 300,
-
 				cell: (info) => {
 					const transaction = info.row.original;
-
 					const accountName = transaction.account?.trim() || "Unknown account";
-
 					const accountId = transaction.account_id;
-
 					const canNavigate = Boolean(accountId);
 
 					return (
@@ -493,51 +475,54 @@ export function DataTable({
 									return;
 								}
 
-								router.push(
+								const activeSource = navigationSource || source;
+								const url = appendNavigationSource(
 									`/accounts/details/${encodeURIComponent(accountId)}`,
+									activeSource,
 								);
+								router.push(url);
 							}}
 							aria-label={`View ${accountName} account`}
 							title={
 								canNavigate ? `View ${accountName}` : "Account ID unavailable"
 							}
 							className={`
-		group 
-		flex w-full min-w-0
-		items-center gap-3
-		rounded-lg
-		border border-transparent
-		px-2 py-1 text-left
-		bg-transparent
-		group-hover:border-gray-300
-		dark:group-hover:border-white/20
-		transition-colors
-		focus-visible:outline-none
-		focus-visible:border-blue-500/60
-		focus-visible:ring-2
-		focus-visible:ring-blue-500/20
-		${
-			canNavigate
-				? `
-					cursor-pointer
-					hover:border-gray-300
-					hover:bg-gray-50
-					dark:hover:border-white/20
-					dark:hover:bg-white/4
-				`
-				: `
-					cursor-not-allowed
-					opacity-50
-				`
-		}
-	`}
+								group 
+								flex w-full min-w-0
+								items-center gap-3
+								rounded-lg
+								border border-transparent
+								px-2 py-1 text-left
+								bg-transparent
+								group-hover:border-gray-300
+								dark:group-hover:border-white/20
+								transition-colors
+								focus-visible:outline-none
+								focus-visible:border-blue-500/60
+								focus-visible:ring-2
+								focus-visible:ring-blue-500/20
+								${
+									canNavigate
+										? `
+											cursor-pointer
+											hover:border-gray-300
+											hover:bg-gray-50
+											dark:hover:border-white/20
+											dark:hover:bg-white/4
+										`
+										: `
+											cursor-not-allowed
+											opacity-50
+										`
+								}
+							`}
 						>
 							<span
 								className="
-			min-w-0 flex-1 truncate
-			text-[15px] font-semibold
-			text-gray-900 dark:text-white
-		"
+									min-w-0 flex-1 truncate
+									text-[15px] font-semibold
+									text-gray-900 dark:text-white
+								"
 								title={accountName}
 							>
 								{accountName}
@@ -550,18 +535,18 @@ export function DataTable({
 								className={
 									accountId
 										? `
-				shrink-0
-				opacity-0
-				text-gray-600 dark:text-gray-400
-				transition-opacity duration-150
-				group-hover:opacity-100
-				group-focus-visible:opacity-100
-			`
+											shrink-0
+											opacity-0
+											text-gray-600 dark:text-gray-400
+											transition-opacity duration-150
+											group-hover:opacity-100
+											group-focus-visible:opacity-100
+										`
 										: `
-				shrink-0
-				opacity-0
-				text-gray-300 dark:text-gray-600
-			`
+											shrink-0
+											opacity-0
+											text-gray-300 dark:text-gray-600
+										`
 								}
 							/>
 						</button>
@@ -571,27 +556,21 @@ export function DataTable({
 
 			columnHelper.accessor("amount", {
 				size: 140,
-
 				sortingFn: (rowA, rowB, columnId) => {
 					const firstAmount = Number(rowA.getValue(columnId));
-
 					const secondAmount = Number(rowB.getValue(columnId));
 					const safeAmountA = Number.isFinite(firstAmount)
 						? Math.abs(firstAmount)
 						: 0;
-
 					const safeAmountB = Number.isFinite(secondAmount)
 						? Math.abs(secondAmount)
 						: 0;
 					return safeAmountA - safeAmountB;
 				},
 				sortUndefined: "last",
-
 				cell: (info) => {
 					const parsedAmount = Number(info.getValue());
-
 					const amount = Number.isFinite(parsedAmount) ? parsedAmount : 0;
-
 					const isPositive = amount > 0;
 
 					return (
@@ -604,7 +583,6 @@ export function DataTable({
 								}`}
 							>
 								{isPositive ? "+" : ""}
-
 								{formatCurrency(amount)}
 							</span>
 
@@ -612,7 +590,6 @@ export function DataTable({
 								type="button"
 								onClick={(event) => {
 									event.stopPropagation();
-
 									onRowClick(info.row.original);
 								}}
 								aria-label={`Open ${
@@ -639,6 +616,8 @@ export function DataTable({
 		navigateToCategory,
 		resolveMerchantId,
 		isMerchantNavigationEnabled,
+		navigationSource,
+		source,
 		router,
 		onRowClick,
 		onMerchantChange,
@@ -652,9 +631,7 @@ export function DataTable({
 			if (!transaction.id || seen.has(transaction.id)) {
 				return false;
 			}
-
 			seen.add(transaction.id);
-
 			return true;
 		});
 	}, [transactions]);
@@ -663,14 +640,11 @@ export function DataTable({
 	const table = useReactTable({
 		data: uniqueTransactions,
 		columns,
-
 		getRowId: (transaction) => {
 			return transaction.id;
 		},
-
 		state: {
 			sorting,
-
 			columnVisibility: {
 				...columnVisibility,
 				date: false,
@@ -678,9 +652,7 @@ export function DataTable({
 				amount: columnVisibility.amount !== false,
 			},
 		},
-
 		getCoreRowModel: getCoreRowModel(),
-
 		getSortedRowModel: getSortedRowModel(),
 	});
 
@@ -696,13 +668,8 @@ export function DataTable({
 			}
 		>();
 
-		/*
-		 * First pass:
-		 * Calculate the total for each date without changing row order.
-		 */
 		for (const row of rows) {
 			const dateInfo = getDateInfo(row.original.date);
-
 			const amount = Number(row.original.amount);
 
 			rowDateInfo.set(row.id, {
@@ -718,21 +685,9 @@ export function DataTable({
 		}
 
 		const result: FlatItem[] = [];
-
 		let previousDateKey: string | null = null;
 		let headerSequence = 0;
 
-		/*
-		 * Second pass:
-		 * Keep the exact TanStack-sorted order.
-		 *
-		 * When sorting by amount, `rows` is already globally sorted:
-		 * $999
-		 * $123
-		 * $10
-		 *
-		 * We only insert date headers without regrouping the rows.
-		 */
 		for (const row of rows) {
 			const dateInfo = rowDateInfo.get(row.id);
 
@@ -764,14 +719,12 @@ export function DataTable({
 
 	const stickyHeaderIndexByItemIndex = useMemo(() => {
 		const indices = new Array<number>(flatRows.length);
-
 		let latestHeaderIndex = -1;
 
 		for (let index = 0; index < flatRows.length; index++) {
 			if (flatRows[index].type === "header") {
 				latestHeaderIndex = index;
 			}
-
 			indices[index] = latestHeaderIndex;
 		}
 
@@ -780,31 +733,25 @@ export function DataTable({
 
 	const rowVirtualizer = useVirtualizer({
 		count: flatRows.length,
-
 		getScrollElement: () => {
 			return parentRef.current;
 		},
-
 		getItemKey: (index) => {
 			return flatRows[index]?.id ?? index;
 		},
-
 		estimateSize: (index) => {
 			return flatRows[index]?.type === "header"
 				? DATE_HEADER_HEIGHT
 				: TRANSACTION_ROW_HEIGHT;
 		},
-
 		overscan: VIRTUAL_OVERSCAN,
 	});
 
 	const virtualItems = rowVirtualizer.getVirtualItems();
-
 	let activeHeader: ActiveHeader = null;
 
 	if (virtualItems.length > 0) {
 		const scrollTop = parentRef.current?.scrollTop ?? 0;
-
 		let currentTopIndex = virtualItems[0].index;
 
 		for (let index = 0; index < virtualItems.length; index++) {
@@ -812,10 +759,8 @@ export function DataTable({
 
 			if (virtualItem.start <= scrollTop) {
 				currentTopIndex = virtualItem.index;
-
 				continue;
 			}
-
 			break;
 		}
 
@@ -827,7 +772,6 @@ export function DataTable({
 
 			if (stickyItem.type === "header") {
 				let translateY = 0;
-
 				const nextHeader = virtualItems.find((virtualItem) => {
 					return (
 						virtualItem.index > stickyHeaderIndex &&
@@ -880,12 +824,10 @@ export function DataTable({
 								className="absolute w-full px-6 flex items-center justify-between bg-[#F9FAFB] dark:bg-[#232323] text-gray-500 dark:text-gray-400 font-bold text-sm border-b border-gray-200 dark:border-white/5 transition-colors duration-200"
 								style={{
 									height: DATE_HEADER_HEIGHT,
-
 									transform: `translateY(${activeHeader.translateY}px)`,
 								}}
 							>
 								<span role="cell">{activeHeader.item.date}</span>
-
 								<span role="cell">
 									{formatCurrency(activeHeader.item.total)}
 								</span>
@@ -914,19 +856,16 @@ export function DataTable({
 										className="absolute w-full px-6 flex items-center justify-between bg-[#F9FAFB] dark:bg-[#232323] text-gray-500 dark:text-gray-400 font-bold text-sm border-b border-gray-200 dark:border-white/5 transition-colors duration-200"
 										style={{
 											height: DATE_HEADER_HEIGHT,
-
 											transform: `translateY(${virtualRow.start}px)`,
 										}}
 									>
 										<span role="cell">{item.date}</span>
-
 										<span role="cell">{formatCurrency(item.total)}</span>
 									</div>
 								);
 							}
 
 							const row = item.row;
-
 							const isSelected = selectedIdSet.has(row.original.id);
 
 							return (
@@ -940,7 +879,6 @@ export function DataTable({
 									}`}
 									style={{
 										height: TRANSACTION_ROW_HEIGHT,
-
 										transform: `translateY(${virtualRow.start}px)`,
 									}}
 								>
@@ -953,7 +891,6 @@ export function DataTable({
 												role="cell"
 												style={{
 													width: isAmount ? "auto" : cell.column.getSize(),
-
 													flex: isAmount ? 1 : "none",
 												}}
 												className={`min-w-0 truncate ${
@@ -962,7 +899,6 @@ export function DataTable({
 											>
 												{flexRender(
 													cell.column.columnDef.cell,
-
 													cell.getContext(),
 												)}
 											</div>

@@ -1,6 +1,7 @@
 "use client";
 
 import {
+	useCallback,
 	useEffect,
 	useMemo,
 	useState,
@@ -57,6 +58,7 @@ import { useMerchantOptions } from "@/hooks/useMerchantOptions";
 import { type Transaction, useBudgetStore } from "@/store/useBudgetStore";
 import { deleteCustomMerchantRecord } from "@/lib/merchants/merchantRepository";
 import { useRecurringStore } from "@/store/useRecurringStore";
+import { appendNavigationSource } from "@/lib/navigation/breadcrumb";
 
 function subscribeToClient(): () => void {
 	return () => {};
@@ -94,32 +96,60 @@ export default function RecurringPageClient() {
 	const searchParams = useSearchParams();
 	const searchParamsString = searchParams.toString();
 	const tab: "monthly" | "all" = pathname.endsWith("/all") ? "all" : "monthly";
-	const transactions = useBudgetStore((state) => state.transactions);
-	const merchants = useBudgetStore((state) => state.merchants);
-	const accounts = useBudgetStore((state) => state.accounts);
-	const customCategories = useBudgetStore((state) => state.customCategories);
-	const fetchTransactions = useBudgetStore((state) => state.fetchTransactions);
-	const fetchAccounts = useBudgetStore((state) => state.fetchAccounts);
-	const fetchMerchants = useBudgetStore((state) => state.fetchMerchants);
-	const fetchCustomCategories = useBudgetStore(
-		(state) => state.fetchCustomCategories,
-	);
-	const updateTransaction = useBudgetStore((state) => state.updateTransaction);
-	const confirmRecurring = useBudgetStore((state) => state.confirmRecurring);
-	const records = useRecurringStore((state) => state.records);
-	const dismissedCandidateKeys = useRecurringStore(
-		(state) => state.dismissedCandidateKeys,
-	);
-	const suppressedSourceKeys = useRecurringStore(
-		(state) => state.suppressedSourceKeys,
-	);
-	const recurringHydrated = useRecurringStore((state) => state.hasHydrated);
-	const fetchRecurringData = useRecurringStore(
-		(state) => state.fetchRecurringData,
-	);
-	const upsertRecord = useRecurringStore((state) => state.upsertRecord);
-	const removeRecord = useRecurringStore((state) => state.removeRecord);
-	const dismissCandidate = useRecurringStore((state) => state.dismissCandidate);
+	const transactions = useBudgetStore((state) => {
+		return state.transactions;
+	});
+	const merchants = useBudgetStore((state) => {
+		return state.merchants;
+	});
+	const accounts = useBudgetStore((state) => {
+		return state.accounts;
+	});
+	const customCategories = useBudgetStore((state) => {
+		return state.customCategories;
+	});
+	const fetchTransactions = useBudgetStore((state) => {
+		return state.fetchTransactions;
+	});
+	const fetchAccounts = useBudgetStore((state) => {
+		return state.fetchAccounts;
+	});
+	const fetchMerchants = useBudgetStore((state) => {
+		return state.fetchMerchants;
+	});
+	const fetchCustomCategories = useBudgetStore((state) => {
+		return state.fetchCustomCategories;
+	});
+	const updateTransaction = useBudgetStore((state) => {
+		return state.updateTransaction;
+	});
+	const confirmRecurring = useBudgetStore((state) => {
+		return state.confirmRecurring;
+	});
+	const records = useRecurringStore((state) => {
+		return state.records;
+	});
+	const dismissedCandidateKeys = useRecurringStore((state) => {
+		return state.dismissedCandidateKeys;
+	});
+	const suppressedSourceKeys = useRecurringStore((state) => {
+		return state.suppressedSourceKeys;
+	});
+	const recurringHydrated = useRecurringStore((state) => {
+		return state.hasHydrated;
+	});
+	const fetchRecurringData = useRecurringStore((state) => {
+		return state.fetchRecurringData;
+	});
+	const upsertRecord = useRecurringStore((state) => {
+		return state.upsertRecord;
+	});
+	const removeRecord = useRecurringStore((state) => {
+		return state.removeRecord;
+	});
+	const dismissCandidate = useRecurringStore((state) => {
+		return state.dismissCandidate;
+	});
 	const merchantItems = useMerchantOptions();
 	const { predictedBills } = useBudgetData("all");
 
@@ -183,7 +213,9 @@ export default function RecurringPageClient() {
 			fetchCustomCategories(),
 			fetchRecurringData(),
 		])
-			.catch((error) => console.error("Failed to load recurring data:", error))
+			.catch((error) => {
+				console.error("Failed to load recurring data:", error);
+			})
 			.finally(() => {
 				if (active) setIsInitialDataLoading(false);
 			});
@@ -198,13 +230,6 @@ export default function RecurringPageClient() {
 		fetchTransactions,
 	]);
 
-	/*
-	 * Confirmed recurring data has one source of truth:
-	 * the records loaded from public.recurring_data.
-	 *
-	 * Automatic predictions belong only in the review queue and
-	 * are never rendered as active recurring records until saved.
-	 */
 	const allRecords = records;
 
 	const filteredRecords = useMemo(() => {
@@ -232,10 +257,6 @@ export default function RecurringPageClient() {
 	const reviewCandidates = useMemo(() => {
 		const candidateByKey = new Map<string, RecurringCandidate>();
 
-		/*
-		 * Transaction inference supplies normal recurring
-		 * suggestions.
-		 */
 		for (const candidate of buildRecurringCandidates(
 			transactions,
 			merchantItems,
@@ -291,8 +312,12 @@ export default function RecurringPageClient() {
 		const options: TransactionFilterOption[] = [];
 		const roots = new Map(
 			customCategories
-				.filter((category) => !category.parent_name)
-				.map((category) => [normalize(category.name), category]),
+				.filter((category) => {
+					return !category.parent_name;
+				})
+				.map((category) => {
+					return [normalize(category.name), category];
+				}),
 		);
 		for (const [parentName] of Object.entries(CATEGORY_HIERARCHY)) {
 			const root = roots.get(normalize(parentName));
@@ -303,9 +328,9 @@ export default function RecurringPageClient() {
 				iconName: root?.icon_name ?? parentName,
 				colorKey: root?.color_key ?? parentName,
 			});
-			for (const category of customCategories.filter(
-				(item) => normalize(item.parent_name) === normalize(parentName),
-			))
+			for (const category of customCategories.filter((item) => {
+				return normalize(item.parent_name) === normalize(parentName);
+			})) {
 				options.push({
 					value: category.id,
 					label: category.name,
@@ -313,13 +338,17 @@ export default function RecurringPageClient() {
 					iconName: category.icon_name ?? category.name,
 					colorKey: category.color_key ?? parentName,
 				});
+			}
 		}
 		for (const category of customCategories) {
 			if (
 				!category.parent_name ||
-				options.some((option) => option.value === category.id)
-			)
+				options.some((option) => {
+					return option.value === category.id;
+				})
+			) {
 				continue;
+			}
 			options.push({
 				value: category.id,
 				label: category.name,
@@ -330,25 +359,26 @@ export default function RecurringPageClient() {
 		}
 		return options;
 	}, [customCategories]);
-	const accountOptions = useMemo<TransactionFilterOption[]>(
-		() =>
-			accounts.map((account) => ({
+
+	const accountOptions = useMemo<TransactionFilterOption[]>(() => {
+		return accounts.map((account) => {
+			return {
 				value: account.id,
 				label: account.name,
 				group: "Assets::Cash",
-			})),
-		[accounts],
-	);
-	const filterData = useMemo<TransactionFilterData>(
-		() => ({
+			};
+		});
+	}, [accounts]);
+
+	const filterData = useMemo<TransactionFilterData>(() => {
+		return {
 			categories: categoryOptions,
 			merchants: [],
 			accounts: accountOptions,
 			tags: [],
 			goals: [],
-		}),
-		[accountOptions, categoryOptions],
-	);
+		};
+	}, [accountOptions, categoryOptions]);
 
 	const transactionMatchesMerchant = (
 		transaction: Transaction,
@@ -482,12 +512,13 @@ export default function RecurringPageClient() {
 				console.error("Failed to remove recurring record:", error);
 			});
 	};
+
 	const openEditorForRecord = (record: RecurringRecord): void => {
-		const merchant = merchantItems.find((item) =>
-			record.merchantId
+		const merchant = merchantItems.find((item) => {
+			return record.merchantId
 				? item.id === record.merchantId
-				: normalize(item.name) === normalize(record.merchantName),
-		);
+				: normalize(item.name) === normalize(record.merchantName);
+		});
 		const candidate = candidateFromMerchant(
 			merchant ?? {
 				id: record.merchantId ?? record.id,
@@ -507,6 +538,7 @@ export default function RecurringPageClient() {
 			returnTo: "page",
 		});
 	};
+
 	const selectMerchant = (
 		merchant: MerchantListItem,
 		defaultType: RecurringType,
@@ -519,7 +551,9 @@ export default function RecurringPageClient() {
 			customCategories,
 		);
 		const existingRecord =
-			allRecords.find((record) => record.sourceKey === candidate.key) ?? null;
+			allRecords.find((record) => {
+				return record.sourceKey === candidate.key;
+			}) ?? null;
 		replaceActiveDialog({
 			type: "editor",
 			candidate,
@@ -528,8 +562,20 @@ export default function RecurringPageClient() {
 		});
 	};
 
-	if (!isClient || !recurringHydrated || isInitialDataLoading)
+	const openTransaction = useCallback(
+		(transactionId: string): void => {
+			const basePath = `/transactions/${encodeURIComponent(transactionId)}`;
+			const pathWithContext = appendNavigationSource(basePath, "recurring");
+
+			router.push(pathWithContext);
+		},
+		[router],
+	);
+
+	if (!isClient || !recurringHydrated || isInitialDataLoading) {
 		return <RecurringPageSkeleton />;
+	}
+
 	return (
 		<div className="min-h-screen bg-gray-50 p-3 text-gray-900 md:p-4 dark:bg-[#171716] dark:text-white">
 			<header className="flex min-h-16 flex-wrap items-center gap-8 pb-5">
@@ -618,19 +664,18 @@ export default function RecurringPageClient() {
 					month={month}
 					occurrences={occurrences}
 					view={view}
-					onMonthChange={(offset) =>
-						setMonth(
-							(current) =>
-								new Date(
-									Date.UTC(
-										current.getUTCFullYear(),
-										current.getUTCMonth() + offset,
-										1,
-										12,
-									),
+					onMonthChange={(offset) => {
+						setMonth((current) => {
+							return new Date(
+								Date.UTC(
+									current.getUTCFullYear(),
+									current.getUTCMonth() + offset,
+									1,
+									12,
 								),
-						)
-					}
+							);
+						});
+					}}
 					onToday={() => {
 						const now = new Date();
 						setMonth(
@@ -638,9 +683,9 @@ export default function RecurringPageClient() {
 						);
 					}}
 					onViewChange={setView}
-					onAdd={(type) =>
-						setActiveDialog({ type: "search", defaultType: type })
-					}
+					onAdd={(type) => {
+						setActiveDialog({ type: "search", defaultType: type });
+					}}
 				/>
 			)}
 
@@ -659,8 +704,9 @@ export default function RecurringPageClient() {
 				}}
 				onEdit={openEditorForRecord}
 				onMarkNotRecurring={markNotRecurring}
+				onOpenTransaction={openTransaction}
+				navigationSource="recurring"
 			/>
-
 			{activeDialog?.type === "review" && (
 				<RecurringReviewDialog
 					open

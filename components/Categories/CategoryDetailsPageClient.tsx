@@ -53,6 +53,7 @@ import {
 	type CategoryEditorGroupOption,
 	type CategoryEditorSaveValue,
 	type CategoryEditorValue,
+	type CategoryBudgetType,
 } from "@/components/Categories/CategoryEditorModal";
 import { CategoryGlyph } from "@/components/Categories/CategoryGlyph";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
@@ -63,6 +64,10 @@ import { useUnifiedCategories } from "@/hooks/useUnifiedCategories";
 import { useUnifiedMerchants } from "@/hooks/useUnifiedMerchants";
 import { type Transaction, useBudgetStore } from "@/store/useBudgetStore";
 import { compactCurrency, formatMoney } from "@/utils/formatters";
+import {
+	getBreadcrumb,
+	type NavigationSource,
+} from "@/lib/navigation/breadcrumb";
 
 const DEFAULT_SORTING: SortingState = [{ id: "date", desc: true }];
 const HIDDEN_MODES = ["visible", "hidden", "all"] as const;
@@ -215,6 +220,8 @@ export default function CategoryDetailsPageClient() {
 	const searchParams = useSearchParams();
 	const searchParamsString = searchParams.toString();
 	const categoryId = decodeURIComponent(params.id ?? "");
+	const fromParam = searchParams.get("from");
+	const breadcrumb = getBreadcrumb(fromParam);
 
 	const transactions = useBudgetStore((state) => state.transactions);
 	const accounts = useBudgetStore((state) => state.accounts);
@@ -403,6 +410,13 @@ export default function CategoryDetailsPageClient() {
 			return null;
 		}
 
+		const preference = categoryPreferences[category.id] as
+			| ((typeof categoryPreferences)[string] & {
+					budgetType?: CategoryBudgetType;
+					monthlyRollover?: boolean;
+			  })
+			| undefined;
+
 		return {
 			id: category.id,
 			name: category.name,
@@ -411,9 +425,10 @@ export default function CategoryDetailsPageClient() {
 				String(category.icon ?? category.name),
 			parentName: effectiveParentName,
 			isSystem: categoryRecord?.is_system ?? !category.isCustom,
-			excludedFromBudget:
-				categoryPreferences[category.id]?.excludedFromBudget === true,
-			hidden: categoryPreferences[category.id]?.hidden === true,
+			excludedFromBudget: preference?.excludedFromBudget === true,
+			budgetType: preference?.budgetType ?? "flexible",
+			monthlyRollover: preference?.monthlyRollover === true,
+			hidden: preference?.hidden === true,
 		};
 	}, [category, categoryPreferences, categoryRecord, effectiveParentName]);
 
@@ -611,6 +626,11 @@ export default function CategoryDetailsPageClient() {
 					...(current[category.id as string] ?? {}),
 					parentName: value.parentName.trim(),
 					excludedFromBudget: value.excludedFromBudget,
+					budgetType: value.budgetType,
+					monthlyRollover: value.monthlyRollover,
+				} as (typeof current)[string] & {
+					budgetType: CategoryBudgetType;
+					monthlyRollover: boolean;
 				},
 			};
 		});
@@ -691,10 +711,10 @@ export default function CategoryDetailsPageClient() {
 						No category exists with ID {categoryId}.
 					</p>
 					<Link
-						href="/transactions"
+						href={breadcrumb.href}
 						className="mt-5 inline-flex rounded-xl bg-[#FF6633] px-4 py-2.5 font-semibold text-white"
 					>
-						Back to Transactions
+						{`Back to ${breadcrumb.label}`}
 					</Link>
 				</div>
 			</div>
@@ -706,10 +726,10 @@ export default function CategoryDetailsPageClient() {
 			<header className="flex flex-wrap items-center gap-4">
 				<nav className="flex min-w-0 items-center gap-2 text-lg font-semibold">
 					<Link
-						href="/transactions"
+						href={breadcrumb.href}
 						className="text-gray-500 transition-colors hover:text-gray-900 dark:text-gray-400 dark:hover:text-white"
 					>
-						Transactions
+						{breadcrumb.label}
 					</Link>
 					<ChevronRight size={18} className="shrink-0 text-gray-400" />
 					<span className="flex min-w-0 items-center gap-2">
@@ -816,6 +836,7 @@ export default function CategoryDetailsPageClient() {
 									category: newCategory,
 								});
 							}}
+							navigationSource={(fromParam as NavigationSource) ?? undefined}
 						/>
 					</div>
 				</section>

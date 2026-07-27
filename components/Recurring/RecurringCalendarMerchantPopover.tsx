@@ -19,12 +19,14 @@ import {
 } from "@/components/Recurring/recurringUtils";
 import type { Transaction } from "@/store/useBudgetStore";
 import { formatSignedCurrency } from "@/utils/formatters";
+import type { NavigationSource } from "@/lib/navigation/breadcrumb";
 
 interface RecurringCalendarMerchantPopoverProps {
 	occurrence: RecurringOccurrence;
 	transactions: Transaction[];
 	onEdit: (record: RecurringRecord) => void;
 	onMarkNotRecurring: (record: RecurringRecord) => void;
+	navigationSource?: NavigationSource;
 }
 
 function absoluteAmount(value: number | null | undefined): number {

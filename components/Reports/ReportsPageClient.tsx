@@ -7,11 +7,7 @@ import {
 	type MouseEvent as ReactMouseEvent,
 } from "react";
 import { X } from "lucide-react";
-import {
-	usePathname,
-	useRouter,
-	useSearchParams,
-} from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { SortingState, VisibilityState } from "@tanstack/react-table";
 
 import { CATEGORY_HIERARCHY, findParentCategory } from "@/constants";
@@ -78,11 +74,7 @@ function getAccountHierarchyGroup(
 	account: ReportAccountLike | undefined,
 	accountName: string,
 ): string {
-	const searchable = [
-		accountName,
-		account?.type,
-		account?.account_type,
-	]
+	const searchable = [accountName, account?.type, account?.account_type]
 		.filter(Boolean)
 		.join(" ")
 		.toLowerCase();
@@ -143,10 +135,7 @@ function getAccountHierarchyGroup(
 		return "Assets::Valuables";
 	}
 
-	const balance =
-		account?.current_balance ??
-		account?.balance ??
-		0;
+	const balance = account?.current_balance ?? account?.balance ?? 0;
 
 	if (balance < 0) {
 		return "Liabilities::Other Liabilities";
@@ -155,11 +144,17 @@ function getAccountHierarchyGroup(
 	return "Assets::Cash";
 }
 
-function ReportsTransactionSummary({ transactions }: { transactions: ReturnType<typeof useBudgetStore.getState>["transactions"] }) {
+function ReportsTransactionSummary({
+	transactions,
+}: {
+	transactions: ReturnType<typeof useBudgetStore.getState>["transactions"];
+}) {
 	const summary = getReportSummary(transactions);
 	return (
 		<aside className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-white/5 dark:bg-[#1b1b1b]">
-			<h3 className="border-b border-gray-200 px-5 py-4 text-lg font-bold dark:border-white/5">Summary</h3>
+			<h3 className="border-b border-gray-200 px-5 py-4 text-lg font-bold dark:border-white/5">
+				Summary
+			</h3>
 			<dl className="space-y-4 px-5 py-5 text-sm">
 				{[
 					["Total transactions", String(transactions.length)],
@@ -172,11 +167,15 @@ function ReportsTransactionSummary({ transactions }: { transactions: ReturnType<
 				].map(([label, value]) => (
 					<div key={label} className="flex items-center justify-between gap-6">
 						<dt className="text-gray-500 dark:text-zinc-400">{label}</dt>
-						<dd className="font-semibold text-gray-900 dark:text-white">{value}</dd>
+						<dd className="font-semibold text-gray-900 dark:text-white">
+							{value}
+						</dd>
 					</div>
 				))}
 			</dl>
-			<button className="w-full border-t border-gray-200 py-4 text-sm font-semibold text-cyan-600 dark:border-white/5 dark:text-cyan-400">Download CSV</button>
+			<button className="w-full border-t border-gray-200 py-4 text-sm font-semibold text-cyan-600 dark:border-white/5 dark:text-cyan-400">
+				Download CSV
+			</button>
 		</aside>
 	);
 }
@@ -185,13 +184,14 @@ export default function ReportsPageClient() {
 	const router = useRouter();
 	const pathname = usePathname();
 	const searchParams = useSearchParams();
-	const transactionsSectionRef =
-		useRef<HTMLElement | null>(null);
+	const transactionsSectionRef = useRef<HTMLElement | null>(null);
 	const transactions = useBudgetStore((state) => state.transactions);
 	const accounts = useBudgetStore((state) => state.accounts);
 	const customCategories = useBudgetStore((state) => state.customCategories);
 	const customTags = useBudgetStore((state) => state.customTags);
-	const confirmedRecurringMerchants = useBudgetStore((state) => state.confirmedRecurringMerchants);
+	const confirmedRecurringMerchants = useBudgetStore(
+		(state) => state.confirmedRecurringMerchants,
+	);
 	const merchantItems = useMerchantOptions();
 	const {
 		savedReports,
@@ -212,40 +212,26 @@ export default function ReportsPageClient() {
 		});
 	});
 
-	const [tab, setTab] =
-		useState<ReportTab>(
-			initialUrlState.tab,
-		);
-	const [view, setView] =
-		useState<ReportView>(
-			initialUrlState.view,
-		);
-	const [grouping, setGrouping] =
-		useState<ReportGrouping>(
-			initialUrlState.grouping,
-		);
-	const [interval, setInterval] =
-		useState<ReportInterval>(
-			initialUrlState.interval,
-		);
-	const [
-		breakdownChart,
-		setBreakdownChart,
-	] = useState<BreakdownChartType>(
+	const [tab, setTab] = useState<ReportTab>(initialUrlState.tab);
+	const [view, setView] = useState<ReportView>(initialUrlState.view);
+	const [grouping, setGrouping] = useState<ReportGrouping>(
+		initialUrlState.grouping,
+	);
+	const [interval, setInterval] = useState<ReportInterval>(
+		initialUrlState.interval,
+	);
+	const [breakdownChart, setBreakdownChart] = useState<BreakdownChartType>(
 		initialUrlState.breakdownChart,
 	);
-	const [trendChart, setTrendChart] =
-		useState<TrendChartType>(
-			initialUrlState.trendChart,
-		);
-	const [dateRange, setDateRange] =
-		useState<ReportDateRange>(
-			initialUrlState.dateRange,
-		);
-	const [filters, setFilters] =
-		useState<TransactionFilters>(
-			initialUrlState.filters,
-		);
+	const [trendChart, setTrendChart] = useState<TrendChartType>(
+		initialUrlState.trendChart,
+	);
+	const [dateRange, setDateRange] = useState<ReportDateRange>(
+		initialUrlState.dateRange,
+	);
+	const [filters, setFilters] = useState<TransactionFilters>(
+		initialUrlState.filters,
+	);
 	const [sorting, setSorting] = useState<SortingState>(DEFAULT_SORTING);
 	const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
 	const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -258,9 +244,7 @@ export default function ReportsPageClient() {
 		const categoryOptions: TransactionFilterOption[] = [];
 		const seenCategories = new Set<string>();
 
-		for (const [parent, children] of Object.entries(
-			CATEGORY_HIERARCHY,
-		)) {
+		for (const [parent, children] of Object.entries(CATEGORY_HIERARCHY)) {
 			categoryOptions.push({
 				value: `__parent__:${parent}`,
 				label: parent,
@@ -280,34 +264,23 @@ export default function ReportsPageClient() {
 		for (const category of customCategories) {
 			const name = category.name.trim();
 
-			if (
-				!name ||
-				seenCategories.has(normalize(name))
-			) {
+			if (!name || seenCategories.has(normalize(name))) {
 				continue;
 			}
 
 			categoryOptions.push({
 				value: name,
 				label: name,
-				group:
-					category.parent_name?.trim() ||
-					findParentCategory(name),
+				group: category.parent_name?.trim() || findParentCategory(name),
 			});
 		}
 
-		const accountByName = new Map<
-			string,
-			ReportAccountLike
-		>();
-		const accountDisplayNameByKey =
-			new Map<string, string>();
-		const accountCountByKey =
-			new Map<string, number>();
+		const accountByName = new Map<string, ReportAccountLike>();
+		const accountDisplayNameByKey = new Map<string, string>();
+		const accountCountByKey = new Map<string, number>();
 
 		for (const account of accounts) {
-			const accountRecord =
-				account as ReportAccountLike;
+			const accountRecord = account as ReportAccountLike;
 			const name = accountRecord.name?.trim();
 
 			if (!name) {
@@ -323,21 +296,16 @@ export default function ReportsPageClient() {
 		const tagNames = new Set<string>(customTags);
 
 		for (const transaction of transactions) {
-			const accountName =
-				transaction.account?.trim();
+			const accountName = transaction.account?.trim();
 
 			if (accountName) {
 				const key = normalize(accountName);
 
 				accountDisplayNameByKey.set(
 					key,
-					accountDisplayNameByKey.get(key) ??
-						accountName,
+					accountDisplayNameByKey.get(key) ?? accountName,
 				);
-				accountCountByKey.set(
-					key,
-					(accountCountByKey.get(key) ?? 0) + 1,
-				);
+				accountCountByKey.set(key, (accountCountByKey.get(key) ?? 0) + 1);
 			}
 
 			for (const tag of transaction.tags ?? []) {
@@ -347,40 +315,32 @@ export default function ReportsPageClient() {
 			}
 		}
 
-		const accountOptions = [
-			...accountDisplayNameByKey.entries(),
-		]
+		const accountOptions = [...accountDisplayNameByKey.entries()]
 			.map(([key, name]) => {
 				const account = accountByName.get(key);
 
 				return {
 					value: name,
 					label: name,
-					group: getAccountHierarchyGroup(
-						account,
-						name,
-					),
+					group: getAccountHierarchyGroup(account, name),
 					count: accountCountByKey.get(key) ?? 0,
 				};
 			})
 			.sort((first, second) => {
 				return (
-					String(first.group).localeCompare(
-						String(second.group),
-					) ||
+					String(first.group).localeCompare(String(second.group)) ||
 					first.label.localeCompare(second.label)
 				);
 			});
 
-		const merchantOptions =
-			merchantItems.map((merchant) => {
-				return {
-					value: merchant.name,
-					label: merchant.name,
-					count: merchant.transactionCount,
-					merchant,
-				};
-			});
+		const merchantOptions = merchantItems.map((merchant) => {
+			return {
+				value: merchant.name,
+				label: merchant.name,
+				count: merchant.transactionCount,
+				merchant,
+			};
+		});
 
 		return {
 			categories: categoryOptions,
@@ -398,29 +358,18 @@ export default function ReportsPageClient() {
 				}),
 			goals: [],
 		};
-	}, [
-		accounts,
-		customCategories,
-		customTags,
-		merchantItems,
-		transactions,
-	]);
+	}, [accounts, customCategories, customTags, merchantItems, transactions]);
 
 	const recurringMerchantSet = useMemo(() => {
 		return new Set(
-			confirmedRecurringMerchants.map(
-				(merchant) => normalize(merchant),
-			),
+			confirmedRecurringMerchants.map((merchant) => normalize(merchant)),
 		);
 	}, [confirmedRecurringMerchants]);
 
 	const merchantNameById = useMemo(() => {
 		return new Map(
 			merchantItems.map((merchant) => {
-				return [
-					merchant.id,
-					merchant.name,
-				] as const;
+				return [merchant.id, merchant.name] as const;
 			}),
 		);
 	}, [merchantItems]);
@@ -428,10 +377,7 @@ export default function ReportsPageClient() {
 	const merchantIdByName = useMemo(() => {
 		return new Map(
 			merchantItems.map((merchant) => {
-				return [
-					normalize(merchant.name),
-					merchant.id,
-				] as const;
+				return [normalize(merchant.name), merchant.id] as const;
 			}),
 		);
 	}, [merchantItems]);
@@ -439,16 +385,9 @@ export default function ReportsPageClient() {
 	const effectiveFilters = useMemo<TransactionFilters>(() => {
 		return {
 			...filters,
-			merchantNames:
-				filters.merchantNames.map(
-					(value) => {
-						return (
-							merchantNameById.get(
-								value,
-							) ?? value
-						);
-					},
-				),
+			merchantNames: filters.merchantNames.map((value) => {
+				return merchantNameById.get(value) ?? value;
+			}),
 		};
 	}, [filters, merchantNameById]);
 
@@ -474,38 +413,46 @@ export default function ReportsPageClient() {
 	const tableTransactions = useMemo(() => {
 		if (!chartSelection) return filteredTransactions;
 		const selectedIdSet = new Set(chartSelection.transactionIds);
-		return filteredTransactions.filter((transaction) => selectedIdSet.has(transaction.id));
+		return filteredTransactions.filter((transaction) =>
+			selectedIdSet.has(transaction.id),
+		);
 	}, [chartSelection, filteredTransactions]);
 
-	const summary = useMemo(() => getReportSummary(filteredTransactions), [filteredTransactions]);
-	const incomeRows = useMemo(() => buildCategoryRows(filteredTransactions, grouping, "income"), [filteredTransactions, grouping]);
-	const expenseRows = useMemo(() => buildCategoryRows(filteredTransactions, grouping, "expense"), [filteredTransactions, grouping]);
+	const summary = useMemo(
+		() => getReportSummary(filteredTransactions),
+		[filteredTransactions],
+	);
+	const incomeRows = useMemo(
+		() => buildCategoryRows(filteredTransactions, grouping, "income"),
+		[filteredTransactions, grouping],
+	);
+	const expenseRows = useMemo(
+		() => buildCategoryRows(filteredTransactions, grouping, "expense"),
+		[filteredTransactions, grouping],
+	);
 	const activeRows = tab === "income" ? incomeRows : expenseRows;
-	const monthlyRows = useMemo(() => buildMonthlyRows(filteredTransactions, grouping, interval), [filteredTransactions, grouping, interval]);
+	const monthlyRows = useMemo(
+		() => buildMonthlyRows(filteredTransactions, grouping, interval),
+		[filteredTransactions, grouping, interval],
+	);
 	const chartCategories = tab === "income" ? incomeRows : expenseRows;
-	const reportTitle = formatDateRangeLabel(dateRange.startDate, dateRange.endDate);
+	const reportTitle = formatDateRangeLabel(
+		dateRange.startDate,
+		dateRange.endDate,
+	);
 
-	const handleChartSelection = (
-		selection: ChartTransactionSelection,
-	): void => {
-		const isClearingSelection =
-			chartSelection?.key ===
-			selection.key;
+	const handleChartSelection = (selection: ChartTransactionSelection): void => {
+		const isClearingSelection = chartSelection?.key === selection.key;
 
 		setSelectedIds([]);
-		setChartSelection(
-			isClearingSelection
-				? null
-				: selection,
-		);
+		setChartSelection(isClearingSelection ? null : selection);
 
 		if (!isClearingSelection) {
 			window.requestAnimationFrame(() => {
-				transactionsSectionRef.current
-					?.scrollIntoView({
-						behavior: "smooth",
-						block: "start",
-					});
+				transactionsSectionRef.current?.scrollIntoView({
+					behavior: "smooth",
+					block: "start",
+				});
 			});
 		}
 	};
@@ -517,37 +464,37 @@ export default function ReportsPageClient() {
 
 	const handleSelectRow = (id: string, event: ReactMouseEvent) => {
 		event.stopPropagation();
-		setSelectedIds((current) => current.includes(id) ? current.filter((value) => value !== id) : [...current, id]);
+		setSelectedIds((current) =>
+			current.includes(id)
+				? current.filter((value) => value !== id)
+				: [...current, id],
+		);
 	};
 
-	const currentReportConfiguration =
-		useMemo<SavedReportConfiguration>(() => {
-			return {
-				tab,
-				dateRange,
-				filters: effectiveFilters,
-				view,
-				grouping,
-				interval,
-				breakdownChart,
-				trendChart,
-				includeChartSettings: true,
-			};
-		}, [
-			breakdownChart,
+	const currentReportConfiguration = useMemo<SavedReportConfiguration>(() => {
+		return {
+			tab,
 			dateRange,
-			effectiveFilters,
+			filters: effectiveFilters,
+			view,
 			grouping,
 			interval,
-			tab,
+			breakdownChart,
 			trendChart,
-			view,
-		]);
+			includeChartSettings: true,
+		};
+	}, [
+		breakdownChart,
+		dateRange,
+		effectiveFilters,
+		grouping,
+		interval,
+		tab,
+		trendChart,
+		view,
+	]);
 
-	const replaceReportUrl = (
-		configuration:
-			SavedReportConfiguration,
-	): void => {
+	const replaceReportUrl = (configuration: SavedReportConfiguration): void => {
 		router.replace(
 			buildReportUrl({
 				configuration,
@@ -561,15 +508,12 @@ export default function ReportsPageClient() {
 
 	const clearAllReportFilters = (): void => {
 		setDateRange(EMPTY_DATE_RANGE);
-		setFilters(
-			EMPTY_TRANSACTION_FILTERS,
-		);
+		setFilters(EMPTY_TRANSACTION_FILTERS);
 		clearChartSelection();
 		replaceReportUrl({
 			...currentReportConfiguration,
 			dateRange: EMPTY_DATE_RANGE,
-			filters:
-				EMPTY_TRANSACTION_FILTERS,
+			filters: EMPTY_TRANSACTION_FILTERS,
 		});
 	};
 
@@ -589,8 +533,7 @@ export default function ReportsPageClient() {
 	const handleEditSavedReport = async (
 		reportId: string,
 		name: string,
-		configuration:
-			SavedReportConfiguration,
+		configuration: SavedReportConfiguration,
 	): Promise<void> => {
 		await editReport({
 			reportId,
@@ -599,15 +542,11 @@ export default function ReportsPageClient() {
 		});
 	};
 
-	const handleDeleteSavedReport = async (
-		reportId: string,
-	): Promise<void> => {
+	const handleDeleteSavedReport = async (reportId: string): Promise<void> => {
 		await deleteReport(reportId);
 	};
 
-	const handleLoadSavedReport = (
-		report: SavedReport,
-	): void => {
+	const handleLoadSavedReport = (report: SavedReport): void => {
 		setTab(report.tab);
 		setDateRange(report.dateRange);
 		setFilters(report.filters);
@@ -629,10 +568,7 @@ export default function ReportsPageClient() {
 			<ReportHeader
 				tab={tab}
 				onTabChange={(nextTab) => {
-					const nextView =
-						nextTab === "cash-flow"
-							? "breakdown"
-							: view;
+					const nextView = nextTab === "cash-flow" ? "breakdown" : view;
 
 					setTab(nextTab);
 					setView(nextView);
@@ -664,33 +600,23 @@ export default function ReportsPageClient() {
 				}}
 				onClearAll={clearAllReportFilters}
 				savedReports={savedReports}
-				currentConfiguration={
-					currentReportConfiguration
-				}
+				currentConfiguration={currentReportConfiguration}
 				onSaveReport={handleSaveReport}
-				onEditSavedReport={
-					handleEditSavedReport
-				}
-				onDeleteSavedReport={
-					handleDeleteSavedReport
-				}
-				onLoadSavedReport={
-					handleLoadSavedReport
-				}
-				areSavedReportsLoading={
-					areSavedReportsLoading
-				}
+				onEditSavedReport={handleEditSavedReport}
+				onDeleteSavedReport={handleDeleteSavedReport}
+				onLoadSavedReport={handleLoadSavedReport}
+				areSavedReportsLoading={areSavedReportsLoading}
 				isSavingReport={isSavingReport}
-				deletingReportId={
-					deletingReportId
-				}
+				deletingReportId={deletingReportId}
 				savedReportError={savedReportError}
-				onClearSavedReportError={
-					clearSavedReportError
-				}
+				onClearSavedReportError={clearSavedReportError}
 			/>
 
-			{tab === "cash-flow" && <div className="mt-5"><ReportSummaryCards summary={summary} /></div>}
+			{tab === "cash-flow" && (
+				<div className="mt-5">
+					<ReportSummaryCards summary={summary} />
+				</div>
+			)}
 
 			<section className="mt-5 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-white/5 dark:bg-[#1b1b1b]">
 				<h2 className="px-7 pt-6 text-xl font-bold">{reportTitle}</h2>
@@ -711,8 +637,7 @@ export default function ReportsPageClient() {
 						clearChartSelection();
 						replaceReportUrl({
 							...currentReportConfiguration,
-							grouping:
-								nextGrouping,
+							grouping: nextGrouping,
 						});
 					}}
 					interval={interval}
@@ -721,8 +646,7 @@ export default function ReportsPageClient() {
 						clearChartSelection();
 						replaceReportUrl({
 							...currentReportConfiguration,
-							interval:
-								nextInterval,
+							interval: nextInterval,
 						});
 					}}
 					breakdownChart={breakdownChart}
@@ -733,8 +657,7 @@ export default function ReportsPageClient() {
 						replaceReportUrl({
 							...currentReportConfiguration,
 							view: "breakdown",
-							breakdownChart:
-								nextChart,
+							breakdownChart: nextChart,
 						});
 					}}
 					trendChart={trendChart}
@@ -745,8 +668,7 @@ export default function ReportsPageClient() {
 						replaceReportUrl({
 							...currentReportConfiguration,
 							view: "trends",
-							trendChart:
-								nextChart,
+							trendChart: nextChart,
 						});
 					}}
 					showInterval={view === "trends"}
@@ -793,8 +715,12 @@ export default function ReportsPageClient() {
 								onClick={clearChartSelection}
 								className="inline-flex items-center gap-2 rounded-lg bg-gray-100 px-3 py-1.5 text-sm font-medium text-gray-800 transition-colors hover:bg-gray-200 dark:bg-white/5 dark:text-gray-200 dark:hover:bg-white/10"
 							>
-								<span className="max-w-64 truncate">{chartSelection.label}</span>
-								<span className="text-gray-500 dark:text-zinc-400">{tableTransactions.length}</span>
+								<span className="max-w-64 truncate">
+									{chartSelection.label}
+								</span>
+								<span className="text-gray-500 dark:text-zinc-400">
+									{tableTransactions.length}
+								</span>
 								<X size={14} />
 							</button>
 						)}
@@ -804,7 +730,9 @@ export default function ReportsPageClient() {
 						setIsEditMode={setIsEditMode}
 						selectedIds={selectedIds}
 						setSelectedIds={setSelectedIds}
-						visibleTransactionIds={tableTransactions.map((transaction) => transaction.id)}
+						visibleTransactionIds={tableTransactions.map(
+							(transaction) => transaction.id,
+						)}
 						currentView={currentView}
 						setCurrentView={setCurrentView}
 						filteredLength={tableTransactions.length}
@@ -819,12 +747,17 @@ export default function ReportsPageClient() {
 							transactions={tableTransactions}
 							selectedIds={selectedIds}
 							onSelectRow={handleSelectRow}
-							onRowClick={(transaction) => router.push(`/transactions/${encodeURIComponent(transaction.id)}`)}
+							onRowClick={(transaction) =>
+								router.push(
+									`/transactions/${encodeURIComponent(transaction.id)}`,
+								)
+							}
 							columnVisibility={columnVisibility}
 							isEditMode={isEditMode}
 							currentView={currentView}
 							sorting={sorting}
 							merchantItems={merchantItems}
+							navigationSource="reports"
 						/>
 					</div>
 				</section>
