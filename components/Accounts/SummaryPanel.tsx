@@ -1,16 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import {
-	Download,
-	Sparkles,
-} from "lucide-react";
+import { Download, Sparkles } from "lucide-react";
 
-import type {
-	AccountRecord,
-	SummaryMode,
-} from "@/components/Accounts/types";
+import type { AccountRecord, SummaryMode } from "@/components/Accounts/types";
 import { formatSignedCurrency } from "@/utils/formatters";
+import { getColorForGroup } from "@/components/Accounts/utils/account";
 
 export function SummaryPanel({
 	accounts,
@@ -27,33 +22,37 @@ export function SummaryPanel({
 	const liabilityAccounts = accounts.filter((account) => account.isLiability);
 	const [showInsight, setShowInsight] = useState(false);
 
-	const renderRows = (
-		rows: AccountRecord[],
-		total: number,
-		color: string,
-	) => {
+	// Group and sort by total descending, filter out zero amounts
+	const renderRows = (rows: AccountRecord[], total: number) => {
 		const groupTotals = new Map<string, number>();
 
 		for (const account of rows) {
+			const amount = Math.abs(account.balance);
+			if (amount === 0) continue; // skip zero‑balance groups
 			groupTotals.set(
 				account.group,
-				(groupTotals.get(account.group) ?? 0) + Math.abs(account.balance),
+				(groupTotals.get(account.group) ?? 0) + amount,
 			);
 		}
 
-		return [...groupTotals.entries()].map(([label, value]) => (
-			<div key={label} className="flex items-center justify-between text-sm">
-				<span className="flex items-center gap-2">
-					<span className={`size-2 rounded-full ${color}`} />
-					{label}
-				</span>
-				<strong>
-					{mode === "totals"
-						? formatSignedCurrency(value)
-						: `${total > 0 ? Math.round((value / total) * 100) : 0}%`}
-				</strong>
-			</div>
-		));
+		return [...groupTotals.entries()]
+			.sort((a, b) => b[1] - a[1]) // descending by value
+			.map(([label, value]) => (
+				<div key={label} className="flex items-center justify-between text-sm">
+					<span className="flex items-center gap-2">
+						<span
+							className="size-2.5 rounded-full"
+							style={{ backgroundColor: getColorForGroup(label) }}
+						/>
+						{label}
+					</span>
+					<strong>
+						{mode === "totals"
+							? formatSignedCurrency(value)
+							: `${total > 0 ? Math.round((value / total) * 100) : 0}%`}
+					</strong>
+				</div>
+			));
 	};
 
 	const downloadCsv = () => {
@@ -148,7 +147,7 @@ export function SummaryPanel({
 					<div className="h-full w-full rounded-sm bg-emerald-500/80" />
 				</div>
 				<div className="space-y-4">
-					{renderRows(assetAccounts, summary.assets, "bg-emerald-500")}
+					{renderRows(assetAccounts, summary.assets)}
 				</div>
 			</div>
 
@@ -163,7 +162,7 @@ export function SummaryPanel({
 					<div className="h-full w-full rounded-sm bg-red-500" />
 				</div>
 				<div className="space-y-4">
-					{renderRows(liabilityAccounts, summary.liabilities, "bg-red-500")}
+					{renderRows(liabilityAccounts, summary.liabilities)}
 				</div>
 			</div>
 

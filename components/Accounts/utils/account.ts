@@ -128,7 +128,20 @@ export function accountAccent(account: AccountRecord): string {
 	return "bg-zinc-600";
 }
 
-// ✅ NEW HELPERS TO FIX THE GROUP MAPPING
+export function getColorForGroup(group: string): string {
+	const colorMap: Record<string, string> = {
+		Cash: "#10b981",
+		Investments: "#3b82f6",
+		"Real Estate": "#8b5cf6",
+		Vehicles: "#f97316",
+		Valuables: "#6b7280",
+		"Other Assets": "#6b7280",
+		"Credit Cards": "#ef4444",
+		Loans: "#f59e0b",
+	};
+	return colorMap[group] || "#6b7280";
+}
+
 export function getKindFromSubtype(
 	subtype: string | null | undefined,
 ): AccountKind {

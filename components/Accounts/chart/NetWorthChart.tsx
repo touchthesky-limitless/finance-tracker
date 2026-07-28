@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useMemo } from "react"; // ✅ Added useMemo
 import {
 	Area,
 	AreaChart,
@@ -28,7 +28,6 @@ import {
 	PERFORMANCE_TOOLTIP_POINT_GAP,
 	PERFORMANCE_TOOLTIP_WIDTH,
 	type PerformanceTooltipState,
-	type RechartsBreakdownPoint,
 	type RechartsPerformancePoint,
 } from "@/components/Accounts/chart/NetWorthTooltip";
 import type {
@@ -38,6 +37,7 @@ import type {
 	Timeframe,
 } from "@/components/Accounts/types";
 import { compactCurrency, formatSignedCurrency } from "@/utils/formatters";
+import { getColorForGroup } from "@/components/Accounts/utils/account";
 
 interface NetWorthChartProps {
 	chartType: ChartType;
@@ -48,7 +48,16 @@ interface NetWorthChartProps {
 	onChartTypeChange: (value: ChartType) => void;
 	onDateRangeChange: (value: DateRange) => void;
 	onTimeframeChange?: (value: Timeframe) => void;
+	breakdownGroups: {
+		assets: { group: string; amount: number }[];
+		liabilities: { group: string; amount: number }[];
+	};
 }
+
+type BreakdownDataPoint = {
+	label: string;
+	[key: string]: number | string; // label is string, others are numbers
+};
 
 export function NetWorthChart({
 	chartType,
@@ -59,6 +68,7 @@ export function NetWorthChart({
 	onChartTypeChange,
 	onDateRangeChange,
 	onTimeframeChange,
+	breakdownGroups,
 }: NetWorthChartProps) {
 	const [chartMenuOpen, setChartMenuOpen] = useState(false);
 	const [rangeMenuOpen, setRangeMenuOpen] = useState(false);
@@ -78,30 +88,10 @@ export function NetWorthChart({
 		}
 	};
 
-	const hidePerformanceTooltip = (): void => {
-		clearTooltipHideTimeout();
-		tooltipHideTimeoutRef.current = setTimeout(() => {
-			if (!isPerformanceTooltipHoveredRef.current) {
-				setPerformanceTooltip(null);
-			}
-			tooltipHideTimeoutRef.current = null;
-		}, 220);
-	};
-
 	const clearPerformanceTooltip = (): void => {
 		clearTooltipHideTimeout();
 		isPerformanceTooltipHoveredRef.current = false;
 		setPerformanceTooltip(null);
-	};
-
-	const handlePerformanceTooltipMouseEnter = (): void => {
-		isPerformanceTooltipHoveredRef.current = true;
-		clearTooltipHideTimeout();
-	};
-
-	const handlePerformanceTooltipMouseLeave = (): void => {
-		isPerformanceTooltipHoveredRef.current = false;
-		hidePerformanceTooltip();
 	};
 
 	const performanceTooltipPosition = performanceTooltip?.position;
@@ -188,22 +178,24 @@ export function NetWorthChart({
 		Math.max(...performanceValues, 0),
 	]);
 
-	const breakdownData: RechartsBreakdownPoint[] = [
-		{
+	const breakdownData = useMemo(() => {
+		const data: BreakdownDataPoint = {
 			label:
 				timeframe === "year"
-					? String(new Date().getFullYear())
+					? "Yearly"
 					: timeframe === "quarter"
-						? `Q${Math.floor(new Date().getMonth() / 3) + 1} ${new Date().getFullYear()}`
-						: new Date().toLocaleDateString("en-US", {
-								month: "short",
-								year: "numeric",
-							}),
-			assets: summary.assets,
-			liabilities: -summary.liabilities,
-			netWorth: summary.netWorth,
-		},
-	];
+						? "Quarterly"
+						: "Monthly",
+		};
+		for (const item of breakdownGroups.assets) {
+			data[`asset_${item.group}`] = item.amount;
+		}
+		for (const item of breakdownGroups.liabilities) {
+			data[`liability_${item.group}`] = -item.amount;
+		}
+		return [data];
+	}, [breakdownGroups, timeframe]);
+
 	const breakdownValues = [
 		summary.assets,
 		-summary.liabilities,
@@ -230,16 +222,39 @@ export function NetWorthChart({
 							{formatSignedCurrency(summary.netWorth)}
 						</strong>
 
-						<span
-							className={`text-sm font-semibold ${
-								summary.netWorth >= 0
-									? "text-emerald-500 dark:text-emerald-400"
-									: "text-red-500 dark:text-red-400"
-							}`}
-						>
-							{summary.netWorth >= 0 ? "↗" : "↘"}{" "}
-							{formatSignedCurrency(Math.abs(summary.netWorth))}
-						</span>
+						{(() => {
+							const firstValue = points.length > 0 ? points[0].value : 0;
+							const lastValue =
+								points.length > 0 ? points[points.length - 1].value : 0;
+							const change = lastValue - firstValue;
+							const changePercent =
+								firstValue !== 0 ? (change / firstValue) * 100 : 0;
+							const isPositive = change >= 0;
+							const sign = isPositive ? "+" : "-";
+							const absPercent = Math.abs(changePercent);
+							// Format with thousands separator and one decimal place
+							const formattedPercent = absPercent.toLocaleString("en-US", {
+								minimumFractionDigits: 1,
+								maximumFractionDigits: 1,
+							});
+
+							return (
+								<span
+									className={`text-sm font-semibold ${
+										isPositive
+											? "text-emerald-500 dark:text-emerald-400"
+											: "text-red-500 dark:text-red-400"
+									}`}
+								>
+									{isPositive ? "↗" : "↘"}{" "}
+									{formatSignedCurrency(Math.abs(change))}
+									<span className="ml-1">
+										({sign}
+										{formattedPercent}%)
+									</span>
+								</span>
+							);
+						})()}
 
 						<span className="text-sm font-medium text-gray-500 dark:text-zinc-400">
 							{chartType === "breakdown"
@@ -281,7 +296,7 @@ export function NetWorthChart({
 						className="w-full sm:w-52"
 					/>
 
-					{/* Breakdown: dropdown controls timeframe, not dateRange */}
+					{/* Breakdown dropdown */}
 					{chartType === "breakdown" ? (
 						<Dropdown
 							key={timeframe}
@@ -371,14 +386,20 @@ export function NetWorthChart({
 
 									const chartWidth =
 										chartContainerRef.current?.clientWidth ?? 0;
-									const desiredLeft =
-										coordinate.x - PERFORMANCE_TOOLTIP_WIDTH / 2;
-									const maximumLeft = Math.max(
-										PERFORMANCE_TOOLTIP_EDGE_PADDING,
+
+									// ✅ FIX: Use window.innerWidth to guarantee right-side clipping never happens
+									const screenWidth = window.innerWidth;
+									const maxLeft = Math.min(
 										chartWidth -
 											PERFORMANCE_TOOLTIP_WIDTH -
 											PERFORMANCE_TOOLTIP_EDGE_PADDING,
+										screenWidth -
+											PERFORMANCE_TOOLTIP_WIDTH -
+											PERFORMANCE_TOOLTIP_EDGE_PADDING,
 									);
+
+									const desiredLeft =
+										coordinate.x - PERFORMANCE_TOOLTIP_WIDTH / 2;
 									const clampedLeft =
 										chartWidth > 0
 											? Math.min(
@@ -386,9 +407,11 @@ export function NetWorthChart({
 														desiredLeft,
 														PERFORMANCE_TOOLTIP_EDGE_PADDING,
 													),
-													maximumLeft,
+													maxLeft,
 												)
 											: desiredLeft;
+
+									// ✅ FIX: Use the updated (smaller) gap from the tooltip file
 									const clampedTop = Math.max(
 										PERFORMANCE_TOOLTIP_MINIMUM_TOP,
 										coordinate.y -
@@ -491,8 +514,6 @@ export function NetWorthChart({
 											ref={performanceTooltipCardRef}
 											activePoint={performanceTooltip?.point ?? null}
 											startPoint={performanceData[0] ?? null}
-											onMouseEnter={handlePerformanceTooltipMouseEnter}
-											onMouseLeave={handlePerformanceTooltipMouseLeave}
 										/>
 									}
 									cursor={false}
@@ -606,41 +627,45 @@ export function NetWorthChart({
 							<ReferenceLine y={0} stroke="rgba(148, 163, 184, 0.36)" />
 
 							<Tooltip
-								content={<NetWorthBreakdownTooltip />}
-								cursor={{
-									fill: "rgba(255,255,255,0.025)",
+								content={({ active, payload }) => {
+									const label = payload?.[0]?.payload?.label;
+									return (
+										<NetWorthBreakdownTooltip
+											active={active}
+											label={label}
+											breakdownGroups={breakdownGroups}
+										/>
+									);
 								}}
+								cursor={{ fill: "rgba(255,255,255,0.025)" }}
 								offset={18}
-								allowEscapeViewBox={{
-									x: true,
-									y: true,
-								}}
+								allowEscapeViewBox={{ x: true, y: true }}
 								isAnimationActive={false}
-								wrapperStyle={{
-									outline: "none",
-									zIndex: 40,
-								}}
+								wrapperStyle={{ outline: "none", zIndex: 40 }}
 							/>
 
-							<Bar
-								dataKey="assets"
-								name="Assets"
-								stackId="net-worth"
-								fill="#35aa76"
-								barSize={58}
-								radius={[5, 5, 0, 0]}
-								isAnimationActive={false}
-							/>
-
-							<Bar
-								dataKey="liabilities"
-								name="Liabilities"
-								stackId="net-worth"
-								fill="#ed4650"
-								barSize={58}
-								radius={[0, 0, 5, 5]}
-								isAnimationActive={false}
-							/>
+							{breakdownGroups.assets.map((item) => (
+								<Bar
+									key={`asset_${item.group}`}
+									dataKey={`asset_${item.group}`}
+									stackId="net-worth"
+									fill={getColorForGroup(item.group)}
+									barSize={58}
+									radius={[0, 0, 0, 0]}
+									isAnimationActive={false}
+								/>
+							))}
+							{breakdownGroups.liabilities.map((item) => (
+								<Bar
+									key={`liability_${item.group}`}
+									dataKey={`liability_${item.group}`}
+									stackId="net-worth"
+									fill={getColorForGroup(item.group)}
+									barSize={58}
+									radius={[0, 0, 0, 0]}
+									isAnimationActive={false}
+								/>
+							))}
 						</BarChart>
 					</ResponsiveContainer>
 				)}

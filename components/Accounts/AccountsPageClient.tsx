@@ -166,14 +166,14 @@ export default function AccountsPageClient() {
 		const storeRecords: AccountRecord[] = storeAccounts.map((account) => {
 			let kind: AccountKind;
 			let type: string;
-			let group: AccountGroup; // ✅ use the exact type
+			let group: AccountGroup;
 			let isLiability: boolean;
 
 			if (account.account_subtype) {
 				kind = getKindFromSubtype(account.account_subtype);
 				type = account.account_subtype;
 				isLiability = isLiabilityKind(kind);
-				group = getGroupFromKind(kind); // ✅ now returns AccountGroup
+				group = getGroupFromKind(kind);
 			} else {
 				const classified = classifyAccount(
 					account.name,
@@ -181,7 +181,7 @@ export default function AccountsPageClient() {
 				);
 				kind = classified.kind;
 				type = classified.type;
-				group = classified.group as AccountGroup; // ✅ cast to union
+				group = classified.group as AccountGroup;
 				isLiability = classified.isLiability;
 			}
 
@@ -396,6 +396,35 @@ export default function AccountsPageClient() {
 		setIsAddAccountOpen(false);
 	};
 
+	// ✅ Build per‑group breakdown for the stacked chart
+	const breakdownGroups = useMemo(() => {
+		const assetsMap = new Map<string, number>();
+		const liabilitiesMap = new Map<string, number>();
+
+		for (const account of visibleAccounts) {
+			const amount = Math.abs(account.balance);
+			const group = account.group;
+			if (account.isLiability) {
+				liabilitiesMap.set(group, (liabilitiesMap.get(group) || 0) + amount);
+			} else {
+				assetsMap.set(group, (assetsMap.get(group) || 0) + amount);
+			}
+		}
+
+		const assets = Array.from(assetsMap.entries()).map(([group, amount]) => ({
+			group,
+			amount,
+		}));
+		const liabilities = Array.from(liabilitiesMap.entries()).map(
+			([group, amount]) => ({ group, amount }),
+		);
+
+		assets.sort((a, b) => b.amount - a.amount);
+		liabilities.sort((a, b) => b.amount - a.amount);
+
+		return { assets, liabilities };
+	}, [visibleAccounts]);
+
 	if (!isClient) {
 		return <AccountsPageSkeleton />;
 	}
@@ -469,11 +498,20 @@ export default function AccountsPageClient() {
 				timeframe={timeframe}
 				points={chartPoints}
 				summary={summary}
+				breakdownGroups={breakdownGroups} // ✅ pass the breakdown data
 				onChartTypeChange={(value) => {
-					updateQuery({
+					const updates: Partial<typeof DEFAULT_QUERY> = {
 						chartType: value,
-						timeframe: value === "breakdown" ? "year" : timeframe,
-					});
+						timeframe: value === "breakdown" ? "month" : timeframe,
+					};
+					if (
+						value === "breakdown" &&
+						dateRange !== "1M" &&
+						dateRange !== "YTD"
+					) {
+						updates.dateRange = "1M";
+					}
+					updateQuery(updates);
 				}}
 				onDateRangeChange={(value) => updateQuery({ dateRange: value })}
 				onTimeframeChange={(value) => updateQuery({ timeframe: value })}
