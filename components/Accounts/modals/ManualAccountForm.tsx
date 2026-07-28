@@ -1,21 +1,11 @@
 "use client";
 
-import {
-	useState,
-	type FormEvent,
-} from "react";
-import {
-	ArrowLeft,
-	LoaderCircle,
-	X,
-} from "lucide-react";
+import { useState, type FormEvent } from "react";
+import { ArrowLeft, LoaderCircle, X } from "lucide-react";
 
 import { MANUAL_ACCOUNT_OPTIONS } from "@/components/Accounts/constants";
 import { ModalShell } from "@/components/ui/ModalShell";
-import type {
-	AccountKind,
-	ManualAccount,
-} from "@/components/Accounts/types";
+import type { AccountKind, ManualAccount } from "@/components/Accounts/types";
 
 export function ManualAccountForm({
 	kind,
@@ -92,9 +82,13 @@ export function ManualAccountForm({
 								onChange={(event) => setCashType(event.target.value)}
 								className="mt-3 h-13 w-full rounded-xl border border-gray-200 bg-white px-4 text-base outline-none dark:border-white/10 dark:bg-[#222]"
 							>
+								<option>CD</option>
 								<option>Checking</option>
 								<option>Savings</option>
-								<option>Cash</option>
+								<option>Money Market</option>
+								<option>Mobile Payment System</option>
+								<option>Prepaid</option>
+								<option>Cash Management</option>
 							</select>
 						</label>
 					)}
@@ -129,7 +123,11 @@ export function ManualAccountForm({
 						disabled={!name.trim() || isSaving}
 						className="flex min-w-20 items-center justify-center rounded-xl bg-[#a94628] px-5 py-3 font-semibold text-white disabled:opacity-50"
 					>
-						{isSaving ? <LoaderCircle size={18} className="animate-spin" /> : "Save"}
+						{isSaving ? (
+							<LoaderCircle size={18} className="animate-spin" />
+						) : (
+							"Save"
+						)}
 					</button>
 				</div>
 			</form>

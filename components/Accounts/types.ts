@@ -1,6 +1,6 @@
 export type ChartType = "performance" | "breakdown";
 export type DateRange = "1M" | "3M" | "6M" | "YTD" | "1Y" | "ALL";
-export type Timeframe = "month" | "year";
+export type Timeframe = "month" | "quarter" | "year";
 export type SummaryMode = "totals" | "percent";
 
 export type AccountKind =
@@ -20,7 +20,17 @@ export interface AccountRecord {
 	name: string;
 	type: string;
 	kind: AccountKind;
-	group: "Cash" | "Investments" | "Other Assets" | "Credit Cards" | "Loans";
+	group:
+		| "Cash"
+		| "Investments"
+		| "Real Estate"
+		| "Vehicles"
+		| "Valuables"
+		| "Other Assets"
+		| "Credit Cards"
+		| "Mortgage"
+		| "Loans"
+		| "Other Liabilities";
 	balance: number;
 	lastUpdated: string;
 	lastFour?: string;

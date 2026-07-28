@@ -8,21 +8,16 @@ import {
 	WalletCards,
 } from "lucide-react";
 
-import type {
-	AccountKind,
-	AccountRecord,
-} from "@/components/Accounts/types";
+import type { AccountKind, AccountRecord } from "@/components/Accounts/types";
 
 export function isLiabilityKind(kind: AccountKind): boolean {
-	return [
-		"credit-card",
-		"mortgage",
-		"loan",
-		"other-liability",
-	].includes(kind);
+	return ["credit-card", "mortgage", "loan", "other-liability"].includes(kind);
 }
 
-export function classifyAccount(name: string, balance: number): {
+export function classifyAccount(
+	name: string,
+	balance: number,
+): {
 	kind: AccountKind;
 	type: string;
 	group: AccountRecord["group"];
@@ -131,4 +126,57 @@ export function accountAccent(account: AccountRecord): string {
 	}
 
 	return "bg-zinc-600";
+}
+
+// ✅ NEW HELPERS TO FIX THE GROUP MAPPING
+export function getKindFromSubtype(
+	subtype: string | null | undefined,
+): AccountKind {
+	const normalized = subtype?.toLowerCase().trim() || "";
+
+	if (normalized === "credit card") return "credit-card";
+	if (normalized === "mortgage") return "mortgage";
+	if (normalized === "loan") return "loan";
+	if (normalized === "investment") return "investment";
+	if (normalized === "real estate") return "real-estate";
+	if (normalized === "vehicle") return "vehicle";
+	if (normalized === "valuable") return "valuable";
+	if (normalized === "other liability" || normalized === "other liabilities")
+		return "other-liability";
+	if (normalized === "other asset" || normalized === "other assets")
+		return "other-asset";
+
+	// Cash subtypes
+	if (
+		["checking", "savings", "cash", "money market", "prepaid", "cd"].includes(
+			normalized,
+		)
+	) {
+		return "cash";
+	}
+
+	return "other-asset";
+}
+
+export type AccountGroup =
+	| "Cash"
+	| "Investments"
+	| "Other Assets"
+	| "Credit Cards"
+	| "Loans";
+
+export function getGroupFromKind(kind: AccountKind): AccountGroup {
+	const groupMap: Record<AccountKind, AccountGroup> = {
+		"cash": "Cash",
+		"investment": "Investments",
+		"credit-card": "Credit Cards",
+		"mortgage": "Loans",
+		"loan": "Loans",
+		"other-liability": "Loans",
+		"real-estate": "Other Assets",
+		"vehicle": "Other Assets",
+		"valuable": "Other Assets",
+		"other-asset": "Other Assets",
+	};
+	return groupMap[kind];
 }

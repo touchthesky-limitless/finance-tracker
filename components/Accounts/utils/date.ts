@@ -30,15 +30,21 @@ export function getDateCutoff(range: DateRange): Date | null {
 }
 
 export function normalizeDateRange(value: string | null): DateRange {
-	return DATE_RANGE_OPTIONS.some((option) => option.value === value)
+	return DATE_RANGE_OPTIONS.some(
+		(option: { value: string }) => option.value === value,
+	)
 		? (value as DateRange)
 		: DEFAULT_QUERY.dateRange;
 }
 
+// ✅ FIXED: Returns "performance" or "breakdown" to match the component
 export function normalizeChartType(value: string | null): ChartType {
 	return value === "breakdown" ? "breakdown" : "performance";
 }
 
+// ✅ FIXED: Handles "quarter" correctly
 export function normalizeTimeframe(value: string | null): Timeframe {
-	return value === "year" ? "year" : "month";
+	if (value === "year") return "year";
+	if (value === "quarter") return "quarter";
+	return "month";
 }

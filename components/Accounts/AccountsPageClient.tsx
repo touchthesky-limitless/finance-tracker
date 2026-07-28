@@ -29,6 +29,9 @@ import type {
 import {
 	classifyAccount,
 	isLiabilityKind,
+	getKindFromSubtype,
+	getGroupFromKind,
+	type AccountGroup,
 } from "@/components/Accounts/utils/account";
 import {
 	getDateCutoff,
@@ -36,14 +39,11 @@ import {
 	normalizeDateRange,
 	normalizeTimeframe,
 } from "@/components/Accounts/utils/date";
-import {
-	loadManualAccounts,
-	saveManualAccounts,
-} from "@/components/Accounts/utils/storage";
 import { useBudgetStore } from "@/store/useBudgetStore";
 import { appendNavigationSource } from "@/lib/navigation/breadcrumb";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { MOBILE_BREAKPOINT } from "@/config/breakpoints";
+import { manualAccountToAccountRecord } from "@/components/Accounts/utils/accountMapping";
 
 export default function AccountsPageClient() {
 	const router = useRouter();
@@ -52,6 +52,8 @@ export default function AccountsPageClient() {
 
 	const transactions = useBudgetStore((state) => state.transactions);
 	const fetchAccounts = useBudgetStore((state) => state.fetchAccounts);
+	const addAccount = useBudgetStore((state) => state.addAccount);
+	const storeAccounts = useBudgetStore((state) => state.accounts);
 
 	const [isRefreshing, setIsRefreshing] = useState(false);
 	const [isFilterOpen, setIsFilterOpen] = useState(false);
@@ -60,8 +62,7 @@ export default function AccountsPageClient() {
 	const [isAddAccountOpen, setIsAddAccountOpen] = useState(false);
 	const [isManualPickerOpen, setIsManualPickerOpen] = useState(false);
 	const [manualKind, setManualKind] = useState<AccountKind | null>(null);
-	const [manualAccounts, setManualAccounts] =
-		useState<ManualAccount[]>(loadManualAccounts);
+
 	const [selectedAccountIds, setSelectedAccountIds] = useState<string[]>([]);
 	const [draftSelectedIds, setDraftSelectedIds] = useState<string[]>([]);
 	const [filterQuery, setFilterQuery] = useState("");
@@ -162,38 +163,48 @@ export default function AccountsPageClient() {
 	}, [transactions]);
 
 	const accounts = useMemo<AccountRecord[]>(() => {
-		const manualRecords = manualAccounts.map<AccountRecord>((account) => {
-			const isLiability = isLiabilityKind(account.kind);
+		const storeRecords: AccountRecord[] = storeAccounts.map((account) => {
+			let kind: AccountKind;
+			let type: string;
+			let group: AccountGroup; // ✅ use the exact type
+			let isLiability: boolean;
+
+			if (account.account_subtype) {
+				kind = getKindFromSubtype(account.account_subtype);
+				type = account.account_subtype;
+				isLiability = isLiabilityKind(kind);
+				group = getGroupFromKind(kind); // ✅ now returns AccountGroup
+			} else {
+				const classified = classifyAccount(
+					account.name,
+					account.current_balance ?? 0,
+				);
+				kind = classified.kind;
+				type = classified.type;
+				group = classified.group as AccountGroup; // ✅ cast to union
+				isLiability = classified.isLiability;
+			}
 
 			return {
 				id: account.id,
 				name: account.name,
-				kind: account.kind,
-				type: account.type,
-				balance: isLiability ? Math.abs(account.balance) : account.balance,
-				lastUpdated: account.createdAt,
+				kind,
+				type,
+				balance: isLiability
+					? Math.abs(account.current_balance ?? 0)
+					: (account.current_balance ?? 0),
+				lastUpdated: account.created_at,
 				isLiability,
-				group:
-					account.kind === "cash"
-						? "Cash"
-						: account.kind === "investment"
-							? "Investments"
-							: ["credit-card"].includes(account.kind)
-								? "Credit Cards"
-								: ["mortgage", "loan", "other-liability"].includes(account.kind)
-									? "Loans"
-									: "Other Assets",
+				group,
 			};
 		});
 
 		const byId = new Map<string, AccountRecord>();
-
-		for (const account of [...transactionAccounts, ...manualRecords]) {
+		for (const account of [...transactionAccounts, ...storeRecords]) {
 			byId.set(account.id, account);
 		}
-
 		return [...byId.values()];
-	}, [manualAccounts, transactionAccounts]);
+	}, [storeAccounts, transactionAccounts]);
 
 	const visibleAccounts = useMemo(() => {
 		if (selectedAccountIds.length === 0) {
@@ -370,18 +381,15 @@ export default function AccountsPageClient() {
 		}
 	};
 
-	const saveManualAccount = (account: ManualAccount) => {
-		setManualAccounts((current) => {
-			const next = [...current, account];
-
-			try {
-				saveManualAccounts(next);
-			} catch (error) {
-				console.error("Failed to save manual account:", error);
-			}
-
-			return next;
+	const saveManualAccount = async (account: ManualAccount) => {
+		const accountData = manualAccountToAccountRecord({
+			name: account.name,
+			kind: account.kind,
+			type: account.type,
+			balance: account.balance,
 		});
+
+		await addAccount(accountData);
 
 		setManualKind(null);
 		setIsManualPickerOpen(false);
@@ -395,7 +403,7 @@ export default function AccountsPageClient() {
 	return (
 		<div className="min-h-screen bg-gray-50 p-2 text-gray-900 sm:p-3 md:p-5 dark:bg-[#171717] dark:text-[#f5f5f5]">
 			<header className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-				 {!isMobile && <h1 className="px-1 text-lg font-semibold">Accounts</h1>}
+				{!isMobile && <h1 className="px-1 text-lg font-semibold">Accounts</h1>}
 
 				<div className="flex flex-wrap items-center gap-2">
 					{selectedAccountIds.length > 0 && (
@@ -468,6 +476,7 @@ export default function AccountsPageClient() {
 					});
 				}}
 				onDateRangeChange={(value) => updateQuery({ dateRange: value })}
+				onTimeframeChange={(value) => updateQuery({ timeframe: value })}
 			/>
 
 			<div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,2.25fr)_minmax(300px,0.95fr)]">

@@ -1,110 +1,111 @@
-import type { LucideIcon } from "lucide-react";
 import {
-	ArrowDown,
-	ArrowUp,
+	Banknote,
 	Building2,
 	Car,
-	CircleDollarSign,
 	CreditCard,
+	Gem,
 	Home,
 	Landmark,
 	LineChart,
-	Sparkles,
-	Upload,
+	Wallet,
+	type LucideIcon,
 } from "lucide-react";
 
 import type {
 	AccountKind,
-	AccountRecord,
 	ChartType,
 	DateRange,
 	Timeframe,
 } from "@/components/Accounts/types";
+
+export const DATE_RANGE_OPTIONS = [
+	{ value: "1M", label: "1 Month" },
+	{ value: "3M", label: "3 Months" },
+	{ value: "6M", label: "6 Months" },
+	{ value: "1Y", label: "1 Year" },
+	{ value: "YTD", label: "Year to Date" },
+	{ value: "ALL", label: "All Time" },
+];
+
+export const ADD_ACCOUNT_CATEGORIES = [
+	{
+		title: "Personal accounts",
+		subtitle: "Checking, savings, cash management",
+		icon: Banknote,
+	},
+	{
+		title: "Credit cards",
+		subtitle: "Rewards, cash back, travel",
+		icon: CreditCard,
+		badge: "Popular",
+	},
+	{
+		title: "Investments",
+		subtitle: "Brokerage, retirement, crypto",
+		icon: LineChart,
+	},
+	{
+		title: "Mortgages & Loans",
+		subtitle: "Auto, home, personal, student",
+		icon: Building2,
+	},
+];
+
+export const MANUAL_ACCOUNT_OPTIONS: Array<{
+	kind: AccountKind;
+	label: string;
+	icon: LucideIcon;
+	section: "Asset" | "Liability";
+}> = [
+	{ kind: "cash", label: "Cash", icon: Landmark, section: "Asset" },
+	{
+		kind: "investment",
+		label: "Investments",
+		icon: LineChart,
+		section: "Asset",
+	},
+	{ kind: "real-estate", label: "Real Estate", icon: Home, section: "Asset" },
+	{ kind: "vehicle", label: "Vehicles", icon: Car, section: "Asset" },
+	{ kind: "valuable", label: "Valuables", icon: Gem, section: "Asset" },
+	{
+		kind: "other-asset",
+		label: "Other Assets",
+		icon: Wallet,
+		section: "Asset",
+	},
+	{
+		kind: "credit-card",
+		label: "Credit Card",
+		icon: CreditCard,
+		section: "Liability",
+	},
+	{ kind: "mortgage", label: "Mortgage", icon: Home, section: "Liability" },
+	{ kind: "loan", label: "Loans", icon: Building2, section: "Liability" },
+	{
+		kind: "other-liability",
+		label: "Other Liabilities",
+		icon: Wallet,
+		section: "Liability",
+	},
+];
+
+export const GROUP_ORDER = [
+	"Cash",
+	"Investments",
+	"Real Estate",
+	"Vehicles",
+	"Valuables",
+	"Other Assets",
+	"Credit Cards",
+	"Mortgage",
+	"Loans",
+	"Other Liabilities",
+];
+
+export const LIABILITY_GROUPS = new Set(["Credit Cards", "Loans"]);
 
 export const DEFAULT_QUERY = {
 	chartType: "performance" as ChartType,
 	dateRange: "1M" as DateRange,
 	timeframe: "month" as Timeframe,
 };
-
-export const DATE_RANGE_OPTIONS: ReadonlyArray<{
-	value: DateRange;
-	label: string;
-}> = [
-	{ value: "1M", label: "1 month" },
-	{ value: "3M", label: "3 months" },
-	{ value: "6M", label: "6 months" },
-	{ value: "YTD", label: "Year to date" },
-	{ value: "1Y", label: "1 year" },
-	{ value: "ALL", label: "All time" },
-];
-
-export const MANUAL_ACCOUNT_OPTIONS: ReadonlyArray<{
-	kind: AccountKind;
-	label: string;
-	section: "Asset" | "Liability";
-	icon: LucideIcon;
-}> = [
-	{ kind: "cash", label: "Cash", section: "Asset", icon: CircleDollarSign },
-	{ kind: "investment", label: "Investments", section: "Asset", icon: LineChart },
-	{ kind: "real-estate", label: "Real Estate", section: "Asset", icon: Home },
-	{ kind: "vehicle", label: "Vehicles", section: "Asset", icon: Car },
-	{ kind: "valuable", label: "Valuables", section: "Asset", icon: Sparkles },
-	{ kind: "other-asset", label: "Other Assets", section: "Asset", icon: ArrowUp },
-	{ kind: "credit-card", label: "Credit Card", section: "Liability", icon: CreditCard },
-	{ kind: "mortgage", label: "Mortgage", section: "Liability", icon: Home },
-	{ kind: "loan", label: "Loans", section: "Liability", icon: Building2 },
-	{
-		kind: "other-liability",
-		label: "Other Liabilities",
-		section: "Liability",
-		icon: ArrowDown,
-	},
-];
-
-export const ADD_ACCOUNT_CATEGORIES: ReadonlyArray<{
-	title: string;
-	subtitle: string;
-	icon: LucideIcon;
-	badge?: string;
-}> = [
-	{
-		title: "Banks & credit cards",
-		subtitle: "10 added",
-		icon: Landmark,
-	},
-	{
-		title: "Investments & loans",
-		subtitle: "0 added",
-		icon: LineChart,
-	},
-	{
-		title: "Real estate, crypto, and more",
-		subtitle: "0 added",
-		icon: Home,
-	},
-	{
-		title: "Company equity",
-		subtitle: "0 added",
-		icon: CircleDollarSign,
-		badge: "New",
-	},
-	{
-		title: "Import transaction & balance history",
-		subtitle: "Import from CSV",
-		icon: Upload,
-	},
-];
-
-export const GROUP_ORDER: AccountRecord["group"][] = [
-	"Cash",
-	"Investments",
-	"Other Assets",
-	"Credit Cards",
-	"Loans",
-];
-
-export const LIABILITY_GROUPS = new Set<AccountRecord["group"]>([
-	"Credit Cards",
-	"Loans",
-]);

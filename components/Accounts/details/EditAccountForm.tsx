@@ -1,15 +1,11 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useState, type FormEvent } from "react";
 import { X } from "lucide-react";
-import * as Dialog from "@radix-ui/react-dialog";
-
-import AccountDetailsPageClient from "@/components/Accounts/details/AccountDetailsPageClient";
 
 import { type Account, useBudgetStore } from "@/store/useBudgetStore";
 
-type EditableAccount = Account & {
+export type EditableAccount = Account & {
 	institution?: string | null;
 	account_type?: string | null;
 	account_subtype?: string | null;
@@ -91,80 +87,44 @@ function SettingCard({
 	);
 }
 
-function EditAccountForm({
-	account,
-	onBack,
-}: {
+interface EditAccountFormProps {
 	account: EditableAccount;
 	onBack: () => void;
-}) {
-	const router = useRouter();
+}
 
-	const [name, setName] = useState(account.name);
-	const [type, setType] = useState(
-		account.account_type === "Credit Card" ? "Liability" : "Asset",
-	);
-	const [subtype, setSubtype] = useState(
-		account.account_subtype ?? account.account_type ?? "Credit Card",
-	);
-	const [apr, setApr] = useState(
-		account.apr == null ? "" : String(account.apr),
-	);
-	const [minimumPayment, setMinimumPayment] = useState(
-		account.minimum_monthly_payment == null
-			? ""
-			: String(account.minimum_monthly_payment),
-	);
-	const [plannedPayment, setPlannedPayment] = useState(
-		account.planned_monthly_payment == null
-			? ""
-			: String(account.planned_monthly_payment),
-	);
-	const [creditLimit, setCreditLimit] = useState(
-		account.credit_limit == null ? "" : String(account.credit_limit),
-	);
-	const [invertBalance, setInvertBalance] = useState(
-		Boolean(account.invert_balance),
-	);
-	const [isHidden, setIsHidden] = useState(Boolean(account.is_hidden));
-	const [excludeFromNetWorth, setExcludeFromNetWorth] = useState(
-		Boolean(account.exclude_from_net_worth),
-	);
-	const [hideTransactions, setHideTransactions] = useState(
-		Boolean(account.hide_transactions),
-	);
-	const [excludeFromPaydown, setExcludeFromPaydown] = useState(
-		Boolean(account.exclude_from_paydown),
-	);
-	const [excludeFromBudget, setExcludeFromBudget] = useState(
-		Boolean(account.exclude_from_budget),
-	);
+export function EditAccountForm({ account, onBack }: EditAccountFormProps) {
+	// Combined state object
+	const [formData, setFormData] = useState(() => ({
+		name: account.name,
+		type: account.account_type === "Credit Card" ? "Liability" : "Asset",
+		subtype: account.account_subtype ?? account.account_type ?? "Credit Card",
+		apr: account.apr == null ? "" : String(account.apr),
+		minimumPayment:
+			account.minimum_monthly_payment == null
+				? ""
+				: String(account.minimum_monthly_payment),
+		plannedPayment:
+			account.planned_monthly_payment == null
+				? ""
+				: String(account.planned_monthly_payment),
+		creditLimit:
+			account.credit_limit == null ? "" : String(account.credit_limit),
+		invertBalance: Boolean(account.invert_balance),
+		isHidden: Boolean(account.is_hidden),
+		excludeFromNetWorth: Boolean(account.exclude_from_net_worth),
+		hideTransactions: Boolean(account.hide_transactions),
+		excludeFromPaydown: Boolean(account.exclude_from_paydown),
+		excludeFromBudget: Boolean(account.exclude_from_budget),
+	}));
+
 	const [photoUrl, setPhotoUrl] = useState<string | null>(null);
 	const [isSaving, setIsSaving] = useState(false);
 
+	// Get fetchAccounts from the store
+	const fetchAccounts = useBudgetStore((state) => state.fetchAccounts);
+
 	const persistPatch = async (patch: AccountPatch): Promise<void> => {
-		const store = useBudgetStore.getState() as BudgetStoreState &
-			OptionalAccountActions;
-
-		if (store.updateAccount) {
-			await store.updateAccount(account.id, patch);
-			return;
-		}
-
-		useBudgetStore.setState((state) => {
-			return {
-				accounts: state.accounts.map((item) => {
-					if (item.id !== account.id) {
-						return item;
-					}
-
-					return {
-						...item,
-						...patch,
-					} as Account;
-				}),
-			};
-		});
+		await useBudgetStore.getState().updateAccount(account.id, patch);
 	};
 
 	const submit = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
@@ -173,22 +133,31 @@ function EditAccountForm({
 
 		try {
 			await persistPatch({
-				name: name.trim(),
-				account_type: subtype,
-				account_subtype: subtype,
-				apr: apr ? Number(apr) : null,
-				minimum_monthly_payment: minimumPayment ? Number(minimumPayment) : null,
-				planned_monthly_payment: plannedPayment ? Number(plannedPayment) : null,
-				credit_limit: creditLimit ? Number(creditLimit) : null,
-				invert_balance: invertBalance,
-				is_hidden: isHidden,
-				exclude_from_net_worth: excludeFromNetWorth,
-				hide_transactions: hideTransactions,
-				exclude_from_paydown: excludeFromPaydown,
-				exclude_from_budget: excludeFromBudget,
+				name: formData.name.trim(),
+				account_type: formData.subtype,
+				account_subtype: formData.subtype,
+				apr: formData.apr ? Number(formData.apr) : null,
+				minimum_monthly_payment: formData.minimumPayment
+					? Number(formData.minimumPayment)
+					: null,
+				planned_monthly_payment: formData.plannedPayment
+					? Number(formData.plannedPayment)
+					: null,
+				credit_limit: formData.creditLimit
+					? Number(formData.creditLimit)
+					: null,
+				invert_balance: formData.invertBalance,
+				is_hidden: formData.isHidden,
+				exclude_from_net_worth: formData.excludeFromNetWorth,
+				hide_transactions: formData.hideTransactions,
+				exclude_from_paydown: formData.excludeFromPaydown,
+				exclude_from_budget: formData.excludeFromBudget,
 			});
 
-			router.push(`/accounts/details/${encodeURIComponent(account.id)}`);
+			// ✅ Fetch fresh data from Supabase to ensure persistence
+			await fetchAccounts();
+
+			onBack();
 		} finally {
 			setIsSaving(false);
 		}
@@ -198,7 +167,8 @@ function EditAccountForm({
 		await persistPatch({
 			current_balance: 0,
 		});
-		router.push(`/accounts/details/${encodeURIComponent(account.id)}`);
+		await fetchAccounts();
+		onBack();
 	};
 
 	const deleteAccount = async (): Promise<void> => {
@@ -216,8 +186,8 @@ function EditAccountForm({
 				};
 			});
 		}
-
-		router.push("/accounts");
+		await fetchAccounts();
+		onBack();
 	};
 
 	const fieldClassName =
@@ -247,7 +217,7 @@ function EditAccountForm({
 				<div className="flex items-center gap-4">
 					<div className="flex size-14 items-center justify-center overflow-hidden rounded-full bg-[#103B55] text-xs font-bold text-white">
 						{photoUrl ? (
-							//! TODO: Fetch logos
+                            //! TODO: Fetch logos
 							// eslint-disable-next-line @next/next/no-img-element
 							<img src={photoUrl} alt="" className="size-full object-cover" />
 						) : (
@@ -275,9 +245,9 @@ function EditAccountForm({
 				<label className="block">
 					<span className="mb-2 block text-sm font-semibold">Name</span>
 					<input
-						value={name}
+						value={formData.name}
 						onChange={(event) => {
-							setName(event.target.value);
+							setFormData((prev) => ({ ...prev, name: event.target.value }));
 						}}
 						className={fieldClassName}
 					/>
@@ -286,9 +256,14 @@ function EditAccountForm({
 				<label className="block">
 					<span className="mb-2 block text-sm font-semibold">Type</span>
 					<select
-						value={type}
+						value={formData.type}
 						onChange={(event) => {
-							setType(event.target.value);
+							const newType = event.target.value;
+							setFormData((prev) => ({
+								...prev,
+								type: newType,
+								subtype: newType === "Liability" ? "Credit Card" : "Checking",
+							}));
 						}}
 						className={fieldClassName}
 					>
@@ -300,13 +275,13 @@ function EditAccountForm({
 				<label className="block">
 					<span className="mb-2 block text-sm font-semibold">Subtype</span>
 					<select
-						value={subtype}
+						value={formData.subtype}
 						onChange={(event) => {
-							setSubtype(event.target.value);
+							setFormData((prev) => ({ ...prev, subtype: event.target.value }));
 						}}
 						className={fieldClassName}
 					>
-						{type === "Liability" ? (
+						{formData.type === "Liability" ? (
 							<>
 								<option>Credit Card</option>
 								<option>Mortgage</option>
@@ -327,9 +302,9 @@ function EditAccountForm({
 				<label className="block">
 					<span className="mb-2 block text-sm font-semibold">APR</span>
 					<input
-						value={apr}
+						value={formData.apr}
 						onChange={(event) => {
-							setApr(event.target.value);
+							setFormData((prev) => ({ ...prev, apr: event.target.value }));
 						}}
 						inputMode="decimal"
 						placeholder="Enter APR"
@@ -342,9 +317,12 @@ function EditAccountForm({
 						Minimum monthly payment
 					</span>
 					<input
-						value={minimumPayment}
+						value={formData.minimumPayment}
 						onChange={(event) => {
-							setMinimumPayment(event.target.value);
+							setFormData((prev) => ({
+								...prev,
+								minimumPayment: event.target.value,
+							}));
 						}}
 						inputMode="decimal"
 						placeholder="Enter minimum monthly payment"
@@ -358,9 +336,12 @@ function EditAccountForm({
 						<span className="font-normal text-gray-500">(optional)</span>
 					</span>
 					<input
-						value={plannedPayment}
+						value={formData.plannedPayment}
 						onChange={(event) => {
-							setPlannedPayment(event.target.value);
+							setFormData((prev) => ({
+								...prev,
+								plannedPayment: event.target.value,
+							}));
 						}}
 						inputMode="decimal"
 						placeholder="Enter planned monthly payment"
@@ -375,9 +356,12 @@ function EditAccountForm({
 							$
 						</span>
 						<input
-							value={creditLimit}
+							value={formData.creditLimit}
 							onChange={(event) => {
-								setCreditLimit(event.target.value);
+								setFormData((prev) => ({
+									...prev,
+									creditLimit: event.target.value,
+								}));
 							}}
 							inputMode="decimal"
 							placeholder="Enter credit limit"
@@ -394,8 +378,10 @@ function EditAccountForm({
 					<SettingCard
 						title="Invert account balance"
 						description="This will invert your account balance if updates from your bank are not syncing correctly."
-						checked={invertBalance}
-						onChange={setInvertBalance}
+						checked={formData.invertBalance}
+						onChange={(checked) => {
+							setFormData((prev) => ({ ...prev, invertBalance: checked }));
+						}}
 					/>
 				</section>
 
@@ -405,32 +391,54 @@ function EditAccountForm({
 						<SettingCard
 							title="Hide account"
 							description="This will hide the account from your Accounts page."
-							checked={isHidden}
-							onChange={setIsHidden}
+							checked={formData.isHidden}
+							onChange={(checked) => {
+								setFormData((prev) => ({ ...prev, isHidden: checked }));
+							}}
 						/>
 						<SettingCard
 							title="Exclude account balance"
 							description="This will exclude this account’s balance from your net worth and account group totals."
-							checked={excludeFromNetWorth}
-							onChange={setExcludeFromNetWorth}
+							checked={formData.excludeFromNetWorth}
+							onChange={(checked) => {
+								setFormData((prev) => ({
+									...prev,
+									excludeFromNetWorth: checked,
+								}));
+							}}
 						/>
 						<SettingCard
 							title="Hide transactions"
 							description="Hiding will exclude transactions from cash flow and budget calculations."
-							checked={hideTransactions}
-							onChange={setHideTransactions}
+							checked={formData.hideTransactions}
+							onChange={(checked) => {
+								setFormData((prev) => ({
+									...prev,
+									hideTransactions: checked,
+								}));
+							}}
 						/>
 						<SettingCard
 							title="Exclude account from pay down projection"
 							description="This will exclude the account from projections and the pay down calculator."
-							checked={excludeFromPaydown}
-							onChange={setExcludeFromPaydown}
+							checked={formData.excludeFromPaydown}
+							onChange={(checked) => {
+								setFormData((prev) => ({
+									...prev,
+									excludeFromPaydown: checked,
+								}));
+							}}
 						/>
 						<SettingCard
 							title="Exclude account from budget contributions"
 							description="This will remove the account from the Budget > Contributions section."
-							checked={excludeFromBudget}
-							onChange={setExcludeFromBudget}
+							checked={formData.excludeFromBudget}
+							onChange={(checked) => {
+								setFormData((prev) => ({
+									...prev,
+									excludeFromBudget: checked,
+								}));
+							}}
 						/>
 					</div>
 				</section>
@@ -491,73 +499,12 @@ function EditAccountForm({
 
 				<button
 					type="submit"
-					disabled={!name.trim() || isSaving}
+					disabled={!formData.name.trim() || isSaving}
 					className="rounded-lg bg-[#FF5A35] px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-[#E04825] disabled:cursor-not-allowed disabled:opacity-50"
 				>
 					{isSaving ? "Saving..." : "Save"}
 				</button>
 			</div>
 		</form>
-	);
-}
-
-export default function EditAccountPageClient() {
-	const params = useParams<{ accountId: string }>();
-	const router = useRouter();
-	const accountId = params.accountId
-		? decodeURIComponent(params.accountId)
-		: "";
-
-	const accounts = useBudgetStore((state) => {
-		return state.accounts;
-	});
-	const fetchAccounts = useBudgetStore((state) => {
-		return state.fetchAccounts;
-	});
-
-	useEffect(() => {
-		void fetchAccounts();
-	}, [fetchAccounts]);
-
-	const account = accounts.find((item) => {
-		return item.id === accountId;
-	}) as EditableAccount | undefined;
-
-	const back = (): void => {
-		router.push(`/accounts/details/${encodeURIComponent(accountId)}`);
-	};
-
-	if (!account) {
-		return (
-			<div className="flex min-h-screen items-center justify-center bg-gray-50 text-gray-900 dark:bg-[#171716] dark:text-white">
-				Loading account...
-			</div>
-		);
-	}
-
-	return (
-		<>
-			<AccountDetailsPageClient />
-			<Dialog.Root
-				open
-				onOpenChange={(open) => {
-					if (!open) back();
-				}}
-			>
-				<Dialog.Portal>
-					<Dialog.Overlay className="fixed inset-0 z-[140] bg-black/45 backdrop-blur-md data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
-					<Dialog.Content
-						onOpenAutoFocus={(event) => event.preventDefault()}
-						className="fixed left-1/2 top-1/2 z-[150] max-h-[calc(100vh-32px)] w-[min(570px,calc(100vw-24px))] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl border border-gray-200 bg-white shadow-2xl outline-none dark:border-white/10 dark:bg-[#222220]"
-					>
-						<Dialog.Title className="sr-only">Edit account</Dialog.Title>
-						<Dialog.Description className="sr-only">
-							Update account details, visibility, balance, and actions.
-						</Dialog.Description>
-						<EditAccountForm key={account.id} account={account} onBack={back} />
-					</Dialog.Content>
-				</Dialog.Portal>
-			</Dialog.Root>
-		</>
 	);
 }

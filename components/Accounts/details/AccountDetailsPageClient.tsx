@@ -54,6 +54,9 @@ import {
 	type NavigationSource,
 } from "@/lib/navigation/breadcrumb";
 import { useTransactionDrawer } from "@/store/useTransactionDrawer";
+import { EditAccountForm } from "@/components/Accounts/details/EditAccountForm";
+import * as Dialog from "@radix-ui/react-dialog";
+import { EditableAccount } from "@/components/Accounts/details/EditAccountForm";
 
 const AddTransactionModal = dynamic(
 	() => {
@@ -166,6 +169,17 @@ export default function AccountDetailsPageClient() {
 	const [showUploader, setShowUploader] = useState(false);
 	const [isInitialDataLoading, setIsInitialDataLoading] = useState(true);
 	const merchantItems = useMerchantOptions();
+
+	// ✅ Use query parameter instead of path
+	const isEditOpen = searchParams.get("edit") === "true";
+
+	// ✅ FIXED: pass a mutator function, not an object
+	const openEditModal = () => {
+		updateUrl((params) => params.set("edit", "true"));
+	};
+	const closeEditModal = () => {
+		updateUrl((params) => params.delete("edit"));
+	};
 
 	useEffect(() => {
 		let active = true;
@@ -627,7 +641,7 @@ export default function AccountDetailsPageClient() {
 		[],
 	);
 
-		const handleRowClick = (transaction: Transaction) => {
+	const handleRowClick = (transaction: Transaction) => {
 		openDrawer(transaction.id);
 	};
 
@@ -729,11 +743,7 @@ export default function AccountDetailsPageClient() {
 
 				<div className="flex items-center gap-2">
 					<AccountActionMenu
-						onEditAccount={() => {
-							router.push(
-								`/accounts/details/${encodeURIComponent(accountId)}/edit`,
-							);
-						}}
+						onEditAccount={openEditModal}
 						onInstitutionSettings={() => {
 							router.push(
 								`/accounts/details/${encodeURIComponent(accountId)}/edit#institution`,
@@ -975,6 +985,31 @@ export default function AccountDetailsPageClient() {
 				}}
 				onMove={moveSelectedTransactions}
 			/>
+
+			{/* ✅ Edit Account modal – driven by ?edit=true query param, guarded for account */}
+			{isEditOpen && account && (
+				<Dialog.Root
+					open={isEditOpen}
+					onOpenChange={(open) => !open && closeEditModal()}
+				>
+					<Dialog.Portal>
+						<Dialog.Overlay className="fixed inset-0 z-[140] bg-black/45 backdrop-blur-md data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
+						<Dialog.Content
+							onOpenAutoFocus={(event) => event.preventDefault()}
+							className="fixed left-1/2 top-1/2 z-[150] max-h-[calc(100vh-32px)] w-[min(570px,calc(100vw-24px))] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl border border-gray-200 bg-white shadow-2xl outline-none dark:border-white/10 dark:bg-[#222220]"
+						>
+							<Dialog.Title className="sr-only">Edit account</Dialog.Title>
+							<Dialog.Description className="sr-only">
+								Update account details, visibility, balance, and actions.
+							</Dialog.Description>
+							<EditAccountForm
+								account={account as EditableAccount}
+								onBack={closeEditModal}
+							/>
+						</Dialog.Content>
+					</Dialog.Portal>
+				</Dialog.Root>
+			)}
 		</div>
 	);
 }

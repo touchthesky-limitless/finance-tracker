@@ -119,6 +119,21 @@ export interface Account {
 	user_id: string;
 	name: string;
 	created_at: string;
+	account_type?: string | null;
+	account_subtype?: string | null;
+	apr?: number | null;
+	minimum_monthly_payment?: number | null;
+	planned_monthly_payment?: number | null;
+	credit_limit?: number | null;
+	current_balance?: number | null;
+	invert_balance?: boolean | null;
+	is_hidden?: boolean | null;
+	exclude_from_net_worth?: boolean | null;
+	hide_transactions?: boolean | null;
+	exclude_from_paydown?: boolean | null;
+	exclude_from_budget?: boolean | null;
+	institution?: string | null;
+	logo_url?: string | null;
 }
 
 export type TransactionUpdate = Partial<
@@ -193,9 +208,7 @@ export interface CreditCard {
 	image_url?: string;
 }
 
-type PreferenceUpdater<T> =
-	| T
-	| ((current: Readonly<T>) => T);
+type PreferenceUpdater<T> = T | ((current: Readonly<T>) => T);
 
 interface BudgetState {
 	transactions: Transaction[];
@@ -284,6 +297,11 @@ interface BudgetState {
 	setWalletIds: (ids: string[]) => void;
 	setCustomRates: (rates: Record<string, Record<string, number>>) => void;
 
+	addAccount: (
+		account: Omit<Account, "id" | "user_id" | "created_at">,
+	) => Promise<Account>;
+	updateAccount: (accountId: string, patch: Partial<Account>) => Promise<void>;
+	deleteAccount: (accountId: string) => Promise<void>;
 	fetchAccounts: (force?: boolean) => Promise<void>;
 
 	merchants: Merchant[];
@@ -1403,10 +1421,7 @@ export const useBudgetStore = create<BudgetState>()(
 				const nextSortOrder =
 					existingRule?.sortOrder ??
 					currentRules.reduce((highestOrder, item, index) => {
-						return Math.max(
-							highestOrder,
-							item.sortOrder ?? index,
-						);
+						return Math.max(highestOrder, item.sortOrder ?? index);
 					}, -1) + 1;
 
 				const result = await saveTransactionRule(
@@ -1483,11 +1498,11 @@ export const useBudgetStore = create<BudgetState>()(
 
 					return rule
 						? [
-							{
-								...rule,
-								sortOrder: index,
-							},
-						]
+								{
+									...rule,
+									sortOrder: index,
+								},
+							]
 						: [];
 				});
 
@@ -1867,38 +1882,98 @@ export const useBudgetStore = create<BudgetState>()(
 				set({ customRates: { ...customRates } });
 			},
 
-			fetchAccounts: async (force = false) => {
-				if (!force && get().accounts.length > 0) {
-					return;
+			addAccount: async (accountData) => {
+				const userId = await getUserId();
+				if (!userId)
+					throw new Error("You must be signed in to add an account.");
+
+				const { data, error } = await supabase
+					.from("accounts")
+					.insert({
+						user_id: userId,
+						...accountData,
+						created_at: new Date().toISOString(),
+					})
+					.select("*")
+					.single();
+
+				if (error) throw error;
+
+				const newAccount = data as Account;
+				set((state) => ({
+					accounts: [...state.accounts, newAccount],
+				}));
+
+				return newAccount;
+			},
+
+			updateAccount: async (accountId, patch) => {
+				const userId = await getUserId();
+				if (!userId)
+					throw new Error("You must be signed in to update an account.");
+
+				// Optimistic update
+				set((state) => ({
+					accounts: state.accounts.map((account) =>
+						account.id === accountId ? { ...account, ...patch } : account,
+					),
+				}));
+
+				const { error } = await supabase
+					.from("accounts")
+					.update(patch)
+					.eq("id", accountId)
+					.eq("user_id", userId);
+
+				if (error) {
+					// Rollback: re-fetch accounts to restore
+					await get().fetchAccounts(true);
+					throw error;
 				}
+			},
+
+			deleteAccount: async (accountId) => {
+				const userId = await getUserId();
+				if (!userId)
+					throw new Error("You must be signed in to delete an account.");
+
+				set((state) => ({
+					accounts: state.accounts.filter((acc) => acc.id !== accountId),
+				}));
+
+				const { error } = await supabase
+					.from("accounts")
+					.delete()
+					.eq("id", accountId)
+					.eq("user_id", userId);
+
+				if (error) {
+					await get().fetchAccounts(true);
+					throw error;
+				}
+			},
+
+			fetchAccounts: async (force = false) => {
+				if (!force && get().accounts.length > 0) return;
 
 				const userId = await getUserId();
-
 				if (!userId) {
-					set({
-						accounts: [],
-					});
-
+					set({ accounts: [] });
 					return;
 				}
 
 				const { data, error } = await supabase
 					.from("accounts")
-					.select("id, user_id, name, created_at")
+					.select("*")
 					.eq("user_id", userId)
-					.order("name", {
-						ascending: true,
-					});
+					.order("name", { ascending: true });
 
 				if (error) {
 					console.error("Failed to fetch accounts:", error.message);
-
 					return;
 				}
 
-				set({
-					accounts: (data ?? []) as Account[],
-				});
+				set({ accounts: (data ?? []) as Account[] });
 			},
 		}),
 		{
@@ -1914,9 +1989,7 @@ export const useBudgetStore = create<BudgetState>()(
 
 				if (persistedVersion < 3 && typeof window !== "undefined") {
 					if (Object.keys(groupPreferences).length === 0) {
-						groupPreferences = readLegacyGroupPreferences(
-							window.localStorage,
-						);
+						groupPreferences = readLegacyGroupPreferences(window.localStorage);
 					}
 
 					if (Object.keys(categoryPreferences).length === 0) {

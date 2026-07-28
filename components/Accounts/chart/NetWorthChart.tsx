@@ -37,10 +37,18 @@ import type {
 	DateRange,
 	Timeframe,
 } from "@/components/Accounts/types";
-import {
-	compactCurrency,
-	formatSignedCurrency,
-} from "@/utils/formatters";
+import { compactCurrency, formatSignedCurrency } from "@/utils/formatters";
+
+interface NetWorthChartProps {
+	chartType: ChartType;
+	dateRange: DateRange;
+	timeframe: Timeframe;
+	points: ChartPoint[];
+	summary: { assets: number; liabilities: number; netWorth: number };
+	onChartTypeChange: (value: ChartType) => void;
+	onDateRangeChange: (value: DateRange) => void;
+	onTimeframeChange?: (value: Timeframe) => void;
+}
 
 export function NetWorthChart({
 	chartType,
@@ -50,15 +58,8 @@ export function NetWorthChart({
 	summary,
 	onChartTypeChange,
 	onDateRangeChange,
-}: {
-	chartType: ChartType;
-	dateRange: DateRange;
-	timeframe: Timeframe;
-	points: ChartPoint[];
-	summary: { assets: number; liabilities: number; netWorth: number };
-	onChartTypeChange: (value: ChartType) => void;
-	onDateRangeChange: (value: DateRange) => void;
-}) {
+	onTimeframeChange,
+}: NetWorthChartProps) {
 	const [chartMenuOpen, setChartMenuOpen] = useState(false);
 	const [rangeMenuOpen, setRangeMenuOpen] = useState(false);
 	const [performanceTooltip, setPerformanceTooltip] =
@@ -192,16 +193,17 @@ export function NetWorthChart({
 			label:
 				timeframe === "year"
 					? String(new Date().getFullYear())
-					: new Date().toLocaleDateString("en-US", {
-							month: "short",
-							year: "numeric",
-						}),
+					: timeframe === "quarter"
+						? `Q${Math.floor(new Date().getMonth() / 3) + 1} ${new Date().getFullYear()}`
+						: new Date().toLocaleDateString("en-US", {
+								month: "short",
+								year: "numeric",
+							}),
 			assets: summary.assets,
 			liabilities: -summary.liabilities,
 			netWorth: summary.netWorth,
 		},
 	];
-
 	const breakdownValues = [
 		summary.assets,
 		-summary.liabilities,
@@ -243,7 +245,9 @@ export function NetWorthChart({
 							{chartType === "breakdown"
 								? timeframe === "year"
 									? "This year"
-									: "This month"
+									: timeframe === "quarter"
+										? "This quarter"
+										: "This month"
 								: `${
 										DATE_RANGE_OPTIONS.find(
 											(option) => option.value === dateRange,
@@ -255,6 +259,7 @@ export function NetWorthChart({
 
 				<div className="flex flex-col gap-3 sm:flex-row">
 					<Dropdown
+						key={chartType}
 						label={chartType === "performance" ? "Performance" : "Breakdown"}
 						open={chartMenuOpen}
 						onOpenChange={(open) => {
@@ -276,39 +281,57 @@ export function NetWorthChart({
 						className="w-full sm:w-52"
 					/>
 
-					<Dropdown
-						label={
-							chartType === "breakdown"
-								? timeframe === "year"
+					{/* Breakdown: dropdown controls timeframe, not dateRange */}
+					{chartType === "breakdown" ? (
+						<Dropdown
+							key={timeframe}
+							label={
+								timeframe === "year"
 									? "Yearly"
-									: "Monthly"
-								: (DATE_RANGE_OPTIONS.find(
-										(option) => option.value === dateRange,
-									)?.label ?? "1 month")
-						}
-						open={rangeMenuOpen}
-						onOpenChange={(open) => {
-							setRangeMenuOpen(open);
-
-							if (open) {
-								setChartMenuOpen(false);
+									: timeframe === "quarter"
+										? "Quarterly"
+										: "Monthly"
 							}
-						}}
-						options={
-							chartType === "breakdown"
-								? [
-										{ value: "YTD", label: "Yearly" },
-										{ value: "1M", label: "Monthly" },
-									]
-								: DATE_RANGE_OPTIONS
-						}
-						value={dateRange}
-						onChange={(value) => {
-							onDateRangeChange(value as DateRange);
-							setRangeMenuOpen(false);
-						}}
-						className="w-full sm:w-40"
-					/>
+							open={rangeMenuOpen}
+							onOpenChange={(open) => {
+								setRangeMenuOpen(open);
+								if (open) setChartMenuOpen(false);
+							}}
+							options={[
+								{ value: "month", label: "Monthly" },
+								{ value: "quarter", label: "Quarterly" },
+								{ value: "year", label: "Yearly" },
+							]}
+							value={timeframe}
+							onChange={(value) => {
+								if (onTimeframeChange) {
+									onTimeframeChange(value as Timeframe);
+								}
+								setRangeMenuOpen(false);
+							}}
+							className="w-full sm:w-40"
+						/>
+					) : (
+						<Dropdown
+							key={dateRange}
+							label={
+								DATE_RANGE_OPTIONS.find((option) => option.value === dateRange)
+									?.label ?? "1 month"
+							}
+							open={rangeMenuOpen}
+							onOpenChange={(open) => {
+								setRangeMenuOpen(open);
+								if (open) setChartMenuOpen(false);
+							}}
+							options={DATE_RANGE_OPTIONS}
+							value={dateRange}
+							onChange={(value) => {
+								onDateRangeChange(value as DateRange);
+								setRangeMenuOpen(false);
+							}}
+							className="w-full sm:w-40"
+						/>
+					)}
 				</div>
 			</div>
 
