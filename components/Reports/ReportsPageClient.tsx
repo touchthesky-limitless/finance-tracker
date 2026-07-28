@@ -21,7 +21,7 @@ import {
 	type TransactionFilters,
 } from "@/components/Transactions/transactionFilters";
 import { useMerchantOptions } from "@/hooks/useMerchantOptions";
-import { useBudgetStore } from "@/store/useBudgetStore";
+import { Transaction, useBudgetStore } from "@/store/useBudgetStore";
 import { formatMoney } from "@/utils/formatters";
 
 import { CashFlowBreakdown } from "@/components/Reports/CashFlowBreakdown";
@@ -55,6 +55,7 @@ import type {
 	SavedReport,
 	SavedReportConfiguration,
 } from "@/components/Reports/types";
+import { useTransactionDrawer } from "@/store/useTransactionDrawer";
 
 const DEFAULT_SORTING: SortingState = [{ id: "date", desc: true }];
 
@@ -193,6 +194,8 @@ export default function ReportsPageClient() {
 		(state) => state.confirmedRecurringMerchants,
 	);
 	const merchantItems = useMerchantOptions();
+	const openDrawer = useTransactionDrawer((state) => state.openDrawer);
+
 	const {
 		savedReports,
 		isLoading: areSavedReportsLoading,
@@ -563,6 +566,10 @@ export default function ReportsPageClient() {
 		replaceReportUrl(report);
 	};
 
+	const handleRowClick = (transaction: Transaction) => {
+		openDrawer(transaction.id);
+	};
+
 	return (
 		<div className="min-h-screen bg-[#f6f5f3] p-3 text-gray-950 sm:p-5 dark:bg-[#121212] dark:text-white">
 			<ReportHeader
@@ -747,10 +754,8 @@ export default function ReportsPageClient() {
 							transactions={tableTransactions}
 							selectedIds={selectedIds}
 							onSelectRow={handleSelectRow}
-							onRowClick={(transaction) =>
-								router.push(
-									`/transactions/${encodeURIComponent(transaction.id)}`,
-								)
+							onRowClick={handleRowClick
+								
 							}
 							columnVisibility={columnVisibility}
 							isEditMode={isEditMode}

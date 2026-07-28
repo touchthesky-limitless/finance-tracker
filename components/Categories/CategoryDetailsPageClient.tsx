@@ -68,6 +68,8 @@ import {
 	getBreadcrumb,
 	type NavigationSource,
 } from "@/lib/navigation/breadcrumb";
+// ✅ ADDED: Import global drawer store
+import { useTransactionDrawer } from "@/store/useTransactionDrawer";
 
 const DEFAULT_SORTING: SortingState = [{ id: "date", desc: true }];
 const HIDDEN_MODES = ["visible", "hidden", "all"] as const;
@@ -258,6 +260,9 @@ export default function CategoryDetailsPageClient() {
 			categoryPreferences,
 			groupPreferences,
 		});
+
+	// ✅ ADDED: Global drawer store
+	const openDrawer = useTransactionDrawer((state) => state.openDrawer);
 
 	const [loading, setLoading] = useState(true);
 	const [isEditOpen, setIsEditOpen] = useState(false);
@@ -721,6 +726,10 @@ export default function CategoryDetailsPageClient() {
 		);
 	}
 
+	const handleRowClick = (transaction: Transaction) => {
+		openDrawer(transaction.id);
+	};
+
 	return (
 		<div className="min-h-screen space-y-5 bg-gray-50 p-4 text-gray-900 dark:bg-[#171716] dark:text-white sm:p-5">
 			<header className="flex flex-wrap items-center gap-4">
@@ -817,11 +826,7 @@ export default function CategoryDetailsPageClient() {
 							transactions={periodTransactions}
 							selectedIds={selectedIds}
 							onSelectRow={handleSelectRow}
-							onRowClick={(transaction: Transaction) => {
-								router.push(
-									`/transactions/${encodeURIComponent(transaction.id)}`,
-								);
-							}}
+							onRowClick={handleRowClick}
 							columnVisibility={columnVisibility}
 							isEditMode={isTableEditMode}
 							currentView="all"

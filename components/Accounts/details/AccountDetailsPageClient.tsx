@@ -41,7 +41,6 @@ import { MoveTransactionsDialog } from "@/components/Accounts/details/MoveTransa
 import CsvUploader from "@/components/CsvUploader";
 import { DataTable } from "@/components/Transactions/DataTable";
 import { TableToolbar } from "@/components/Transactions/TableToolbar";
-import { TRANSACTION_RETURN_URL_KEY } from "@/lib/transactions/navigation";
 import {
 	type Account,
 	type Transaction,
@@ -54,6 +53,7 @@ import {
 	getBreadcrumb,
 	type NavigationSource,
 } from "@/lib/navigation/breadcrumb";
+import { useTransactionDrawer } from "@/store/useTransactionDrawer";
 
 const AddTransactionModal = dynamic(
 	() => {
@@ -147,6 +147,8 @@ export default function AccountDetailsPageClient() {
 	const updateTransaction = useBudgetStore((state) => {
 		return state.updateTransaction;
 	});
+
+	const openDrawer = useTransactionDrawer((state) => state.openDrawer);
 
 	const [isEditMode, setIsEditMode] = useState(false);
 	const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -610,25 +612,6 @@ export default function AccountDetailsPageClient() {
 		[updateUrl],
 	);
 
-	const openTransaction = useCallback(
-		(transaction: Transaction): void => {
-			if (typeof window !== "undefined") {
-				const returnUrl = [
-					window.location.pathname,
-					window.location.search,
-					window.location.hash,
-				].join("");
-
-				window.sessionStorage.setItem(TRANSACTION_RETURN_URL_KEY, returnUrl);
-			}
-
-			router.push(`/transactions/${encodeURIComponent(transaction.id)}`, {
-				scroll: false,
-			});
-		},
-		[router],
-	);
-
 	const handleSelectRow = useCallback(
 		(transactionId: string, event: ReactMouseEvent): void => {
 			event.stopPropagation();
@@ -643,6 +626,10 @@ export default function AccountDetailsPageClient() {
 		},
 		[],
 	);
+
+		const handleRowClick = (transaction: Transaction) => {
+		openDrawer(transaction.id);
+	};
 
 	const downloadTransactions = (): void => {
 		downloadCsv(`${accountName}-transactions.csv`, [
@@ -880,7 +867,7 @@ export default function AccountDetailsPageClient() {
 								transactions={filteredTransactions}
 								selectedIds={selectedIds}
 								onSelectRow={handleSelectRow}
-								onRowClick={openTransaction}
+								onRowClick={handleRowClick}
 								columnVisibility={columnVisibility}
 								isEditMode={isEditMode}
 								currentView="all"

@@ -70,10 +70,9 @@ import { type Transaction, useBudgetStore } from "@/store/useBudgetStore";
 import { compactCurrency, formatMoney } from "@/utils/formatters";
 import {
 	getBreadcrumb,
-	appendNavigationSource,
-	getNavigationSource,
 	type NavigationSource,
 } from "@/lib/navigation/breadcrumb";
+import { useTransactionDrawer } from "@/store/useTransactionDrawer";
 
 const DEFAULT_SORTING: SortingState = [{ id: "date", desc: true }];
 const HIDDEN_MODES = ["visible", "hidden", "all"] as const;
@@ -285,6 +284,8 @@ export default function MerchantDetailsPageClient() {
 	const { allUnifiedMerchants, getMerchantById, getMerchantId } =
 		useUnifiedMerchants();
 
+	const openDrawer = useTransactionDrawer((state) => state.openDrawer);
+
 	const [loading, setLoading] = useState(true);
 	const [isEditOpen, setIsEditOpen] = useState(false);
 	const [mergeSource, setMergeSource] = useState<MerchantEditorValue | null>(
@@ -349,34 +350,6 @@ export default function MerchantDetailsPageClient() {
 
 	const fromParam = searchParams.get("from");
 	const breadcrumb = getBreadcrumb(fromParam);
-	const currentSource = getNavigationSource(fromParam);
-
-	const openTransaction = useCallback(
-		(transaction: Transaction): void => {
-			const basePath = `/transactions/${encodeURIComponent(transaction.id)}`;
-
-			// Pass the current context forward to the transaction detail page
-			const pathWithContext = appendNavigationSource(basePath, currentSource);
-
-			router.push(pathWithContext);
-		},
-		[router, currentSource],
-	);
-
-	// const cameFrom = searchParams.get("from");
-	// const breadcrumbLabel =
-	// 	cameFrom === "cash-flow"
-	// 		? "Cash Flow"
-	// 		: cameFrom === "transactions"
-	// 			? "Transactions"
-	// 			: "Accounts";
-
-	// const breadcrumbHref =
-	// 	cameFrom === "cash-flow"
-	// 		? "/cash-flow"
-	// 		: cameFrom === "transactions"
-	// 			? "/transactions"
-	// 			: "/accounts";
 
 	const updateUrl = useCallback(
 		(updates: Record<string, string | null>) => {
@@ -599,6 +572,10 @@ export default function MerchantDetailsPageClient() {
 				? current.filter((value) => value !== id)
 				: [...current, id];
 		});
+	};
+
+	const handleRowClick = (transaction: Transaction) => {
+		openDrawer(transaction.id);
 	};
 
 	const handleTimeframeChange = (nextTimeframe: CashFlowTimeframe): void => {
@@ -863,7 +840,7 @@ export default function MerchantDetailsPageClient() {
 							transactions={periodTransactions}
 							selectedIds={selectedIds}
 							onSelectRow={handleSelectRow}
-							onRowClick={openTransaction}
+							onRowClick={handleRowClick}
 							columnVisibility={columnVisibility}
 							isEditMode={isTableEditMode}
 							currentView="all"

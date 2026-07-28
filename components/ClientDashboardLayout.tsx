@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 "use client";
 
 import { useState, createContext, useContext, useMemo } from "react"; // ✅ Removed useEffect
@@ -10,6 +11,8 @@ import { UndoToast } from "@/components/ui/UndoToast";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { PAGE_TITLES } from "@/config/pageTitles";
 import { MOBILE_BREAKPOINT } from "@/config/breakpoints";
+import TransactionDetailsDrawer from "@/components/Transactions/TransactionDetailsDrawer";
+import { useTransactionDrawer } from "@/store/useTransactionDrawer";
 
 const SidebarContext = createContext<{ openSidebar: () => void } | null>(null);
 export const useSidebar = () => {
@@ -39,6 +42,16 @@ export default function ClientDashboardLayout({
 		);
 		return matchingPath ? PAGE_TITLES[matchingPath] : "";
 	}, [pathname]);
+
+	const selectedTransactionId = useTransactionDrawer(
+		(state) => state.selectedTransactionId,
+	);
+	const closeDrawer = useTransactionDrawer((state) => state.closeDrawer);
+	const transactions = useBudgetStore((state) => state.transactions);
+
+	const selectedTransaction = useMemo(() => {
+		return transactions.find((tx) => tx.id === selectedTransactionId) ?? null;
+	}, [selectedTransactionId, transactions]);
 
 	return (
 		<VersionProvider version="pro">
@@ -118,6 +131,26 @@ export default function ClientDashboardLayout({
 					/>
 				)}
 			</SidebarContext.Provider>
+			{selectedTransaction && (
+				<TransactionDetailsDrawer
+					key={selectedTransaction.id}
+					transaction={selectedTransaction}
+					isOpen={!!selectedTransactionId}
+					onClose={closeDrawer}
+					onDeleted={(_count) => {
+						//! TODO Handle deletion notification if needed
+						closeDrawer();
+					}}
+					onDuplicate={(_transaction) => {
+						///! TODO Handle duplication (open new transaction modal, etc.)
+						closeDrawer();
+					}}
+					onCreateRule={(_transaction) => {
+						//! TODO Handle rule creation
+						closeDrawer();
+					}}
+				/>
+			)}
 		</VersionProvider>
 	);
 }

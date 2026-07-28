@@ -40,10 +40,9 @@ import { useMerchantOptions } from "@/hooks/useMerchantOptions";
 import type { RuleModalSeed } from "@/components/Transactions/RuleModal";
 import type { TransactionRule } from "@/lib/rules/ruleEngine";
 import { MerchantRuleToast } from "@/components/Transactions/MerchantRuleToast";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { TRANSACTION_RETURN_URL_KEY } from "@/lib/transactions/navigation";
 import { useTransactionToastStore } from "@/store/useTransactionToastStore";
 import BulkEditTransactionsDrawer from "@/components/Transactions/BulkEditTransactionsDrawer";
+import { useTransactionDrawer } from "@/store/useTransactionDrawer";
 
 const DEFAULT_SORTING: SortingState = [
 	{
@@ -214,20 +213,6 @@ function getAccountFilterGroup(
 	return balance < 0 ? "Liabilities::Other Liabilities" : "Assets::Cash";
 }
 
-function getTransactionIdFromPathname(pathname: string): string | null {
-	const match = pathname.match(/^\/transactions\/([^/?#]+)\/?$/);
-
-	if (!match?.[1]) {
-		return null;
-	}
-
-	try {
-		return decodeURIComponent(match[1]);
-	} catch {
-		return match[1];
-	}
-}
-
 function createBlankTransaction(): Transaction {
 	return {
 		id: crypto.randomUUID(),
@@ -323,96 +308,77 @@ export default function TransactionsPageClient({
 		getClientSnapshot,
 		getServerSnapshot,
 	);
-	const router = useRouter();
-	const pathname = usePathname();
-	const searchParams = useSearchParams();
 	type AddTransactionMode = "new" | "duplicate";
 
 	const [addTransactionState, setAddTransactionState] = useState<{
 		mode: AddTransactionMode;
 		transaction: Transaction;
 	} | null>(null);
+
 	// Store selectors
 	const transactions = useBudgetStore((state) => state.transactions);
-
-	const pathnameTransactionId = getTransactionIdFromPathname(pathname);
-
-	const activeTransactionId = initialTransactionId ?? pathnameTransactionId;
-
-	const selectedTransaction = useMemo(() => {
-		if (!activeTransactionId) {
-			return null;
-		}
-
-		return (
-			transactions.find((transaction) => {
-				return transaction.id === activeTransactionId;
-			}) ?? null
-		);
-	}, [activeTransactionId, transactions]);
-
 	const updateTransaction = useBudgetStore((state) => state.updateTransaction);
-
 	const setToast = useBudgetStore((state) => state.setToast);
-
 	const toast = useBudgetStore((state) => state.toast);
-
 	const customCategories = useBudgetStore((state) => state.customCategories);
-
 	const fetchCustomCategories = useBudgetStore(
 		(state) => state.fetchCustomCategories,
 	);
-
 	const reportDeletedTransactions = useTransactionToastStore((state) => {
 		return state.reportDeletedTransactions;
 	});
-
 	const accounts = useBudgetStore((state) => state.accounts);
-
 	const fetchAccounts = useBudgetStore((state) => state.fetchAccounts);
-
 	const fetchMerchants = useBudgetStore((state) => state.fetchMerchants);
-
 	const customTags = useBudgetStore((state) => state.customTags);
-
 	const saveRule = useBudgetStore((state) => state.saveRule);
 	const deleteRule = useBudgetStore((state) => state.deleteRule);
-
 	const confirmedRecurringMerchants = useBudgetStore(
 		(state) => state.confirmedRecurringMerchants,
 	);
-
 	const merchants = useBudgetStore((state) => {
 		return state.merchants;
 	});
 
+	const selectedTransactionId = useTransactionDrawer(
+		(state) => state.selectedTransactionId,
+	);
+	const openDrawer = useTransactionDrawer((state) => state.openDrawer);
+	const closeDrawer = useTransactionDrawer((state) => state.closeDrawer);
+
+	// ✅ Deep‑link support: open drawer if initialTransactionId is provided
+	useEffect(() => {
+		if (initialTransactionId) {
+			openDrawer(initialTransactionId);
+		}
+	}, [initialTransactionId, openDrawer]);
+
+	// ✅ Derive the selected transaction from the store
+	const selectedTransaction = useMemo(() => {
+		if (!selectedTransactionId) return null;
+		return (
+			transactions.find(
+				(transaction) => transaction.id === selectedTransactionId,
+			) ?? null
+		);
+	}, [selectedTransactionId, transactions]);
+
 	// Page state
 	const [searchQuery, setSearchQuery] = useState("");
-
 	const [dateRange, setDateRange] = useState<TransactionDateRange>({
 		startDate: "",
 		endDate: "",
 	});
-
 	const merchantItems = useMerchantOptions();
-
 	const [transactionFilters, setTransactionFilters] =
 		useState<TransactionFilters>(EMPTY_TRANSACTION_FILTERS);
-
 	const [selectedIds, setSelectedIds] = useState<string[]>([]);
-
 	const [currentView, setCurrentView] = useState<"all" | "review">("all");
-
 	const [isEditMode, setIsEditMode] = useState(false);
-
 	const [isSummaryVisible, setIsSummaryVisible] = useState(false);
-
 	const [showUploader, setShowUploader] = useState(false);
-
 	const [isInitialDataLoading, setIsInitialDataLoading] = useState(true);
-
 	const [isBulkEditOpen, setIsBulkEditOpen] = useState(false);
-
 	const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(
 		() => {
 			return readLocalStorage<VisibilityState>("sort_cols", {});
@@ -469,44 +435,13 @@ export default function TransactionsPageClient({
 		});
 	}, [merchantItems]);
 
-	const getTransactionUrl = useCallback(
-		(transactionId?: string) => {
-			const query = searchParams.toString();
-
-			const pathname = transactionId
-				? `/transactions/${encodeURIComponent(transactionId)}`
-				: "/transactions";
-
-			return query ? `${pathname}?${query}` : pathname;
-		},
-		[searchParams],
-	);
-
-	const openTransaction = useCallback(
+	// ✅ Row click handler – opens the global drawer instead of navigating
+	const handleRowClick = useCallback(
 		(transaction: Transaction) => {
-			router.push(getTransactionUrl(transaction.id), {
-				scroll: false,
-			});
+			openDrawer(transaction.id);
 		},
-		[getTransactionUrl, router],
+		[openDrawer],
 	);
-
-	const closeTransaction = useCallback(() => {
-		const fallbackUrl = getTransactionUrl();
-
-		const returnUrl =
-			typeof window === "undefined"
-				? null
-				: window.sessionStorage.getItem(TRANSACTION_RETURN_URL_KEY);
-
-		if (typeof window !== "undefined") {
-			window.sessionStorage.removeItem(TRANSACTION_RETURN_URL_KEY);
-		}
-
-		router.replace(returnUrl || fallbackUrl, {
-			scroll: false,
-		});
-	}, [getTransactionUrl, router]);
 
 	const handleOpenBulkEdit = useCallback(() => {
 		if (selectedIds.length === 0) {
@@ -543,20 +478,6 @@ export default function TransactionsPageClient({
 		};
 	}, [fetchAccounts, fetchCustomCategories, fetchMerchants]);
 
-	const openDuplicateTransaction = useCallback((transaction: Transaction) => {
-		setAddTransactionState({
-			mode: "duplicate",
-			transaction: {
-				...transaction,
-				id: crypto.randomUUID(),
-				created_at: undefined,
-				user_id: undefined,
-				is_hidden: false,
-				tags: [...(transaction.tags ?? [])],
-			},
-		});
-	}, []);
-
 	// Persist sorting
 	useEffect(() => {
 		writeLocalStorage("custom_sort", sorting);
@@ -584,6 +505,43 @@ export default function TransactionsPageClient({
 			window.removeEventListener("keydown", handleEscape);
 		};
 	}, []);
+
+	// ✅ Handlers for the drawer callbacks (they actually use the parameters)
+	const handleDeleted = useCallback(
+		(count: number) => {
+			reportDeletedTransactions(count);
+			closeDrawer();
+		},
+		[closeDrawer, reportDeletedTransactions],
+	);
+
+	const handleDuplicate = useCallback(
+		(transaction: Transaction) => {
+			setAddTransactionState({
+				mode: "duplicate",
+				transaction: {
+					...transaction,
+					id: crypto.randomUUID(),
+					created_at: undefined,
+					user_id: undefined,
+					is_hidden: false,
+					tags: [...(transaction.tags ?? [])],
+				},
+			});
+			closeDrawer();
+		},
+		[closeDrawer],
+	);
+
+	const handleCreateRule = useCallback(
+		(transaction: Transaction) => {
+			setRuleModalState({
+				seed: { sourceTransaction: transaction },
+			});
+			closeDrawer();
+		},
+		[closeDrawer],
+	);
 
 	const filterData = useMemo<TransactionFilterData>(() => {
 		const categoryOptions: TransactionFilterOption[] = [];
@@ -1106,7 +1064,6 @@ export default function TransactionsPageClient({
 		[transactions, updateTransaction],
 	);
 
-	// Update only the category field
 	const handleCategoryChange = useCallback(
 		async (transactionId: string, newCategory: string) => {
 			const originalTransaction = transactions.find((transaction) => {
@@ -1193,14 +1150,12 @@ export default function TransactionsPageClient({
 			/>
 
 			<div className="flex flex-1 min-h-0 overflow-hidden   md:gap-6 flex-col md:flex-row-reverse">
-				{/* Summary Sidebar - Top on mobile, Right on desktop (no order/auto-margin needed) */}
 				<SummarySidebar
 					isVisible={isSummaryVisible}
 					stats={summaryStats}
 					className="w-full md:w-80 shrink-0"
 				/>
 
-				{/* Table Container - Bottom on mobile, Left on desktop */}
 				<div className="flex-1 flex flex-col min-w-0 bg-white dark:bg-[#191919] border border-gray-200 dark:border-white/5 shadow-sm overflow-hidden transition-colors duration-200">
 					<TableToolbar
 						isEditMode={isEditMode}
@@ -1228,7 +1183,7 @@ export default function TransactionsPageClient({
 							selectedIds={selectedIds}
 							merchantItems={merchantItems}
 							onSelectRow={handleSelectRow}
-							onRowClick={openTransaction}
+							onRowClick={handleRowClick}
 							onMerchantChange={handleMerchantChange}
 							columnVisibility={columnVisibility}
 							isEditMode={isEditMode}
@@ -1282,21 +1237,16 @@ export default function TransactionsPageClient({
 				</div>
 			)}
 
+			{/* ✅ Global drawer – driven by Zustand store */}
 			{selectedTransaction && (
 				<TransactionDetailsDrawer
 					key={selectedTransaction.id}
 					transaction={selectedTransaction}
-					isOpen
-					onClose={closeTransaction}
-					onDeleted={reportDeletedTransactions}
-					onDuplicate={openDuplicateTransaction}
-					onCreateRule={(transaction) => {
-						setRuleModalState({
-							seed: {
-								sourceTransaction: transaction,
-							},
-						});
-					}}
+					isOpen={!!selectedTransactionId}
+					onClose={closeDrawer}
+					onDeleted={handleDeleted}
+					onDuplicate={handleDuplicate}
+					onCreateRule={handleCreateRule}
 				/>
 			)}
 
