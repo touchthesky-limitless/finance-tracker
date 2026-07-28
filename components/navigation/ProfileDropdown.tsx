@@ -58,7 +58,8 @@ export default function ProfileDropdown({ isCollapsed }: ProfileDropdownProps) {
 					side="top"
 					align={isCollapsed ? "center" : "start"}
 					sideOffset={16}
-					className="w-50 rounded-2xl shadow-2xl p-2 animate-in fade-in zoom-in-95 z-100
+					// ✅ Updated z-index to z-[9999] to sit above everything else
+					className="w-50 rounded-2xl shadow-2xl p-2 animate-in fade-in zoom-in-95 z-[9999]
                         bg-white border border-gray-200
                         dark:bg-[#1e1e1e] dark:border-[#2a2a2a]"
 				>

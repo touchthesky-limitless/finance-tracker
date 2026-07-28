@@ -8,6 +8,8 @@ import { StockData } from "@/lib/types";
 import { MarketInfo } from "@/app/(app)/stocks/page";
 import ViewToggle from "@/components/ViewToggle";
 import { Shimmer } from "@/components/ui/Shimmer";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
+import { MOBILE_BREAKPOINT } from "@/config/breakpoints";
 
 interface StockClientViewProps {
 	stocks: (StockData | null)[];
@@ -107,6 +109,8 @@ export default function StockClientView({
 		return window.matchMedia("(max-width: 767px)").matches ? "list" : "grid";
 	});
 
+	const isMobile = useMediaQuery(MOBILE_BREAKPOINT);
+
 	// Search and Sort State
 	const [searchQuery, setSearchQuery] = useState("");
 	// 1. Set default sort to changePercent
@@ -173,9 +177,11 @@ export default function StockClientView({
 			<header className="mb-8 flex items-end justify-between gap-4">
 				{/* Left Side: Title and Status */}
 				<div className="flex flex-col gap-1">
-					<h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-						Market Pulse
-					</h1>
+					{!isMobile && (
+						<h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+							Stocks
+						</h1>
+					)}
 					<p className="text-gray-500">
 						Real-time tracking of your favorite assets
 					</p>

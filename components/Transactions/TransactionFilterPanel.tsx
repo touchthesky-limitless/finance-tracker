@@ -9,20 +9,7 @@ import {
 	type SetStateAction,
 	type ReactNode,
 } from "react";
-import {
-	Building2,
-	Car,
-	CircleX,
-	CreditCard,
-	Home,
-	Landmark,
-	LineChart,
-	Search,
-	Sparkles,
-	Tag,
-	WalletCards,
-	X,
-} from "lucide-react";
+import { CircleX, Search, Tag, X } from "lucide-react";
 
 import { CATEGORY_HIERARCHY, getCategoryTheme } from "@/constants";
 import { CUSTOM_ICON_MAP, SYSTEM_ICON_MAP } from "@/constants/icons";
@@ -36,6 +23,7 @@ import {
 	type TriStateFilter,
 } from "@/components/Transactions/transactionFilters";
 import { MerchantOptionContent } from "@/components/Merchants/MerchantOptionContent";
+import { AccountIcon } from "@/components/Accounts/AccountIcon";
 
 export type TransactionFilterSection =
 	| "categories"
@@ -229,29 +217,7 @@ function buildAccountGroups(
 }
 
 function AccountOptionIcon({ subgroup }: { subgroup: string }) {
-	const normalized = normalize(subgroup);
-	const Icon =
-		normalized === "cash"
-			? Landmark
-			: normalized === "investments"
-				? LineChart
-				: normalized === "real estate" || normalized === "mortgage"
-					? Home
-					: normalized === "vehicles"
-						? Car
-						: normalized === "valuables"
-							? Sparkles
-							: normalized === "credit cards"
-								? CreditCard
-								: normalized === "loans"
-									? Building2
-									: WalletCards;
-
-	return (
-		<span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white">
-			<Icon size={11} strokeWidth={2} />
-		</span>
-	);
+	return <AccountIcon subgroup={subgroup} />;
 }
 
 function getOption(

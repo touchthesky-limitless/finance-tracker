@@ -1,21 +1,32 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useState, useEffect, type ReactNode } from "react";
 import Link from "next/link";
-import { Bell, PanelLeft, Search, Settings } from "lucide-react";
+import { Bell, PanelLeft, Search, Settings, X } from "lucide-react";
 import * as Tooltip from "@radix-ui/react-tooltip";
-
+import { useMediaQuery } from "@/hooks/useMediaQuery";
 import Logo from "@/components/ui/Logo";
+import { MOBILE_BREAKPOINT } from "@/config/breakpoints";
 
 interface SidebarHeaderProps {
 	isCollapsed: boolean;
 	onToggle: () => void;
+	onMobileClose?: () => void;
 }
 
 export default function SidebarHeader({
 	isCollapsed,
 	onToggle,
+	onMobileClose,
 }: SidebarHeaderProps) {
+	const isMobile = useMediaQuery(MOBILE_BREAKPOINT);
+	const [isMounted, setIsMounted] = useState(false);
+
+	useEffect(() => {
+		// eslint-disable-next-line react-hooks/set-state-in-effect
+		setIsMounted(true); // ✅ Runs after hydration is complete
+	}, []);
+
 	if (isCollapsed) {
 		return (
 			<header className="flex shrink-0 justify-center p-2 pb-1">
@@ -63,7 +74,8 @@ export default function SidebarHeader({
 			<Link
 				href="/dashboard"
 				aria-label="Dashboard"
-				className="flex h-9 min-w-0 items-center rounded-lg px-1.5 transition-colors hover:bg-[#ececec] dark:hover:bg-[#2a2a2a]"
+				className="text-[#0d0d0d] dark:text-[#ececec]"
+				// className="flex h-9 min-w-0 items-center rounded-lg px-1.5 transition-colors hover:bg-[#ececec] dark:hover:bg-[#2a2a2a]"
 			>
 				<Logo size={32} />
 			</Link>
@@ -84,9 +96,16 @@ export default function SidebarHeader({
 					<Settings size={19} strokeWidth={1.8} />
 				</HeaderIconButton>
 
-				<HeaderIconButton label="Close sidebar" onClick={onToggle}>
-					<PanelLeft size={19} strokeWidth={1.8} />
-				</HeaderIconButton>
+				{/* ✅ Conditionally renders X for mobile, PanelLeft for desktop */}
+				{isMounted && isMobile ? (
+					<HeaderIconButton label="Close menu" onClick={onMobileClose}>
+						<X size={19} strokeWidth={1.8} />
+					</HeaderIconButton>
+				) : (
+					<HeaderIconButton label="Close sidebar" onClick={onToggle}>
+						<PanelLeft size={19} strokeWidth={1.8} />
+					</HeaderIconButton>
+				)}
 			</div>
 		</header>
 	);

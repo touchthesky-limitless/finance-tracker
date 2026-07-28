@@ -59,6 +59,8 @@ import { type Transaction, useBudgetStore } from "@/store/useBudgetStore";
 import { deleteCustomMerchantRecord } from "@/lib/merchants/merchantRepository";
 import { useRecurringStore } from "@/store/useRecurringStore";
 import { appendNavigationSource } from "@/lib/navigation/breadcrumb";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
+import { MOBILE_BREAKPOINT } from "@/config/breakpoints";
 
 function subscribeToClient(): () => void {
 	return () => {};
@@ -95,6 +97,7 @@ export default function RecurringPageClient() {
 	const router = useRouter();
 	const searchParams = useSearchParams();
 	const searchParamsString = searchParams.toString();
+	const isMobile = useMediaQuery(MOBILE_BREAKPOINT);
 	const tab: "monthly" | "all" = pathname.endsWith("/all") ? "all" : "monthly";
 	const transactions = useBudgetStore((state) => {
 		return state.transactions;
@@ -579,9 +582,11 @@ export default function RecurringPageClient() {
 	return (
 		<div className="min-h-screen bg-gray-50 p-3 text-gray-900 md:p-4 dark:bg-[#171716] dark:text-white">
 			<header className="flex min-h-16 flex-wrap items-center gap-8 pb-5">
-				<h1 className="text-[30px] font-bold leading-none tracking-tight">
-					Recurring
-				</h1>
+				{!isMobile && (
+					<h1 className="text-[30px] font-bold leading-none tracking-tight">
+						Recurring
+					</h1>
+				)}
 				<TabButton
 					active={tab === "monthly"}
 					onClick={() => {

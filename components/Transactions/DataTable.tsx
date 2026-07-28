@@ -19,14 +19,14 @@ import {
 	type VisibilityState,
 } from "@tanstack/react-table";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { ArrowRight, Check, ChevronRight } from "lucide-react";
+import { ArrowRight, Check } from "lucide-react";
 
 import { CategorySelector } from "@/components/CategorySelector";
 import { Shimmer } from "@/components/ui/Shimmer";
 import { MerchantCell } from "@/components/Transactions/MerchantCell";
 import type { MerchantListItem } from "@/components/Merchants/types";
 import type { Merchant, Transaction } from "@/store/useBudgetStore";
-import { formatCurrency } from "@/utils/formatters";
+import { formatCurrency, truncateText } from "@/utils/formatters";
 import {
 	getTransactionMerchantId,
 	useUnifiedMerchants,
@@ -36,6 +36,12 @@ import {
 	type NavigationSource,
 	useNavigationSource,
 } from "@/lib/navigation/breadcrumb";
+import {
+	AccountIcon,
+	inferAccountSubgroup,
+} from "@/components/Accounts/AccountIcon";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
+import { MOBILE_BREAKPOINT } from "@/config/breakpoints";
 
 interface DataTableProps {
 	transactions: Transaction[];
@@ -84,6 +90,7 @@ type ActiveHeader = {
 const DATE_HEADER_HEIGHT = 48;
 const TRANSACTION_ROW_HEIGHT = 56;
 const VIRTUAL_OVERSCAN = 8;
+const ACCOUNT_CHARACTER_LENGTH = 43;
 
 const dateFormatter = new Intl.DateTimeFormat("en-US", {
 	month: "long",
@@ -246,6 +253,7 @@ export function DataTable({
 }: DataTableProps) {
 	const parentRef = useRef<HTMLDivElement>(null);
 	const router = useRouter();
+	const isMobile = useMediaQuery(MOBILE_BREAKPOINT);
 
 	const selectedIdSet = useMemo(() => {
 		return new Set(selectedIds);
@@ -357,8 +365,8 @@ export function DataTable({
 			}),
 
 			columnHelper.accessor("merchant", {
-				size: 360,
-				minSize: 160, // allow shrink on small screens
+				size: isMobile ? 222 : 350,
+				minSize: isMobile ? 140 : 160,
 				cell: (info) => {
 					const transaction = info.row.original;
 					const merchantName = String(info.getValue() || "Unknown merchant");
@@ -370,7 +378,6 @@ export function DataTable({
 						if (!merchantId) {
 							return;
 						}
-
 						const activeSource = navigationSource || source;
 						router.push(
 							appendNavigationSource(`/merchants/${merchantId}`, activeSource),
@@ -388,14 +395,15 @@ export function DataTable({
 								onRowClick(transaction);
 							}}
 							onMerchantChange={onMerchantChange}
+							isMobile={isMobile}
 						/>
 					);
 				},
 			}),
 
 			columnHelper.accessor("category", {
-				size: 360,
-				minSize: 120,
+				size: isMobile ? 20 : 300,
+				minSize: isMobile ? 50 : 120,
 				cell: (info) => {
 					const categoryName = String(info.getValue() || "Uncategorized");
 					const targetId = getCategoryId?.(categoryName);
@@ -405,25 +413,26 @@ export function DataTable({
 							onClick={(event) => {
 								event.stopPropagation();
 							}}
-							className="group flex items-center gap-1.5 w-full h-full pr-2"
+							className={`group flex items-center w-full h-full ${
+								isMobile ? "justify-center" : "gap-1.5 pr-2"
+							}`}
 						>
 							<div className="flex-1 min-w-0">
 								<CategorySelector
 									currentCategory={categoryName}
 									variant="form"
-									showChevron
-									hideChevronUntilHover
+									showChevron={!isMobile}
+									hideChevronUntilHover={!isMobile}
+									iconOnly={isMobile}
 									onSelect={(newCategory) => {
-										if (newCategory === categoryName) {
-											return;
-										}
-
+										if (newCategory === categoryName) return;
 										void onCategoryChange?.(info.row.original.id, newCategory);
 									}}
 								/>
 							</div>
 
-							{isCategoryView && (
+							{/* Hide View Category button on mobile */}
+							{isCategoryView && !isMobile && (
 								<button
 									type="button"
 									onClick={(event) => {
@@ -434,38 +443,35 @@ export function DataTable({
 									aria-label={`View ${categoryName} category`}
 									title={
 										targetId
-											? "View Category"
+											? `View ${categoryName}`
 											: `Category ID unavailable for ${categoryName}`
 									}
-									className={`flex items-center justify-center w-8 h-8 rounded-lg border border-transparent opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 group-hover:border-gray-300 dark:group-hover:border-white/20 hover:bg-gray-100 dark:hover:bg-white/5 transition-all shrink-0 ${
-										targetId ? "cursor-pointer" : "cursor-not-allowed"
-									}`}
+									className={`
+              flex items-center justify-center shrink-0 transition-all
+              ${
+								!isMobile
+									? "w-8 h-8 rounded-lg border border-transparent opacity-0 group-hover:opacity-100 group-hover:border-gray-300 dark:group-hover:border-white/20 hover:bg-gray-100 dark:hover:bg-white/5"
+									: "hidden"
+							}
+              ${targetId ? "cursor-pointer" : "cursor-not-allowed"}
+            `}
 								>
-									<ArrowRight
-										size={16}
-										strokeWidth={2}
-										aria-hidden="true"
-										className={
-											targetId
-												? "text-gray-600 dark:text-gray-400"
-												: "text-gray-300 dark:text-gray-600"
-										}
-									/>
+									<ArrowRight size={16} strokeWidth={2} aria-hidden="true" />
 								</button>
 							)}
 						</div>
 					);
 				},
 			}),
-
 			columnHelper.accessor("account", {
-				size: 300,
-				minSize: 100,
+				size: isMobile ? 40 : 300,
+				minSize: isMobile ? 40 : 100,
 				cell: (info) => {
 					const transaction = info.row.original;
 					const accountName = transaction.account?.trim() || "Unknown account";
 					const accountId = transaction.account_id;
 					const canNavigate = Boolean(accountId);
+					const subgroup = inferAccountSubgroup(accountName);
 
 					return (
 						<button
@@ -473,11 +479,7 @@ export function DataTable({
 							disabled={!canNavigate}
 							onClick={(event) => {
 								event.stopPropagation();
-
-								if (!accountId) {
-									return;
-								}
-
+								if (!accountId) return;
 								const activeSource = navigationSource || source;
 								const url = appendNavigationSource(
 									`/accounts/details/${encodeURIComponent(accountId)}`,
@@ -490,75 +492,41 @@ export function DataTable({
 								canNavigate ? `View ${accountName}` : "Account ID unavailable"
 							}
 							className={`
-								group 
-								flex w-full min-w-0
-								items-center gap-3
-								rounded-lg
-								border border-transparent
-								px-2 py-1 text-left
-								bg-transparent
-								group-hover:border-gray-300
-								dark:group-hover:border-white/20
-								transition-colors
-								focus-visible:outline-none
-								focus-visible:border-blue-500/60
-								focus-visible:ring-2
-								focus-visible:ring-blue-500/20
-								${
-									canNavigate
-										? `
-											cursor-pointer
-											hover:border-gray-300
-											hover:bg-gray-50
-											dark:hover:border-white/20
-											dark:hover:bg-white/4
-										`
-										: `
-											cursor-not-allowed
-											opacity-50
-										`
-								}
-							`}
+  group flex w-full min-w-0 items-center gap-2 rounded-lg border border-transparent text-left transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E94F2D]
+  ${!isMobile ? "px-2 py-1 hover:border-gray-300 hover:bg-gray-50 dark:hover:border-white/20 dark:hover:bg-white/5" : "p-0 justify-center"}
+  ${!canNavigate ? "cursor-not-allowed opacity-50" : "cursor-pointer"}
+`}
 						>
-							<span
-								className="
-									min-w-0 flex-1 truncate
-									text-[15px] font-semibold
-									text-gray-900 dark:text-white
-								"
-								title={accountName}
-							>
-								{accountName}
-							</span>
+							{/* ✅ Always render the icon */}
+							<AccountIcon subgroup={subgroup} />
 
-							<ArrowRight
-								size={16}
-								strokeWidth={2}
-								aria-hidden="true"
-								className={
-									accountId
-										? `
-											shrink-0
-											opacity-0
-											text-gray-600 dark:text-gray-400
-											transition-opacity duration-150
-											group-hover:opacity-100
-											group-focus-visible:opacity-100
-										`
-										: `
-											shrink-0
-											opacity-0
-											text-gray-300 dark:text-gray-600
-										`
-								}
-							/>
+							{/* ✅ Desktop: Show text and arrow. Mobile: Hide them. */}
+							{!isMobile && (
+								<>
+									<span
+										className="min-w-0 flex-1 truncate text-[15px] font-semibold text-gray-900 dark:text-white"
+										title={accountName}
+									>
+										{truncateText(accountName, ACCOUNT_CHARACTER_LENGTH)}
+									</span>
+									{canNavigate && (
+										<ArrowRight
+											size={16}
+											strokeWidth={2}
+											aria-hidden="true"
+											className="shrink-0 text-gray-500 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100 dark:text-gray-400"
+										/>
+									)}
+								</>
+							)}
 						</button>
 					);
 				},
 			}),
 
 			columnHelper.accessor("amount", {
-				size: 140,
+				size: isMobile ? 80 : 140,
+				minSize: isMobile ? 60 : 80,
 				sortingFn: (rowA, rowB, columnId) => {
 					const firstAmount = Number(rowA.getValue(columnId));
 					const secondAmount = Number(rowB.getValue(columnId));
@@ -577,7 +545,7 @@ export function DataTable({
 					const isPositive = amount > 0;
 
 					return (
-						<div className="flex items-center justify-end w-full gap-2 pr-2 font-medium text-[15px]">
+						<div className="flex items-center justify-end w-full pr-2 font-medium text-[15px]">
 							<span
 								className={`text-right ${
 									isPositive
@@ -589,7 +557,7 @@ export function DataTable({
 								{formatCurrency(amount)}
 							</span>
 
-							<button
+							{/* <button
 								type="button"
 								onClick={(event) => {
 									event.stopPropagation();
@@ -601,7 +569,7 @@ export function DataTable({
 								className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full text-gray-500 dark:text-gray-400 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500"
 							>
 								<ChevronRight size={18} strokeWidth={2} aria-hidden="true" />
-							</button>
+							</button> */}
 						</div>
 					);
 				},
@@ -625,6 +593,7 @@ export function DataTable({
 		onRowClick,
 		onMerchantChange,
 		merchantItems,
+		isMobile,
 	]);
 
 	const uniqueTransactions = useMemo(() => {
@@ -653,6 +622,7 @@ export function DataTable({
 				date: false,
 				select: isEditMode || currentView === "review",
 				amount: columnVisibility.amount !== false,
+				account: !isMobile, // ✅ Hides the Account column entirely on mobile
 			},
 		},
 		getCoreRowModel: getCoreRowModel(),
@@ -875,7 +845,8 @@ export function DataTable({
 								<div
 									key={item.id}
 									role="row"
-									className={`absolute w-full flex items-center border-b border-gray-100 dark:border-white/5 transition-colors ${
+									onClick={() => onRowClick(row.original)}
+									className={`absolute w-full flex items-center border-b border-gray-100 dark:border-white/5 transition-colors md:cursor-pointer ${
 										isSelected
 											? "bg-blue-50 dark:bg-[#FF5A35]/10"
 											: "bg-white dark:bg-[#191919] hover:bg-gray-50 dark:hover:bg-white/5"
@@ -898,7 +869,7 @@ export function DataTable({
 													minWidth: cell.column.columnDef.minSize ?? 0,
 												}}
 												className={`min-w-0 truncate ${
-													index === 0 ? "pr-0" : "px-0"
+													index === 0 ? "pr-0" : "px-2"
 												}`}
 											>
 												{flexRender(

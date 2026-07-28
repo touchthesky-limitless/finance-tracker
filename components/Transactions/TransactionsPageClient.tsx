@@ -413,17 +413,6 @@ export default function TransactionsPageClient({
 
 	const [isBulkEditOpen, setIsBulkEditOpen] = useState(false);
 
-	// const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(
-	// 	() => {
-	// 		// On small screens, hide account column by default; respect localStorage if exists.
-	// 		const stored = readLocalStorage<VisibilityState>("sort_cols", {});
-	// 		if (typeof window !== "undefined" && window.innerWidth < 768) {
-	// 			return { ...stored, account: false };
-	// 		}
-	// 		return stored;
-	// 	},
-	// );
-
 	const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(
 		() => {
 			return readLocalStorage<VisibilityState>("sort_cols", {});

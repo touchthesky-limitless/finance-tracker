@@ -21,6 +21,8 @@ import {
 	Settings,
 	X,
 } from "lucide-react";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
+import { MOBILE_BREAKPOINT } from "@/config/breakpoints";
 
 export const ORANGE = "#ff6633";
 
@@ -28,10 +30,11 @@ export function GoalsTabs() {
 	const pathname = usePathname();
 	const isSavings = pathname.startsWith("/goals/savings");
 	const isDebt = pathname.startsWith("/goals/debt-paydown");
+	const isMobile = useMediaQuery(MOBILE_BREAKPOINT);
 
 	return (
 		<nav className="flex min-w-0 items-end gap-5 text-[18px] font-semibold sm:text-[20px]">
-			<span className="pb-2 font-bold text-gray-950 dark:text-white">Goals</span>
+			 {!isMobile &&<h1 className="pb-2 font-bold text-gray-950 dark:text-white">Goals</h1>}
 			<Link
 				href="/goals/savings"
 				className={`border-b-2 pb-2 transition-colors ${

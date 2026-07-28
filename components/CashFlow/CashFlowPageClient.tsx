@@ -42,6 +42,8 @@ import { useMerchantOptions } from "@/hooks/useMerchantOptions";
 import { useCategoryGroups } from "@/hooks/useCategoryGroups";
 import { useBudgetStore } from "@/store/useBudgetStore";
 import { formatMoney } from "@/utils/formatters";
+import { MOBILE_BREAKPOINT } from "@/config/breakpoints";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
 
 const TIMEFRAMES = ["month", "quarter", "year"] as const;
 const VIEWS = ["bar", "sankey"] as const;
@@ -92,6 +94,7 @@ export default function CashFlowPageClient() {
 	const pathname = usePathname();
 	const searchParams = useSearchParams();
 	const searchParamsString = searchParams.toString();
+	const isMobile = useMediaQuery(MOBILE_BREAKPOINT);
 
 	const transactions = useBudgetStore((state) => state.transactions);
 	const accounts = useBudgetStore((state) => state.accounts);
@@ -336,7 +339,7 @@ export default function CashFlowPageClient() {
 	return (
 		<div className="min-h-screen space-y-4 bg-gray-50 p-3 text-gray-900 dark:bg-[#171716] dark:text-white">
 			<header className="sticky top-0 z-[700] -mx-3 -mt-3 flex min-h-16 flex-wrap items-center gap-4 border-b border-gray-200 bg-gray-50/95 px-5 py-3 backdrop-blur-xl dark:border-white/5 dark:bg-[#171716]/95">
-				<h1 className="text-xl font-bold">Cash Flow</h1>
+				 {!isMobile && <h1 className="text-xl font-bold">Cash Flow</h1>}
 				<div className="ml-auto flex flex-wrap items-center justify-end gap-3">
 					<TimeframeTabs
 						value={timeframe}

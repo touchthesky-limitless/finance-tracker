@@ -42,6 +42,8 @@ import {
 } from "@/components/Accounts/utils/storage";
 import { useBudgetStore } from "@/store/useBudgetStore";
 import { appendNavigationSource } from "@/lib/navigation/breadcrumb";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
+import { MOBILE_BREAKPOINT } from "@/config/breakpoints";
 
 export default function AccountsPageClient() {
 	const router = useRouter();
@@ -69,6 +71,8 @@ export default function AccountsPageClient() {
 	const chartType = normalizeChartType(searchParams.get("chartType"));
 	const dateRange = normalizeDateRange(searchParams.get("dateRange"));
 	const timeframe = normalizeTimeframe(searchParams.get("timeframe"));
+
+	const isMobile = useMediaQuery(MOBILE_BREAKPOINT);
 
 	useEffect(() => {
 		const hasRequiredQuery =
@@ -391,7 +395,7 @@ export default function AccountsPageClient() {
 	return (
 		<div className="min-h-screen bg-gray-50 p-2 text-gray-900 sm:p-3 md:p-5 dark:bg-[#171717] dark:text-[#f5f5f5]">
 			<header className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-				<h1 className="px-1 text-lg font-semibold">Accounts</h1>
+				 {!isMobile && <h1 className="px-1 text-lg font-semibold">Accounts</h1>}
 
 				<div className="flex flex-wrap items-center gap-2">
 					{selectedAccountIds.length > 0 && (

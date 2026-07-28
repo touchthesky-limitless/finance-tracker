@@ -3,6 +3,62 @@ import { ChevronDown, Filter } from "lucide-react";
 
 import { CategoryGlyph } from "@/components/Categories/CategoryGlyph";
 
+// --- Standalone visual component ---
+interface CategoryChipProps {
+	variant?: "form" | "filter";
+	isDefault: boolean;
+	icon: string;
+	colorClass: string;
+	label: string;
+	iconOnly?: boolean;
+}
+
+export const CategoryChip = ({
+	variant = "form",
+	isDefault,
+	icon,
+	colorClass,
+	label,
+	iconOnly = false,
+}: CategoryChipProps) => {
+	if (variant === "filter") {
+		return (
+			<div className="flex min-w-0 flex-1 items-center gap-2 pr-2">
+				<Filter size={16} strokeWidth={2.5} className="shrink-0" />
+				{!iconOnly && !isDefault && (
+					<span className="truncate text-[15px] font-normal text-gray-900 dark:text-white">
+						{label}
+					</span>
+				)}
+			</div>
+		);
+	}
+
+	return (
+		 <div className={`flex min-w-0 flex-1 items-center ${iconOnly ? 'justify-center' : 'gap-2 pr-2'}`}>
+			{!isDefault && (
+				<div className={`shrink-0 rounded-xl transition-colors ${!iconOnly ? "border border-gray-100 p-1.5 shadow-sm dark:border-white/5" : "p-0"}`}>
+					<CategoryGlyph name={icon} size={16} colorClass={colorClass} />
+				</div>
+			)}
+
+			{!iconOnly && (
+				<span
+					title={label}
+					className={`truncate text-sm ${
+						isDefault
+							? "font-normal text-gray-400 dark:text-gray-500"
+							: "font-bold text-gray-900 dark:text-white"
+					}`}
+				>
+					{label}
+				</span>
+			)}
+		</div>
+	);
+};
+
+// --- Trigger button ---
 interface CategoryTriggerProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 	variant?: "form" | "filter";
 	isOpen: boolean;
@@ -12,6 +68,7 @@ interface CategoryTriggerProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 	placeholder?: string;
 	showChevron?: boolean;
 	hideChevronUntilHover?: boolean;
+	iconOnly?: boolean;
 }
 
 export const CategoryTrigger = forwardRef<
@@ -28,6 +85,7 @@ export const CategoryTrigger = forwardRef<
 		className = "",
 		showChevron = false,
 		hideChevronUntilHover = false,
+		iconOnly = false,
 		...buttonProps
 	},
 	ref,
@@ -38,62 +96,32 @@ export const CategoryTrigger = forwardRef<
 		currentCategory === "All Categories" ||
 		currentCategory === "Uncategorized";
 
-	const displayText =
+	const label =
 		variant === "form" && isDefaultCategory ? placeholder : currentCategory;
 
 	return (
 		<button
 			ref={ref}
 			type="button"
+			aria-label={label}
+			title={label}
 			aria-expanded={isOpen}
 			{...buttonProps}
 			className={`
-				flex w-full cursor-pointer items-center justify-between
-				rounded-xl 
-				border border-transparent
-group-hover:border-gray-300
-dark:group-hover:border-white/20
-				bg-transparent px-3 py-2.5
-				text-left transition-colors
-				focus:outline-none focus:ring-2 focus:ring-cyan-500/20
-				${className}
-			`}
+        flex cursor-pointer items-center rounded-xl border border-transparent transition-colors outline-none ring-0 focus-visible:ring-0
+        {/* ✅ Removed horizontal padding (px-3) and used 'justify-center' + 'w-full h-full' on mobile so it fills the cell perfectly without extra spacing */}
+        ${iconOnly ? "w-full h-full justify-center p-0" : "w-full justify-between px-3 py-2.5 text-left group-hover:border-gray-300 dark:group-hover:border-white/20"}
+        ${className}
+      `}
 		>
-			<div className="flex min-w-0 flex-1 items-center gap-2 pr-2">
-				{variant === "filter" ? (
-					<>
-						<Filter size={16} strokeWidth={2.5} className="shrink-0" />
-
-						{!isDefaultCategory && (
-							<span className="truncate text-[15px] font-normal text-gray-900 dark:text-white">
-								{currentCategory}
-							</span>
-						)}
-					</>
-				) : (
-					<>
-						{!isDefaultCategory && (
-							<div className="shrink-0 rounded-xl border border-gray-100 p-1.5 shadow-sm dark:border-white/5">
-								<CategoryGlyph
-									name={displayIcon}
-									size={16}
-									colorClass={displayColorClass}
-								/>
-							</div>
-						)}
-
-						<span
-							className={`truncate text-sm ${
-								isDefaultCategory
-									? "font-normal text-gray-400 dark:text-gray-500"
-									: "font-bold text-gray-900 dark:text-white"
-							}`}
-						>
-							{displayText}
-						</span>
-					</>
-				)}
-			</div>
+			<CategoryChip
+				variant={variant}
+				isDefault={isDefaultCategory}
+				icon={displayIcon}
+				colorClass={displayColorClass}
+				label={label}
+				iconOnly={iconOnly}
+			/>
 
 			{showChevron && (
 				<ChevronDown

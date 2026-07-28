@@ -41,6 +41,8 @@ import {
 	type TransactionFilterData,
 	type TransactionFilters,
 } from "@/components/Transactions/transactionFilters";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
+import { MOBILE_BREAKPOINT } from "@/config/breakpoints";
 
 export interface TransactionDateRange {
 	startDate: string;
@@ -279,6 +281,7 @@ export function TopToolbar({
 	const [openPopover, setOpenPopover] = useState<OpenPopover>(null);
 	const [draftSearch, setDraftSearch] = useState(searchQuery);
 	const [draftFilters, setDraftFilters] = useState<TransactionFilters>(filters);
+	const isMobile = useMediaQuery(MOBILE_BREAKPOINT);
 
 	const replaceUrlState = useCallback(
 		(
@@ -422,29 +425,30 @@ export function TopToolbar({
 			"
 		>
 			{/* LEFT GROUP: Title + Tabs */}
-			<div className="flex items-center gap-3 md:gap-8 w-full md:w-auto pb-2 md:pb-0">
-				<h1 className="text-[20px] md:text-[22px] font-bold tracking-tight text-gray-900 dark:text-white">
-					Transactions
-				</h1>
-				<div className="flex h-full gap-3 md:gap-6 text-[14px] md:text-[15px] font-medium">
-					<button
-						type="button"
-						className="border-b-[3px] border-[#FF5A35] pb-2 md:pb-4 text-[#FF5A35]"
-					>
-						All
-					</button>
-					<button
-						type="button"
-						className="pb-2 md:pb-4 text-gray-500 transition-colors hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200"
-					>
-						Receipts
-					</button>
+			{!isMobile && (
+				<div className="flex items-center gap-3 md:gap-8 w-full md:w-auto pb-2 md:pb-0">
+					<h1 className="text-[20px] md:text-[22px] font-bold tracking-tight text-gray-900 dark:text-white">
+						Transactions
+					</h1>
+					<div className="flex h-full gap-3 md:gap-6 text-[14px] md:text-[15px] font-medium">
+						<button
+							type="button"
+							className="border-b-[3px] border-[#FF5A35] pb-2 md:pb-4 text-[#FF5A35]"
+						>
+							All
+						</button>
+						<button
+							type="button"
+							className="pb-2 md:pb-4 text-gray-500 transition-colors hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200"
+						>
+							Receipts
+						</button>
+					</div>
 				</div>
-			</div>
+			)}
 
 			{/* RIGHT GROUP: Actions + Filters */}
 			<div className="flex items-center flex-wrap gap-1.5 md:gap-3 w-full md:w-auto justify-end md:justify-end pb-1 md:pb-4">
-				{" "}
 				{hasActiveFilters && (
 					<button
 						type="button"

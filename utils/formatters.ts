@@ -353,3 +353,14 @@ export function formatMarketCap(valueInMillions: number | undefined) {
 		return (valueInMillions / 1_000).toFixed(2) + "B";
 	}
 }
+
+/**
+ * Truncates a string to a specified maximum length and appends an ellipsis.
+ * @param text - The string to truncate.
+ * @param maxLength - The maximum allowed length before truncation.
+ * @returns The truncated string, or the original string if it's short enough.
+ */
+export function truncateText(text: string, maxLength: number): string {
+  if (!text) return '';
+  return text.length > maxLength ? text.slice(0, maxLength) + '…' : text;
+}

@@ -10,41 +10,42 @@ interface SidebarNavItemProps {
 	item: SidebarItemType;
 	isActive: boolean;
 	isCollapsed: boolean;
+	onItemClick?: () => void;
 }
 
 export default function SidebarNavItem({
 	item,
 	isActive,
 	isCollapsed,
+	onItemClick,
 }: SidebarNavItemProps) {
-	const navItem = (
-		<div
-			className={`group relative ${isCollapsed ? "mx-auto w-10" : "mx-1.5"}`}
-		>
-			<Link
-				href={item.href}
-				aria-current={isActive ? "page" : undefined}
-				className={`
-					flex h-9 min-w-0 items-center rounded-lg text-sm
-					transition-colors duration-100
-					focus-visible:outline-none focus-visible:ring-2
-					focus-visible:ring-black/20 dark:focus-visible:ring-white/20
-					${isCollapsed ? "w-10 justify-center" : "w-full gap-3 px-2.5 pr-9"}
-					${
-						isActive
-							? "bg-[#ececec] text-[#0d0d0d] dark:bg-[#2a2a2a] dark:text-[#ececec]"
-							: "text-[#0d0d0d] hover:bg-[#ececec] dark:text-[#ececec] dark:hover:bg-[#2a2a2a]"
-					}
-				`}
-			>
-				<item.icon size={18} strokeWidth={1.8} className="shrink-0" />
+	const linkClassName = `
+		group relative flex h-9 min-w-0 items-center rounded-lg text-sm
+		transition-colors duration-100
+		focus-visible:outline-none focus-visible:ring-2
+		focus-visible:ring-black/20 dark:focus-visible:ring-white/20
+		${isCollapsed ? "mx-auto w-10 justify-center" : "w-full gap-3 px-2.5 pr-9"} // ✅ Removed 'mx-1.5' for expanded state
+		${
+			isActive
+				? "bg-[#ececec] text-[#0d0d0d] dark:bg-[#2a2a2a] dark:text-[#ececec]"
+				: "text-[#0d0d0d] hover:bg-[#ececec] dark:text-[#ececec] dark:hover:bg-[#2a2a2a]"
+		}
+	`;
 
-				{!isCollapsed && (
-					<span className="min-w-0 flex-1 truncate font-normal">
-						{item.name}
-					</span>
-				)}
-			</Link>
+	const navItem = (
+		<Link
+			href={item.href}
+			aria-current={isActive ? "page" : undefined}
+			className={linkClassName}
+			onClick={onItemClick}
+		>
+			<item.icon size={18} strokeWidth={1.8} className="shrink-0" />
+
+			{!isCollapsed && (
+				<span className="min-w-0 flex-1 truncate font-normal">
+					{item.name}
+				</span>
+			)}
 
 			{!isCollapsed && item.hasAdd && (
 				<button
@@ -59,7 +60,7 @@ export default function SidebarNavItem({
 					<Plus size={17} strokeWidth={1.8} />
 				</button>
 			)}
-		</div>
+		</Link>
 	);
 
 	return (

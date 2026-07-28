@@ -27,12 +27,15 @@ import type { Merchant, Transaction } from "@/store/useBudgetStore";
 import { useBudgetStore } from "@/store/useBudgetStore";
 import type { MerchantListItem } from "@/components/Merchants/types";
 import { MerchantOptionContent } from "@/components/Merchants/MerchantOptionContent";
+import { MerchantLogo } from "@/components/Merchants/MerchantLogo";
+import { truncateText } from "@/utils/formatters";
 
 interface MerchantCellProps {
 	transaction: Transaction;
 	merchantId?: string;
 	merchantItems: MerchantListItem[];
 	showNavigation?: boolean;
+	isMobile?: boolean;
 
 	onNavigate: () => void;
 	onOpenEditor: () => void;
@@ -43,7 +46,7 @@ interface MerchantCellProps {
 	) => Promise<void> | void;
 }
 
-const CHARACTER_LENGTH = 13;
+const MERCHANT_CHARACTER_LENGTH = 43;
 
 function normalizeMerchantText(value: string): string {
 	return value
@@ -116,6 +119,7 @@ export function MerchantCell({
 	onNavigate,
 	onOpenEditor,
 	onMerchantChange,
+	isMobile = false,
 }: MerchantCellProps) {
 	const addCustomMerchant = useBudgetStore((state) => state.addCustomMerchant);
 
@@ -129,11 +133,6 @@ export function MerchantCell({
 	const canEditInline = Boolean(onMerchantChange);
 	const merchantName = transaction.merchant?.trim() || "Unknown merchant";
 
-	/*
-	 * Use the CSV statement/description for recommendations.
-	 * Replace this with transaction.original_statement later
-	 * if you add a dedicated database column.
-	 */
 	const originalStatement = transaction.description?.trim() || merchantName;
 
 	const {
@@ -144,7 +143,6 @@ export function MerchantCell({
 		open: isOpen,
 		onOpenChange: (nextOpen) => {
 			setIsOpen(nextOpen);
-
 			if (!nextOpen) {
 				setSearchQuery("");
 				setErrorMessage(null);
@@ -153,26 +151,12 @@ export function MerchantCell({
 		placement: "bottom-start",
 		strategy: "fixed",
 		whileElementsMounted: autoUpdate,
-		middleware: [
-			offset(6),
-			flip({
-				padding: 12,
-			}),
-			shift({
-				padding: 12,
-			}),
-		],
+		middleware: [offset(6), flip({ padding: 12 }), shift({ padding: 12 })],
 	});
 
-	const click = useClick(context, {
-		enabled: canEditInline,
-	});
-
+	const click = useClick(context, { enabled: canEditInline });
 	const dismiss = useDismiss(context);
-
-	const role = useRole(context, {
-		role: "dialog",
-	});
+	const role = useRole(context, { role: "dialog" });
 
 	const { getReferenceProps, getFloatingProps } = useInteractions([
 		click,
@@ -182,11 +166,7 @@ export function MerchantCell({
 
 	const originalStatementMerchant = useMemo(() => {
 		const normalizedStatement = normalizeMerchantText(originalStatement);
-
-		if (!normalizedStatement) {
-			return undefined;
-		}
-
+		if (!normalizedStatement) return undefined;
 		return merchantItems.find((merchant) => {
 			return normalizeMerchantText(merchant.name) === normalizedStatement;
 		});
@@ -197,24 +177,18 @@ export function MerchantCell({
 
 	const recommendedMerchants = useMemo(() => {
 		return merchantItems
-			.map((merchant) => {
-				return {
-					merchant,
-					score: getMerchantMatchScore(originalStatement, merchant.name),
-				};
-			})
-			.filter(({ score }) => {
-				return score > 0;
-			})
+			.map((merchant) => ({
+				merchant,
+				score: getMerchantMatchScore(originalStatement, merchant.name),
+			}))
+			.filter(({ score }) => score > 0)
 			.sort((first, second) => {
 				return (
 					second.score - first.score ||
 					first.merchant.name.localeCompare(second.merchant.name)
 				);
 			})
-			.map(({ merchant }) => {
-				return merchant;
-			});
+			.map(({ merchant }) => merchant);
 	}, [merchantItems, originalStatement]);
 
 	const visibleMerchants = useMemo(() => {
@@ -233,15 +207,8 @@ export function MerchantCell({
 		return source
 			.filter((merchant) => {
 				const normalizedName = normalizeMerchantText(merchant.name);
+				if (!normalizedName) return false;
 
-				if (!normalizedName) {
-					return false;
-				}
-
-				/*
-				 * Do not repeat the merchant already shown in
-				 * the Original statement section.
-				 */
 				if (
 					originalStatementMerchant &&
 					normalizedName ===
@@ -249,17 +216,8 @@ export function MerchantCell({
 				) {
 					return false;
 				}
-
-				/*
-				 * Prevent system and custom merchants with the
-				 * same normalized name from appearing twice.
-				 */
-				if (seenMerchantNames.has(normalizedName)) {
-					return false;
-				}
-
+				if (seenMerchantNames.has(normalizedName)) return false;
 				seenMerchantNames.add(normalizedName);
-
 				return true;
 			})
 			.slice(0, 20);
@@ -272,11 +230,7 @@ export function MerchantCell({
 
 	const exactMerchantExists = useMemo(() => {
 		const normalizedQuery = normalizeMerchantText(searchQuery);
-
-		if (!normalizedQuery) {
-			return false;
-		}
-
+		if (!normalizedQuery) return false;
 		return merchantItems.some((merchant) => {
 			return normalizeMerchantText(merchant.name) === normalizedQuery;
 		});
@@ -291,20 +245,15 @@ export function MerchantCell({
 	const handleMerchantSelect = async (
 		merchant: Pick<Merchant, "id" | "name">,
 	) => {
-		if (!onMerchantChange || isSaving) {
-			return;
-		}
-
+		if (!onMerchantChange || isSaving) return;
 		setIsSaving(true);
 		setErrorMessage(null);
 
 		try {
 			await onMerchantChange(transaction.id, merchant);
-
 			closePopover();
 		} catch (error) {
 			console.error("Failed to update merchant:", error);
-
 			setErrorMessage(
 				error instanceof Error ? error.message : "Failed to update merchant.",
 			);
@@ -315,14 +264,10 @@ export function MerchantCell({
 
 	const handleOriginalStatementSelect = async () => {
 		const cleanStatement = originalStatement.trim();
-
-		if (!cleanStatement || !onMerchantChange || isSaving) {
-			return;
-		}
+		if (!cleanStatement || !onMerchantChange || isSaving) return;
 
 		if (originalStatementMerchant) {
 			await handleMerchantSelect(originalStatementMerchant);
-
 			return;
 		}
 
@@ -331,13 +276,10 @@ export function MerchantCell({
 
 		try {
 			const createdMerchant = await addCustomMerchant(cleanStatement);
-
 			await onMerchantChange(transaction.id, createdMerchant);
-
 			closePopover();
 		} catch (error) {
 			console.error("Failed to use original statement as merchant:", error);
-
 			setErrorMessage(
 				error instanceof Error
 					? error.message
@@ -350,23 +292,18 @@ export function MerchantCell({
 
 	const handleCreateMerchant = async () => {
 		const cleanName = searchQuery.trim();
-
-		if (!cleanName || exactMerchantExists || !onMerchantChange || isSaving) {
+		if (!cleanName || exactMerchantExists || !onMerchantChange || isSaving)
 			return;
-		}
 
 		setIsSaving(true);
 		setErrorMessage(null);
 
 		try {
 			const createdMerchant = await addCustomMerchant(cleanName);
-
 			await onMerchantChange(transaction.id, createdMerchant);
-
 			closePopover();
 		} catch (error) {
 			console.error("Failed to create merchant:", error);
-
 			setErrorMessage(
 				error instanceof Error ? error.message : "Failed to create merchant.",
 			);
@@ -375,12 +312,10 @@ export function MerchantCell({
 		}
 	};
 
-	const initial = merchantName.charAt(0).toUpperCase() || "?";
-
-	const displayMerchantName =
-		merchantName.length > CHARACTER_LENGTH
-			? merchantName.slice(0, CHARACTER_LENGTH) + "…"
-			: merchantName;
+	const currentMerchant = useMemo(() => {
+		if (!merchantId) return undefined;
+		return merchantItems.find((m) => m.id === merchantId);
+	}, [merchantItems, merchantId]);
 
 	return (
 		<div className="group flex h-full w-full items-center gap-1.5 pr-2">
@@ -391,7 +326,6 @@ export function MerchantCell({
 					{...getReferenceProps({
 						onClick: (event) => {
 							event.stopPropagation();
-
 							if (!canEditInline) {
 								onOpenEditor();
 							}
@@ -399,11 +333,11 @@ export function MerchantCell({
 					})}
 					aria-label={`Change ${merchantName} merchant`}
 					aria-expanded={canEditInline ? isOpen : undefined}
-					className="
-    flex h-10 w-full min-w-0 items-center gap-3
-    rounded-xl border border-transparent pl-1 pr-1 text-left
-    transition-all
-
+					className={`
+						flex h-10 w-full min-w-0 items-center gap-3
+						rounded-xl border border-transparent pl-1 pr-3 text-left
+						transition-all
+						${isMobile ? 'gap-1.5 pl-0.5 pr-1' : 'gap-3 pl-1 pr-3'}
 						group-hover:border-gray-300
 						group-hover:bg-gray-50
 
@@ -414,19 +348,15 @@ export function MerchantCell({
 						focus-visible:outline-none
 						focus-visible:ring-2
 						focus-visible:ring-orange-500/30
-					"
+					`}
 				>
-					<div
-						aria-hidden="true"
-						className="
-							flex h-7 w-7 shrink-0 items-center
-							justify-center rounded-full
-							bg-gray-100 text-sm font-black
-							text-[#FF5A35] dark:bg-white
-						"
-					>
-						{initial}
-					</div>
+					{/* ✅ Replaced the first-letter manual div with MerchantLogo */}
+					<MerchantLogo
+						name={merchantName}
+						logoUrl={currentMerchant?.logoUrl}
+						size="md"
+						className="h-7 w-7 shrink-0"
+					/>
 
 					<span
 						title={merchantName}
@@ -436,11 +366,11 @@ export function MerchantCell({
 							text-gray-900 dark:text-white
 						"
 					>
-						{displayMerchantName}
+						{truncateText(merchantName, MERCHANT_CHARACTER_LENGTH)}
 					</span>
 
 					<ChevronDown
-						size={16}
+						size={isMobile ? 14 : 16}
 						strokeWidth={2}
 						aria-hidden="true"
 						className={`
@@ -457,13 +387,12 @@ export function MerchantCell({
 				</button>
 			</div>
 
-			{showNavigation && (
+			{showNavigation && !isMobile && (
 				<button
 					type="button"
 					disabled={!merchantId}
 					onClick={(event) => {
 						event.stopPropagation();
-
 						if (merchantId) {
 							onNavigate();
 						}
@@ -471,7 +400,7 @@ export function MerchantCell({
 					aria-label={`View ${merchantName} merchant`}
 					title={
 						merchantId
-							? "View merchant"
+							? `View ${merchantName}`
 							: `Merchant ID unavailable for ${merchantName}`
 					}
 					className={`
@@ -522,16 +451,16 @@ export function MerchantCell({
 								},
 							})}
 							className="
-	z-200 flex max-h-[520px]
-	w-[min(430px,calc(100vw-24px))]
-	flex-col overflow-hidden rounded-2xl
+								z-200 flex max-h-[520px]
+								w-[min(430px,calc(100vw-24px))]
+								flex-col overflow-hidden rounded-2xl
 
-	border border-gray-200 bg-white
-	shadow-[0_18px_50px_rgba(0,0,0,0.20)]
+								border border-gray-200 bg-white
+								shadow-[0_18px_50px_rgba(0,0,0,0.20)]
 
-	dark:border-white/10
-	dark:bg-[#202020]
-"
+								dark:border-white/10
+								dark:bg-[#202020]
+							"
 						>
 							<div className="relative border-b border-gray-200 dark:border-white/10">
 								<Search
@@ -555,7 +484,6 @@ export function MerchantCell({
 									onKeyDown={(event) => {
 										if (event.key === "Enter" && visibleMerchants[0]) {
 											event.preventDefault();
-
 											void handleMerchantSelect(visibleMerchants[0]);
 										}
 									}}
@@ -568,7 +496,6 @@ export function MerchantCell({
 								/>
 							</div>
 
-							{/* Scrollable content */}
 							<div className="min-h-0 flex-1 overflow-y-auto">
 								<div className="border-b border-gray-100 px-4 py-4 dark:border-white/5">
 									<p className="px-2 text-sm font-semibold text-gray-500 dark:text-gray-400">
@@ -582,14 +509,14 @@ export function MerchantCell({
 											void handleOriginalStatementSelect();
 										}}
 										className="
-				mt-2 flex w-full items-center gap-3
-				rounded-xl px-3 py-3 text-left
-				transition-colors
-				hover:bg-gray-100
-				disabled:cursor-wait
-				disabled:opacity-60
-				dark:hover:bg-white/5
-			"
+											mt-2 flex w-full items-center gap-3
+											rounded-xl px-3 py-3 text-left
+											transition-colors
+											hover:bg-gray-100
+											disabled:cursor-wait
+											disabled:opacity-60
+											dark:hover:bg-white/5
+										"
 									>
 										<MerchantOptionContent
 											merchant={{
@@ -624,13 +551,13 @@ export function MerchantCell({
 													void handleMerchantSelect(merchant);
 												}}
 												className={`
-						flex w-full items-center
-						rounded-xl px-3 py-3
-						text-left transition-colors
-						hover:bg-gray-100
-						dark:hover:bg-white/5
-						${isSelected ? "bg-cyan-500/15" : ""}
-					`}
+													flex w-full items-center
+													rounded-xl px-3 py-3
+													text-left transition-colors
+													hover:bg-gray-100
+													dark:hover:bg-white/5
+													${isSelected ? "bg-cyan-500/15" : ""}
+												`}
 											>
 												<MerchantOptionContent merchant={merchant} size="sm" />
 											</button>
@@ -645,18 +572,17 @@ export function MerchantCell({
 								</div>
 							</div>
 
-							{/* Fixed footer — outside the scrolling div */}
 							{searchQuery.trim() && !exactMerchantExists && (
 								<div
 									className="
-			z-10 shrink-0
-			border-t border-gray-200
-			bg-white px-4 py-3
-			shadow-[0_-6px_16px_rgba(0,0,0,0.06)]
-			dark:border-white/10
-			dark:bg-[#202020]
-			dark:shadow-[0_-6px_16px_rgba(0,0,0,0.25)]
-		"
+										z-10 shrink-0
+										border-t border-gray-200
+										bg-white px-4 py-3
+										shadow-[0_-6px_16px_rgba(0,0,0,0.06)]
+										dark:border-white/10
+										dark:bg-[#202020]
+										dark:shadow-[0_-6px_16px_rgba(0,0,0,0.25)]
+									"
 								>
 									<button
 										type="button"
@@ -665,18 +591,18 @@ export function MerchantCell({
 											void handleCreateMerchant();
 										}}
 										className="
-				flex min-h-12 w-full
-				items-center gap-2 rounded-xl
-				px-3 py-2 text-left
-				text-base font-medium
-				text-cyan-600
-				transition-colors
-				hover:bg-cyan-50
-				disabled:cursor-wait
-				disabled:opacity-60
-				dark:text-cyan-400
-				dark:hover:bg-cyan-500/10
-			"
+											flex min-h-12 w-full
+											items-center gap-2 rounded-xl
+											px-3 py-2 text-left
+											text-base font-medium
+											text-cyan-600
+											transition-colors
+											hover:bg-cyan-50
+											disabled:cursor-wait
+											disabled:opacity-60
+											dark:text-cyan-400
+											dark:hover:bg-cyan-500/10
+										"
 									>
 										{isSaving ? (
 											<Loader2 size={18} className="shrink-0 animate-spin" />

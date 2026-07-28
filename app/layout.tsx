@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono, Roboto_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import Script from "next/script";
 
 const geistSans = Geist({
 	variable: "--font-geist-sans",
@@ -15,7 +16,7 @@ const geistMono = Geist_Mono({
 
 const robotoMono = Roboto_Mono({
 	subsets: ["latin"],
-	variable: "--font-mono", // Ensure this variable name exists
+	variable: "--font-mono",
 });
 
 export const metadata: Metadata = {
@@ -29,19 +30,38 @@ export default function RootLayout({
 	children: React.ReactNode;
 }) {
 	return (
-		// Removed hardcoded 'dark' class
 		<html lang="en" suppressHydrationWarning>
+			{/* ✅ Inject the theme script safely here to avoid React 19 warnings */}
+			<head>
+				<Script
+					id="next-themes-script"
+					strategy="beforeInteractive"
+					dangerouslySetInnerHTML={{
+						__html: `
+							(function() {
+								try {
+									var storedTheme = localStorage.getItem('theme') || 'system';
+									var theme = storedTheme === 'system' 
+										? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') 
+										: storedTheme;
+									document.documentElement.classList.remove('light', 'dark');
+									document.documentElement.classList.add(theme);
+								} catch (e) {}
+							})();
+						`,
+					}}
+				/>
+			</head>
 			<body
 				className={`${geistSans.variable} ${geistMono.variable} ${robotoMono.variable} antialiased bg-white dark:bg-black text-gray-900 dark:text-white`}
+				suppressHydrationWarning
 			>
-				<ThemeProvider
-					attribute="class"
-					defaultTheme="system"
-					enableSystem
-					disableTransitionOnChange
-				>
-					<div className="flex flex-col min-h-screen">
-						<main className="grow">{children}</main>
+				{/* ✅ Remove disableTransitionOnChange */}
+				<ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+					<div className="flex flex-col min-h-screen" suppressHydrationWarning>
+						<main className="grow" suppressHydrationWarning>
+							{children}
+						</main>
 					</div>
 				</ThemeProvider>
 			</body>

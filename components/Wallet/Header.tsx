@@ -2,6 +2,8 @@ import * as Popover from "@radix-ui/react-popover";
 import { Search, Command, Wallet, Plus } from "lucide-react";
 import { CategoryId } from "@/config/categoryDictionary";
 import { Category } from "@/types/wallet";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
+import { MOBILE_BREAKPOINT } from "@/config/breakpoints";
 
 interface Props {
 	userWalletCount: number;
@@ -20,6 +22,7 @@ export function WalletHeader({
 	onOpenWallet,
 	onAddCategory,
 }: Props) {
+	const isMobile = useMediaQuery(MOBILE_BREAKPOINT);
 	// Explicit loop for identifying untracked categories
 	const untrackedCategories = [];
 	for (let i = 0; i < unifiedCategories.length; i++) {
@@ -58,12 +61,14 @@ export function WalletHeader({
 		);
 	}
 
-return (
+	return (
 		<div className="flex flex-col md:flex-row md:items-end justify-between gap-4 md:gap-8 border-b border-gray-200 dark:border-white/5 pb-5 md:pb-8">
 			<div>
-				<h1 className="text-xl md:text-3xl leading-none font-black tracking-tighter uppercase italic text-gray-900 dark:text-white">
-					Spend Optimizer
-				</h1>
+				{!isMobile && (
+					<h1 className="px-1 text-lg font-semibold">
+						Wallet
+					</h1>
+				)}
 			</div>
 
 			{/* Added flex-wrap to prevent horizontal overflow on smaller devices */}
