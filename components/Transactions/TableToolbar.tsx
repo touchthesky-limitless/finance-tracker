@@ -399,7 +399,7 @@ export function TableToolbar({
 					<DropdownMenu.Trigger asChild>
 						<button
 							type="button"
-							className="relative flex h-8 md:h-9 items-center gap-1.5 rounded-lg border border-gray-300 px-2.5 md:px-3 text-[13px] md:text-[14px] font-medium text-gray-900 outline-none transition-colors hover:bg-gray-100 data-[state=open]:bg-gray-100 dark:border-white/20 dark:text-white dark:hover:bg-white/5 dark:data-[state=open]:bg-white/5"
+							className="relative hidden sm:flex h-8 md:h-9 items-center gap-1.5 rounded-lg border border-gray-300 px-2.5 md:px-3 text-[13px] md:text-[14px] font-medium text-gray-900 outline-none transition-colors hover:bg-gray-100 data-[state=open]:bg-gray-100 dark:border-white/20 dark:text-white dark:hover:bg-white/5 dark:data-[state=open]:bg-white/5"
 						>
 							<Columns size={15} className="text-gray-500 dark:text-gray-400" />
 							<span className="hidden sm:inline">Columns</span>

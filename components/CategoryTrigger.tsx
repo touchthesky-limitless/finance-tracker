@@ -35,9 +35,13 @@ export const CategoryChip = ({
 	}
 
 	return (
-		 <div className={`flex min-w-0 flex-1 items-center ${iconOnly ? 'justify-center' : 'gap-2 pr-2'}`}>
+		<div
+			className={`flex min-w-0 flex-1 items-center ${iconOnly ? "justify-center" : "gap-2 pr-2"}`}
+		>
 			{!isDefault && (
-				<div className={`shrink-0 rounded-xl transition-colors ${!iconOnly ? "border border-gray-100 p-1.5 shadow-sm dark:border-white/5" : "p-0"}`}>
+				<div
+					className={`shrink-0 rounded-xl transition-colors ${!iconOnly ? "border border-gray-100 p-1.5 shadow-sm dark:border-white/5" : "p-0"}`}
+				>
 					<CategoryGlyph name={icon} size={16} colorClass={colorClass} />
 				</div>
 			)}
@@ -45,10 +49,10 @@ export const CategoryChip = ({
 			{!iconOnly && (
 				<span
 					title={label}
-					className={`truncate text-sm ${
+					className={`truncate text-sm text-[15px] ${
 						isDefault
-							? "font-normal text-gray-400 dark:text-gray-500"
-							: "font-bold text-gray-900 dark:text-white"
+							? " text-gray-400 dark:text-gray-500"
+							: " text-gray-900 dark:text-white"
 					}`}
 				>
 					{label}

@@ -504,7 +504,7 @@ export function DataTable({
 							{!isMobile && (
 								<>
 									<span
-										className="min-w-0 flex-1 truncate text-[15px] font-semibold text-gray-900 dark:text-white"
+										className="min-w-0 flex-1 truncate text-[15px] text-gray-900 dark:text-white"
 										title={accountName}
 									>
 										{truncateText(accountName, ACCOUNT_CHARACTER_LENGTH)}
@@ -545,31 +545,19 @@ export function DataTable({
 					const isPositive = amount > 0;
 
 					return (
-						<div className="flex items-center justify-end w-full pr-2 font-medium text-[15px]">
+						<div
+							className={`flex items-center justify-end w-full ${isMobile ? "pr-2" : "pr-6"}`}
+						>
 							<span
-								className={`text-right ${
+								className={`text-right font-mono text-[15px] font-medium tabular-nums ${
 									isPositive
-										? "text-emerald-700 dark:text-emerald-500"
+										? "text-emerald-600 dark:text-emerald-400"
 										: "text-gray-900 dark:text-white"
 								}`}
 							>
 								{isPositive ? "+" : ""}
 								{formatCurrency(amount)}
 							</span>
-
-							{/* <button
-								type="button"
-								onClick={(event) => {
-									event.stopPropagation();
-									onRowClick(info.row.original);
-								}}
-								aria-label={`Open ${
-									info.row.original.merchant || "transaction"
-								} details`}
-								className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full text-gray-500 dark:text-gray-400 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500"
-							>
-								<ChevronRight size={18} strokeWidth={2} aria-hidden="true" />
-							</button> */}
 						</div>
 					);
 				},
@@ -622,7 +610,8 @@ export function DataTable({
 				date: false,
 				select: isEditMode || currentView === "review",
 				amount: columnVisibility.amount !== false,
-				account: !isMobile, // ✅ Hides the Account column entirely on mobile
+				// ✅ Respect user toggle on desktop, but hide on mobile
+				account: isMobile ? false : (columnVisibility.account ?? true),
 			},
 		},
 		getCoreRowModel: getCoreRowModel(),
