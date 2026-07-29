@@ -10,6 +10,18 @@ import {
 
 import type { AccountKind, AccountRecord } from "@/components/Accounts/types";
 
+// ✅ Expanded union to include all distinct groups
+export type AccountGroup =
+	| "Cash"
+	| "Investments"
+	| "Real Estate"
+	| "Vehicles"
+	| "Valuables"
+	| "Other Assets"
+	| "Credit Cards"
+	| "Loans"
+	| "Other Liabilities";
+
 export function isLiabilityKind(kind: AccountKind): boolean {
 	return ["credit-card", "mortgage", "loan", "other-liability"].includes(kind);
 }
@@ -130,14 +142,15 @@ export function accountAccent(account: AccountRecord): string {
 
 export function getColorForGroup(group: string): string {
 	const colorMap: Record<string, string> = {
-		Cash: "#10b981",
-		Investments: "#3b82f6",
+		"Cash": "#10b981",
+		"Investments": "#3b82f6",
 		"Real Estate": "#8b5cf6",
-		Vehicles: "#f97316",
-		Valuables: "#6b7280",
+		"Vehicles": "#f97316",
+		"Valuables": "#6b7280",
 		"Other Assets": "#6b7280",
 		"Credit Cards": "#ef4444",
-		Loans: "#f59e0b",
+		"Loans": "#f59e0b",
+		"Other Liabilities": "#ec4899",
 	};
 	return colorMap[group] || "#6b7280";
 }
@@ -171,13 +184,7 @@ export function getKindFromSubtype(
 	return "other-asset";
 }
 
-export type AccountGroup =
-	| "Cash"
-	| "Investments"
-	| "Other Assets"
-	| "Credit Cards"
-	| "Loans";
-
+// ✅ Fixed mapping: each kind now gets its own distinct group
 export function getGroupFromKind(kind: AccountKind): AccountGroup {
 	const groupMap: Record<AccountKind, AccountGroup> = {
 		"cash": "Cash",
@@ -185,10 +192,10 @@ export function getGroupFromKind(kind: AccountKind): AccountGroup {
 		"credit-card": "Credit Cards",
 		"mortgage": "Loans",
 		"loan": "Loans",
-		"other-liability": "Loans",
-		"real-estate": "Other Assets",
-		"vehicle": "Other Assets",
-		"valuable": "Other Assets",
+		"other-liability": "Other Liabilities",
+		"real-estate": "Real Estate",
+		"vehicle": "Vehicles",
+		"valuable": "Valuables",
 		"other-asset": "Other Assets",
 	};
 	return groupMap[kind];

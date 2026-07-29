@@ -2,8 +2,8 @@
 
 import { useState, type FormEvent } from "react";
 import { X } from "lucide-react";
-
 import { type Account, useBudgetStore } from "@/store/useBudgetStore";
+import { numberFormatter, parseAmountInput } from "@/utils/formatters";
 
 export type EditableAccount = Account & {
 	institution?: string | null;
@@ -23,16 +23,6 @@ export type EditableAccount = Account & {
 };
 
 type AccountPatch = Partial<EditableAccount>;
-
-type BudgetStoreState = ReturnType<typeof useBudgetStore.getState>;
-
-interface OptionalAccountActions {
-	updateAccount?: (
-		accountId: string,
-		patch: AccountPatch,
-	) => Promise<void> | void;
-	deleteAccount?: (accountId: string) => Promise<void> | void;
-}
 
 function Toggle({
 	checked,
@@ -109,6 +99,10 @@ export function EditAccountForm({ account, onBack }: EditAccountFormProps) {
 				: String(account.planned_monthly_payment),
 		creditLimit:
 			account.credit_limit == null ? "" : String(account.credit_limit),
+		currentBalance:
+			account.current_balance != null
+				? numberFormatter.format(account.current_balance)
+				: "",
 		invertBalance: Boolean(account.invert_balance),
 		isHidden: Boolean(account.is_hidden),
 		excludeFromNetWorth: Boolean(account.exclude_from_net_worth),
@@ -119,21 +113,38 @@ export function EditAccountForm({ account, onBack }: EditAccountFormProps) {
 
 	const [photoUrl, setPhotoUrl] = useState<string | null>(null);
 	const [isSaving, setIsSaving] = useState(false);
+	const [error, setError] = useState<string | null>(null);
 
-	// Get fetchAccounts from the store
 	const fetchAccounts = useBudgetStore((state) => state.fetchAccounts);
+	const accounts = useBudgetStore((state) => state.accounts);
+	const updateAccount = useBudgetStore((state) => state.updateAccount);
+	const deleteAccount = useBudgetStore((state) => state.deleteAccount);
 
 	const persistPatch = async (patch: AccountPatch): Promise<void> => {
-		await useBudgetStore.getState().updateAccount(account.id, patch);
+		await updateAccount(account.id, patch);
 	};
 
 	const submit = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
 		event.preventDefault();
 		setIsSaving(true);
+		setError(null);
+
+		const newName = formData.name.trim();
+
+		const duplicate = accounts.some(
+			(acc) =>
+				acc.id !== account.id &&
+				acc.name.trim().toLowerCase() === newName.toLowerCase(),
+		);
+		if (duplicate) {
+			setError("An account with this name already exists.");
+			setIsSaving(false);
+			return;
+		}
 
 		try {
 			await persistPatch({
-				name: formData.name.trim(),
+				name: newName,
 				account_type: formData.subtype,
 				account_subtype: formData.subtype,
 				apr: formData.apr ? Number(formData.apr) : null,
@@ -146,6 +157,9 @@ export function EditAccountForm({ account, onBack }: EditAccountFormProps) {
 				credit_limit: formData.creditLimit
 					? Number(formData.creditLimit)
 					: null,
+				current_balance: formData.currentBalance
+					? Number(formData.currentBalance)
+					: 0,
 				invert_balance: formData.invertBalance,
 				is_hidden: formData.isHidden,
 				exclude_from_net_worth: formData.excludeFromNetWorth,
@@ -154,10 +168,10 @@ export function EditAccountForm({ account, onBack }: EditAccountFormProps) {
 				exclude_from_budget: formData.excludeFromBudget,
 			});
 
-			// ✅ Fetch fresh data from Supabase to ensure persistence
 			await fetchAccounts();
-
 			onBack();
+		} catch (err) {
+			setError(err instanceof Error ? err.message : "Failed to save account.");
 		} finally {
 			setIsSaving(false);
 		}
@@ -171,21 +185,8 @@ export function EditAccountForm({ account, onBack }: EditAccountFormProps) {
 		onBack();
 	};
 
-	const deleteAccount = async (): Promise<void> => {
-		const store = useBudgetStore.getState() as BudgetStoreState &
-			OptionalAccountActions;
-
-		if (store.deleteAccount) {
-			await store.deleteAccount(account.id);
-		} else {
-			useBudgetStore.setState((state) => {
-				return {
-					accounts: state.accounts.filter((item) => {
-						return item.id !== account.id;
-					}),
-				};
-			});
-		}
+	const deleteAccountAction = async (): Promise<void> => {
+		await deleteAccount(account.id);
 		await fetchAccounts();
 		onBack();
 	};
@@ -214,17 +215,17 @@ export function EditAccountForm({ account, onBack }: EditAccountFormProps) {
 			</div>
 
 			<div className="space-y-7 px-6 py-6">
+				{/* ... Avatar and photo upload (unchanged) ... */}
 				<div className="flex items-center gap-4">
 					<div className="flex size-14 items-center justify-center overflow-hidden rounded-full bg-[#103B55] text-xs font-bold text-white">
 						{photoUrl ? (
-                            //! TODO: Fetch logos
+							//! TODO: Fetch logos
 							// eslint-disable-next-line @next/next/no-img-element
 							<img src={photoUrl} alt="" className="size-full object-cover" />
 						) : (
 							"CAP1"
 						)}
 					</div>
-
 					<label className="cursor-pointer rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium shadow-sm hover:bg-gray-50 dark:border-white/10 dark:hover:bg-white/5">
 						Choose photo
 						<input
@@ -233,10 +234,7 @@ export function EditAccountForm({ account, onBack }: EditAccountFormProps) {
 							className="sr-only"
 							onChange={(event) => {
 								const file = event.target.files?.[0];
-
-								if (file) {
-									setPhotoUrl(URL.createObjectURL(file));
-								}
+								if (file) setPhotoUrl(URL.createObjectURL(file));
 							}}
 						/>
 					</label>
@@ -248,9 +246,53 @@ export function EditAccountForm({ account, onBack }: EditAccountFormProps) {
 						value={formData.name}
 						onChange={(event) => {
 							setFormData((prev) => ({ ...prev, name: event.target.value }));
+							setError(null);
 						}}
 						className={fieldClassName}
 					/>
+					{error && (
+						<span className="mt-2 block text-sm text-red-600 dark:text-red-400">
+							{error}
+						</span>
+					)}
+				</label>
+
+				<label className="block">
+					<span className="mb-2 block text-sm font-semibold">Balance</span>
+					<div className="relative">
+						<span className="absolute inset-y-0 left-3 flex items-center text-gray-500">
+							$
+						</span>
+						<input
+							type="text"
+							value={formData.currentBalance}
+							onChange={(event) => {
+								const result = parseAmountInput(event.target.value);
+								setFormData((prev) => ({
+									...prev,
+									currentBalance: result.displayString,
+								}));
+							}}
+							onBlur={() => {
+								const raw = formData.currentBalance.replace(/[^0-9.]/g, "");
+								const parsed = parseFloat(raw);
+								if (!isNaN(parsed) && raw.length > 0) {
+									setFormData((prev) => ({
+										...prev,
+										currentBalance: numberFormatter.format(parsed), // ✅ no $
+									}));
+								} else {
+									setFormData((prev) => ({
+										...prev,
+										currentBalance: "",
+									}));
+								}
+							}}
+							inputMode="decimal"
+							// placeholder="0.00"
+							className={`${fieldClassName} pl-8 pr-4`}
+						/>
+					</div>
 				</label>
 
 				<label className="block">
@@ -445,7 +487,6 @@ export function EditAccountForm({ account, onBack }: EditAccountFormProps) {
 
 				<section>
 					<h2 className="mb-3 text-sm font-semibold">Actions</h2>
-
 					<div className="space-y-3">
 						<div className="flex items-center justify-between gap-4 rounded-xl border border-gray-200 p-4 dark:border-white/10">
 							<div>
@@ -454,7 +495,6 @@ export function EditAccountForm({ account, onBack }: EditAccountFormProps) {
 									Set balance to $0 but keep historical information.
 								</p>
 							</div>
-
 							<button
 								type="button"
 								onClick={() => {
@@ -465,7 +505,6 @@ export function EditAccountForm({ account, onBack }: EditAccountFormProps) {
 								Close
 							</button>
 						</div>
-
 						<div className="flex items-center justify-between gap-4 rounded-xl border border-gray-200 p-4 dark:border-white/10">
 							<div>
 								<strong className="text-sm">Delete account</strong>
@@ -473,11 +512,10 @@ export function EditAccountForm({ account, onBack }: EditAccountFormProps) {
 									Remove all data about this account.
 								</p>
 							</div>
-
 							<button
 								type="button"
 								onClick={() => {
-									void deleteAccount();
+									void deleteAccountAction();
 								}}
 								className="rounded-lg border border-red-200 px-3 py-2 text-sm font-semibold text-red-600 shadow-sm hover:bg-red-50 dark:border-red-500/30 dark:hover:bg-red-500/10"
 							>
@@ -496,7 +534,6 @@ export function EditAccountForm({ account, onBack }: EditAccountFormProps) {
 				>
 					Cancel
 				</button>
-
 				<button
 					type="submit"
 					disabled={!formData.name.trim() || isSaving}

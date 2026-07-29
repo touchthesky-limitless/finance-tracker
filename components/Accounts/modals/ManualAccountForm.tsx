@@ -6,6 +6,7 @@ import { ArrowLeft, LoaderCircle, X } from "lucide-react";
 import { MANUAL_ACCOUNT_OPTIONS } from "@/components/Accounts/constants";
 import { ModalShell } from "@/components/ui/ModalShell";
 import type { AccountKind, ManualAccount } from "@/components/Accounts/types";
+import { useBudgetStore } from "@/store/useBudgetStore";
 
 export function ManualAccountForm({
 	kind,
@@ -25,13 +26,28 @@ export function ManualAccountForm({
 	const [balance, setBalance] = useState("");
 	const [cashType, setCashType] = useState("Checking");
 	const [isSaving, setIsSaving] = useState(false);
+	const [error, setError] = useState<string | null>(null);
+
+	// ✅ Get existing accounts for duplicate check
+	const accounts = useBudgetStore((state) => state.accounts);
 
 	const submit = (event: FormEvent<HTMLFormElement>) => {
 		event.preventDefault();
+		setError(null);
 
+		const trimmedName = name.trim();
 		const parsedBalance = Number(balance.replaceAll(",", "") || 0);
 
-		if (!name.trim() || !Number.isFinite(parsedBalance)) {
+		if (!trimmedName || !Number.isFinite(parsedBalance)) {
+			return;
+		}
+
+		// ✅ Duplicate name check
+		const duplicate = accounts.some(
+			(acc) => acc.name.trim().toLowerCase() === trimmedName.toLowerCase(),
+		);
+		if (duplicate) {
+			setError("An account with this name already exists.");
 			return;
 		}
 
@@ -39,7 +55,7 @@ export function ManualAccountForm({
 
 		onSave({
 			id: crypto.randomUUID(),
-			name: name.trim(),
+			name: trimmedName,
 			kind,
 			type: kind === "cash" ? cashType : option.label.replace(/s$/, ""),
 			balance: parsedBalance,
@@ -68,10 +84,19 @@ export function ManualAccountForm({
 						<span className="font-semibold">Name</span>
 						<input
 							value={name}
-							onChange={(event) => setName(event.target.value)}
+							onChange={(event) => {
+								setName(event.target.value);
+								setError(null); // clear error on typing
+							}}
 							placeholder={`My ${option.label} Account`}
 							className="mt-3 h-13 w-full rounded-xl border border-gray-200 bg-transparent px-4 text-base outline-none focus:border-orange-500 dark:border-white/10"
 						/>
+						{/* ✅ Error message displayed below the input */}
+						{error && (
+							<span className="mt-2 block text-sm text-red-600 dark:text-red-400">
+								{error}
+							</span>
+						)}
 					</label>
 
 					{kind === "cash" && (

@@ -40,9 +40,9 @@ import { compactCurrency, formatSignedCurrency } from "@/utils/formatters";
 import { getColorForGroup } from "@/components/Accounts/utils/account";
 
 interface NetWorthChartProps {
-	chartType: ChartType;
-	dateRange: DateRange;
-	timeframe: Timeframe;
+	chartType: ChartType; // "performance" | "breakdown"
+	dateRange: DateRange; // "1M" | "3M" | ...
+	timeframe: Timeframe; // "month" | "quarter" | "year"
 	points: ChartPoint[];
 	summary: { assets: number; liabilities: number; netWorth: number };
 	onChartTypeChange: (value: ChartType) => void;

@@ -94,28 +94,28 @@ export default function AccountsPageClient() {
 		});
 	}, [chartType, dateRange, router, searchParams, timeframe]);
 
-	const updateQuery = useCallback(
-		(next: Partial<typeof DEFAULT_QUERY>) => {
-			const params = new URLSearchParams(searchParams.toString());
+const updateQuery = useCallback(
+  (next: Partial<Record<keyof typeof DEFAULT_QUERY, string>>) => {
+    const params = new URLSearchParams(searchParams.toString());
 
-			if (next.chartType) {
-				params.set("chartType", next.chartType);
-			}
+    if (next.chartType) {
+      params.set("chartType", next.chartType);
+    }
 
-			if (next.dateRange) {
-				params.set("dateRange", next.dateRange);
-			}
+    if (next.dateRange) {
+      params.set("dateRange", next.dateRange);
+    }
 
-			if (next.timeframe) {
-				params.set("timeframe", next.timeframe);
-			}
+    if (next.timeframe) {
+      params.set("timeframe", next.timeframe);
+    }
 
-			router.replace(`/accounts?${params.toString()}`, {
-				scroll: false,
-			});
-		},
-		[router, searchParams],
-	);
+    router.replace(`/accounts?${params.toString()}`, {
+      scroll: false,
+    });
+  },
+  [router, searchParams],
+);
 
 	const transactionAccounts = useMemo<AccountRecord[]>(() => {
 		const accountMap = new Map<string, AccountRecord>();

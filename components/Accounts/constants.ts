@@ -87,7 +87,7 @@ export const MANUAL_ACCOUNT_OPTIONS: Array<{
 		icon: Wallet,
 		section: "Liability",
 	},
-];
+]
 
 export const GROUP_ORDER = [
 	"Cash",
@@ -102,7 +102,11 @@ export const GROUP_ORDER = [
 	"Other Liabilities",
 ];
 
-export const LIABILITY_GROUPS = new Set(["Credit Cards", "Loans"]);
+export const LIABILITY_GROUPS = new Set([
+	"Credit Cards",
+	"Loans",
+	"Other Liabilities",
+]);
 
 export const DEFAULT_QUERY = {
 	chartType: "performance" as ChartType,
