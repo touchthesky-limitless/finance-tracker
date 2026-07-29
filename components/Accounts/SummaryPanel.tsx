@@ -14,7 +14,7 @@ export function SummaryPanel({
 	onModeChange,
 }: {
 	accounts: AccountRecord[];
-	summary: { assets: number; liabilities: number; netWorth: number };
+	summary: { assets: number; liabilities: number; net: number };
 	mode: SummaryMode;
 	onModeChange: (mode: SummaryMode) => void;
 }) {

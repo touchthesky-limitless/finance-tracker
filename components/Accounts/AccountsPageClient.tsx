@@ -21,7 +21,6 @@ import { SummaryPanel } from "@/components/Accounts/SummaryPanel";
 import type {
 	AccountKind,
 	AccountRecord,
-	ChartPoint,
 	FilterNode,
 	ManualAccount,
 	SummaryMode,
@@ -34,7 +33,6 @@ import {
 	type AccountGroup,
 } from "@/components/Accounts/utils/account";
 import {
-	getDateCutoff,
 	normalizeChartType,
 	normalizeDateRange,
 	normalizeTimeframe,
@@ -44,6 +42,7 @@ import { appendNavigationSource } from "@/lib/navigation/breadcrumb";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { MOBILE_BREAKPOINT } from "@/config/breakpoints";
 import { manualAccountToAccountRecord } from "@/components/Accounts/utils/accountMapping";
+import { useNetWorthHistory } from "@/hooks/useNetWorthHistory";
 
 export default function AccountsPageClient() {
 	const router = useRouter();
@@ -94,28 +93,28 @@ export default function AccountsPageClient() {
 		});
 	}, [chartType, dateRange, router, searchParams, timeframe]);
 
-const updateQuery = useCallback(
-  (next: Partial<Record<keyof typeof DEFAULT_QUERY, string>>) => {
-    const params = new URLSearchParams(searchParams.toString());
+	const updateQuery = useCallback(
+		(next: Partial<Record<keyof typeof DEFAULT_QUERY, string>>) => {
+			const params = new URLSearchParams(searchParams.toString());
 
-    if (next.chartType) {
-      params.set("chartType", next.chartType);
-    }
+			if (next.chartType) {
+				params.set("chartType", next.chartType);
+			}
 
-    if (next.dateRange) {
-      params.set("dateRange", next.dateRange);
-    }
+			if (next.dateRange) {
+				params.set("dateRange", next.dateRange);
+			}
 
-    if (next.timeframe) {
-      params.set("timeframe", next.timeframe);
-    }
+			if (next.timeframe) {
+				params.set("timeframe", next.timeframe);
+			}
 
-    router.replace(`/accounts?${params.toString()}`, {
-      scroll: false,
-    });
-  },
-  [router, searchParams],
-);
+			router.replace(`/accounts?${params.toString()}`, {
+				scroll: false,
+			});
+		},
+		[router, searchParams],
+	);
 
 	const transactionAccounts = useMemo<AccountRecord[]>(() => {
 		const accountMap = new Map<string, AccountRecord>();
@@ -236,7 +235,6 @@ const updateQuery = useCallback(
 	const summary = useMemo(() => {
 		let assets = 0;
 		let liabilities = 0;
-
 		for (const account of visibleAccounts) {
 			if (account.isLiability) {
 				liabilities += Math.abs(account.balance);
@@ -244,81 +242,15 @@ const updateQuery = useCallback(
 				assets += account.balance;
 			}
 		}
-
-		return {
-			assets,
-			liabilities,
-			netWorth: assets - liabilities,
-		};
+		return { assets, liabilities, net: assets - liabilities };
 	}, [visibleAccounts]);
 
-	const chartPoints = useMemo<ChartPoint[]>(() => {
-		const selectedSet =
-			selectedAccountIds.length > 0 ? new Set(selectedAccountIds) : null;
-		const cutoff = getDateCutoff(dateRange);
-		const sorted = [...transactions]
-			.filter((transaction) => {
-				if (selectedSet) {
-					const id = transaction.account_id?.trim() || transaction.account;
-					if (!selectedSet.has(id)) {
-						return false;
-					}
-				}
-
-				const date = new Date(transaction.date);
-				return !cutoff || date >= cutoff;
-			})
-			.sort((first, second) => {
-				return new Date(first.date).getTime() - new Date(second.date).getTime();
-			});
-
-		const daily = new Map<string, number>();
-
-		for (const transaction of sorted) {
-			const date = new Date(transaction.date);
-
-			if (!Number.isFinite(date.getTime())) {
-				continue;
-			}
-
-			const key = date.toISOString().slice(0, 10);
-			daily.set(key, (daily.get(key) ?? 0) + Number(transaction.amount || 0));
-		}
-
-		let running = 0;
-		const points: ChartPoint[] = [];
-
-		for (const [key, value] of daily) {
-			running += value;
-			const date = new Date(`${key}T12:00:00`);
-
-			points.push({
-				date,
-				value: running,
-				label:
-					timeframe === "year"
-						? String(date.getFullYear())
-						: date.toLocaleDateString("en-US", {
-								month: "short",
-								day: "numeric",
-							}),
-			});
-		}
-
-		if (points.length === 0) {
-			const now = new Date();
-			points.push({
-				date: now,
-				value: summary.netWorth,
-				label: now.toLocaleDateString("en-US", {
-					month: "short",
-					day: "numeric",
-				}),
-			});
-		}
-
-		return points;
-	}, [dateRange, selectedAccountIds, summary, timeframe, transactions]);
+	const { points: chartPoints } = useNetWorthHistory({
+		dateRange,
+		timeframe,
+		accountIds: selectedAccountIds.length > 0 ? selectedAccountIds : undefined,
+		currentNetWorth: summary.net,
+	});
 
 	const filterTree = useMemo<FilterNode[]>(() => {
 		const allGroups = GROUP_ORDER.map((group) => {
@@ -498,7 +430,7 @@ const updateQuery = useCallback(
 				timeframe={timeframe}
 				points={chartPoints}
 				summary={summary}
-				breakdownGroups={breakdownGroups} // ✅ pass the breakdown data
+				breakdownGroups={breakdownGroups}
 				onChartTypeChange={(value) => {
 					const updates: Partial<typeof DEFAULT_QUERY> = {
 						chartType: value,

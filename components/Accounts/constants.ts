@@ -19,7 +19,7 @@ import type {
 } from "@/components/Accounts/types";
 
 export const DATE_RANGE_OPTIONS = [
-	{ value: "1M", label: "1 Month" },
+	{ value: "1M", label: "Last 30 Days" },
 	{ value: "3M", label: "3 Months" },
 	{ value: "6M", label: "6 Months" },
 	{ value: "1Y", label: "1 Year" },
@@ -87,7 +87,7 @@ export const MANUAL_ACCOUNT_OPTIONS: Array<{
 		icon: Wallet,
 		section: "Liability",
 	},
-]
+];
 
 export const GROUP_ORDER = [
 	"Cash",

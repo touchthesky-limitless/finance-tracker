@@ -7,9 +7,7 @@ import {
 	ThumbsUp,
 } from "lucide-react";
 
-import {
-	formatSignedCurrency,
-} from "@/utils/formatters";
+import { formatSignedCurrency } from "@/utils/formatters";
 
 interface AccountSummaryCardsProps {
 	institution: string;
@@ -61,15 +59,8 @@ export function AccountSummaryCards({
 				</div>
 
 				<div className="space-y-6 px-6 py-6">
-					<SummaryRow
-						label="Institution"
-						value={institution}
-						accent
-					/>
-					<SummaryRow
-						label="Account type"
-						value={accountType}
-					/>
+					<SummaryRow label="Institution" value={institution} accent />
+					<SummaryRow label="Account type" value={accountType} />
 					<SummaryRow
 						label="Credit limit"
 						value={
@@ -106,9 +97,7 @@ export function AccountSummaryCards({
 					</div>
 
 					<div className="flex items-center justify-between gap-4 text-sm">
-						<span className="text-gray-500 dark:text-gray-400">
-							Status
-						</span>
+						<span className="text-gray-500 dark:text-gray-400">Status</span>
 						<span className="flex items-center gap-1.5 font-medium">
 							Institution Connected
 							<Info size={14} />
@@ -132,8 +121,8 @@ export function AccountSummaryCards({
 						</span>
 						<p className="mt-2">
 							Plaid is migrating {institution} to a new connection. Some
-							customers are experiencing delayed syncs that are typically
-							fixed by updating login information.
+							customers are experiencing delayed syncs that are typically fixed
+							by updating login information.
 							<button
 								type="button"
 								className="ml-1 font-semibold text-[#00A8D2]"
