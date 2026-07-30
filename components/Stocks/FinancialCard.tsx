@@ -1,4 +1,4 @@
-import MarketStatus from "@/components/MarketStatus";
+import MarketStatus from "@/components/Stocks/MarketStatus";
 import Image from "next/image";
 import { ArrowUpRight, ArrowDownRight } from "lucide-react";
 import { getFullMarketInfo } from "@/lib/date";

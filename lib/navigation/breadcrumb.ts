@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 
 export type NavigationSource =
 	| "transactions"
+	| "dashboard"
 	| "accounts"
 	| "cash-flow"
 	| "recurring"
@@ -17,6 +18,10 @@ export interface BreadcrumbConfig {
 const DEFAULT_SOURCE: NavigationSource = "transactions";
 
 const BREADCRUMBS: Record<NavigationSource, BreadcrumbConfig> = {
+	"dashboard": {
+		label: "Dashboard",
+		href: "/dashboard",
+	},
 	"transactions": {
 		label: "Transactions",
 		href: "/transactions",
@@ -71,6 +76,8 @@ export function useNavigationSource(): NavigationSource {
 	const pathname = usePathname();
 	if (!pathname) return "transactions";
 
+	if (pathname === "/dashboard" || pathname.startsWith("/dashboard/"))
+		return "dashboard";
 	if (pathname === "/transactions" || pathname.startsWith("/transactions/"))
 		return "transactions";
 	if (pathname === "/accounts" || pathname.startsWith("/accounts/"))

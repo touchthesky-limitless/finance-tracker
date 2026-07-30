@@ -99,6 +99,22 @@ export function formatDate(dateStr: string) {
 }
 
 /**
+ * Converts a date string into a short date format (Month Day, no year).
+ * @example
+ * formatDateShort("2026-07-19") // "Jul 19"
+ */
+export function formatDateShort(dateStr: string) {
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) {
+    return dateStr;
+  }
+  return d.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+  });
+}
+
+/**
  * Converts a date string into a long date format (Full Month Day, Full Year).
  * @example
  * formatDateLong("2026-07-19") // "July 19, 2026"
@@ -363,4 +379,23 @@ export function formatMarketCap(valueInMillions: number | undefined) {
 export function truncateText(text: string, maxLength: number): string {
   if (!text) return '';
   return text.length > maxLength ? text.slice(0, maxLength) + '…' : text;
+}
+
+/**
+ * Safely formats a tooltip value for Recharts.
+ * Handles numbers, strings, and undefined/NaN values.
+ * Returns a formatted currency string or a fallback dash.
+ *
+ * @example
+ * formatter={(value) => formatTooltipValue(value)}
+ */
+export function formatTooltipValue(value: unknown): string {
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? formatCurrency(value) : '-';
+  }
+  if (typeof value === 'string') {
+    const num = parseFloat(value);
+    return Number.isFinite(num) ? formatCurrency(num) : '-';
+  }
+  return '-';
 }

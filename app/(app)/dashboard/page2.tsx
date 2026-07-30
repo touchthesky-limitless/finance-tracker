@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 
-import FinancialCard from "@/components/FinancialCard";
+import FinancialCard from "@/components/Stocks/FinancialCard";
 import MortgageCard from "@/components/MortgageCard";
 import { BudgetSummaryCards } from "@/components/Dashboard/BudgetSummaryCards";
 import { Shimmer } from "@/components/ui/Shimmer";

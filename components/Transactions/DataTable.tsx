@@ -65,6 +65,13 @@ interface DataTableProps {
 	getMerchantId?: (merchantName: string) => string | undefined;
 	isLoading?: boolean;
 	navigationSource?: NavigationSource;
+	disableDateGrouping?: boolean;
+	onViewCategory?: (categoryName: string, targetId?: string) => void;
+	columnWidths?: {
+		merchant?: number;
+		category?: number;
+		amount?: number;
+	};
 }
 
 type DateHeaderItem = {
@@ -250,6 +257,9 @@ export function DataTable({
 	getMerchantId: getMerchantIdOverride,
 	isLoading = false,
 	navigationSource,
+	disableDateGrouping = false,
+	onViewCategory,
+	columnWidths,
 }: DataTableProps) {
 	const parentRef = useRef<HTMLDivElement>(null);
 	const router = useRouter();
@@ -365,8 +375,10 @@ export function DataTable({
 			}),
 
 			columnHelper.accessor("merchant", {
-				size: isMobile ? 222 : 350,
-				minSize: isMobile ? 140 : 160,
+				// size: isMobile ? 222 : 350,
+				// minSize: isMobile ? 140 : 160,
+				size: columnWidths?.merchant ?? (isMobile ? 222 : 350),
+    minSize: isMobile ? 140 : 160,
 				cell: (info) => {
 					const transaction = info.row.original;
 					const merchantName = String(info.getValue() || "Unknown merchant");
@@ -402,8 +414,10 @@ export function DataTable({
 			}),
 
 			columnHelper.accessor("category", {
-				size: isMobile ? 20 : 300,
-				minSize: isMobile ? 50 : 120,
+				// size: isMobile ? 20 : 300,
+				// minSize: isMobile ? 50 : 120,
+				 size: columnWidths?.category ?? (isMobile ? 20 : 300),
+    minSize: isMobile ? 50 : 120,
 				cell: (info) => {
 					const categoryName = String(info.getValue() || "Uncategorized");
 					const targetId = getCategoryId?.(categoryName);
@@ -437,7 +451,11 @@ export function DataTable({
 									type="button"
 									onClick={(event) => {
 										event.stopPropagation();
-										navigateToCategory(categoryName, targetId);
+										if (onViewCategory) {
+											onViewCategory(categoryName, targetId);
+										} else {
+											navigateToCategory(categoryName, targetId);
+										}
 									}}
 									aria-disabled={!targetId}
 									aria-label={`View ${categoryName} category`}
@@ -525,8 +543,10 @@ export function DataTable({
 			}),
 
 			columnHelper.accessor("amount", {
-				size: isMobile ? 80 : 140,
-				minSize: isMobile ? 60 : 80,
+				// size: isMobile ? 80 : 140,
+				// minSize: isMobile ? 60 : 80,
+				   size: columnWidths?.amount ?? (isMobile ? 80 : 140),
+    minSize: isMobile ? 60 : 80,
 				sortingFn: (rowA, rowB, columnId) => {
 					const firstAmount = Number(rowA.getValue(columnId));
 					const secondAmount = Number(rowB.getValue(columnId));
@@ -582,6 +602,8 @@ export function DataTable({
 		onMerchantChange,
 		merchantItems,
 		isMobile,
+		onViewCategory,
+		columnWidths,
 	]);
 
 	const uniqueTransactions = useMemo(() => {
@@ -621,6 +643,13 @@ export function DataTable({
 	const rows = table.getRowModel().rows;
 
 	const flatRows = useMemo<FlatItem[]>(() => {
+		if (disableDateGrouping) {
+			return rows.map((row) => ({
+				type: "row" as const,
+				id: `row-${row.id}`,
+				row,
+			}));
+		}
 		const dateTotals = new Map<string, number>();
 		const rowDateInfo = new Map<
 			string,
@@ -677,7 +706,7 @@ export function DataTable({
 		}
 
 		return result;
-	}, [rows]);
+	}, [disableDateGrouping, rows]);
 
 	const stickyHeaderIndexByItemIndex = useMemo(() => {
 		const indices = new Array<number>(flatRows.length);
@@ -712,7 +741,7 @@ export function DataTable({
 	const virtualItems = rowVirtualizer.getVirtualItems();
 	let activeHeader: ActiveHeader = null;
 
-	if (virtualItems.length > 0) {
+	if (virtualItems.length > 0 && !disableDateGrouping) {
 		const scrollTop = parentRef.current?.scrollTop ?? 0;
 		let currentTopIndex = virtualItems[0].index;
 
