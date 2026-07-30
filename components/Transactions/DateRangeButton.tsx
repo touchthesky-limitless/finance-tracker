@@ -308,14 +308,14 @@ export function DateRangeButton({
 					<button
 						data-toolbar-popover-trigger="date"
 						type="button"
-						className={`relative flex items-center gap-2 rounded-xl border text-sm font-semibold shadow-sm transition-colors ${className} ${
+						className={`relative flex h-10 items-center gap-2 rounded-xl border px-3 text-sm font-semibold shadow-sm transition-colors ${
 							active
 								? "border-[#FF5A35]/50 bg-[#FF5A35]/5 text-[#FF5A35]"
 								: "border-gray-300 hover:bg-gray-100 dark:border-white/20 dark:hover:bg-white/5"
-						}`}
+						} ${className}`}
 					>
 						<Calendar size={17} />
-						<span className="hidden sm:inline">Date</span>
+						<span>Date</span>
 						{active && (
 							<span className="absolute -right-1 -top-1 size-2.5 rounded-full bg-[#FF5A35]" />
 						)}

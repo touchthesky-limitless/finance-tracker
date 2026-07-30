@@ -21,7 +21,7 @@ import {
 
 import { findParentCategory } from "@/constants";
 import { getIconForCategory } from "@/lib/utils";
-import { REPORT_COLORS } from "@/components/Reports/reportUtils";
+import { getCategoryHex } from "@/constants/categories";
 import type {
 	ChartTransactionSelection,
 	ReportCategoryRow,
@@ -151,19 +151,6 @@ interface ActiveSankeyElement {
 	index: number;
 }
 
-const GROUP_COLORS: Readonly<Record<string, string>> = {
-	"Financial": "#FFC43D",
-	"Housing": "#8A49CA",
-	"Shopping": "#E6414F",
-	"Travel & Lifestyle": "#FFC13D",
-	"Auto & Transport": "#FF642B",
-	"Bills & Utilities": "#4664DA",
-	"Food & Dining": "#4664DA",
-	"Business": "#D43797",
-	"Health & Wellness": "#FF642B",
-	"Other": "#A52D79",
-};
-
 const MAX_INCOME_CATEGORIES = 8;
 const MAX_EXPENSE_CATEGORIES = 20;
 
@@ -247,6 +234,7 @@ function buildCashFlowSankeyData(
 		index: number;
 		row: ReportCategoryRow;
 	}> = [];
+	const incomeColor = getCategoryHex("Income");
 
 	for (const row of visibleIncomeRows) {
 		incomeCategoryIndexes.push({
@@ -255,7 +243,7 @@ function buildCashFlowSankeyData(
 				name: row.label,
 				label: row.label,
 				icon: row.icon,
-				color: "#09A5C4",
+				color: incomeColor,
 				kind: "income-category",
 				displayValue: row.value,
 				percentage: totalIncome > 0 ? (row.value / totalIncome) * 100 : 0,
@@ -285,7 +273,7 @@ function buildCashFlowSankeyData(
 		name: "Income",
 		label: "Income",
 		icon: "",
-		color: "#09A5C4",
+		color: incomeColor,
 		kind: "income-total",
 		displayValue: totalIncome,
 		percentage: totalIncome > 0 ? 100 : 0,
@@ -298,7 +286,7 @@ function buildCashFlowSankeyData(
 			source: item.index,
 			target: incomeIndex,
 			value: item.row.value,
-			color: "#09A5C4",
+			color: incomeColor,
 			selectionKey: `income-link:${item.row.key}`,
 			label: item.row.label,
 			transactionIds: item.row.transactionIds,
@@ -360,13 +348,9 @@ function buildCashFlowSankeyData(
 		},
 	);
 
-	let groupColorIndex = 0;
 	for (const [group, groupRows] of groupedExpenseEntries) {
 		const groupValue = groupRows.reduce((sum, row) => sum + row.value, 0);
-		const groupColor =
-			GROUP_COLORS[group] ??
-			REPORT_COLORS[groupColorIndex % REPORT_COLORS.length];
-		groupColorIndex += 1;
+		const groupColor = getCategoryHex(group) ?? "#A52D79";
 		const groupIds = uniqueIds(groupRows);
 		const groupIndex = addNode(nodes, {
 			name: group,

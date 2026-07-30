@@ -104,6 +104,7 @@ export const stringToPastel = (str: string) => {
  * Returns icons
  */
 export const getIconForCategory = (category: string): LucideIcon => {
+	if (!category) return CreditCard;
 	const lower = category.toLowerCase();
 
 	// --- SPECIFIC MATCHES ---

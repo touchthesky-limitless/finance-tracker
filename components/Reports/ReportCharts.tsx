@@ -28,8 +28,9 @@ import type {
 	ReportTab,
 	TrendChartType,
 } from "@/components/Reports/types";
-import { getIconForCategory } from "@/lib/utils";
 import { formatMoney } from "@/utils/formatters";
+import { getIconForCategory } from "@/lib/categoryIcons";
+import { getCategoryHex } from "@/constants/categories";
 
 type ResolvedCategoryIconProps = {
 	label: string;
@@ -192,7 +193,8 @@ function CurrencyTooltip({ active, payload, label }: CurrencyTooltipProps) {
 					const itemValue = Math.abs(readTooltipNumber(item.value));
 					const itemKey = item.dataKey ?? item.name ?? index;
 					const markerStyle: CSSProperties = {
-						backgroundColor: item.color ?? "#8a8a8a",
+						backgroundColor:
+							getCategoryHex(String(item.name ?? "")) ?? "#8a8a8a",
 					};
 
 					return (
@@ -227,40 +229,35 @@ function CurrencyTooltip({ active, payload, label }: CurrencyTooltipProps) {
 
 function DonutTooltip({ active, payload }: DonutTooltipProps) {
 	const row = payload?.[0]?.payload;
+	const categoryName = row?.label || "Uncategorized";
+	const groupColor = getCategoryHex(categoryName) ?? "#A52D79";
 
 	if (!active || !row) {
 		return null;
 	}
 
 	return (
-		<div className="min-w-40 rounded-xl border border-white/10 bg-[#111] px-4 py-3 text-white shadow-2xl">
-			<div className="flex items-center gap-3">
+		<div className="min-w-[200px] max-w-[280px] rounded-xl border border-white/10 bg-[#111] px-4 py-3 text-white shadow-2xl z-50">
+			<div className="flex items-start gap-3">
 				<span
-					className="size-3 shrink-0 rounded-full"
-					style={{
-						backgroundColor: row.color,
-					}}
+					className="mt-1 size-3 shrink-0 rounded-full"
+					style={{ backgroundColor: groupColor }}
 				/>
-
-				<div className="min-w-0">
-					<p className="truncate text-sm font-semibold">
+				<div className="min-w-0 flex-1">
+					<p className="truncate text-sm font-semibold leading-snug">
 						<span className="mr-1.5 inline-flex align-[-2px]">
-							<CategoryIcon label={row.label} size={15} />
+							<CategoryIcon label={row.label} size={14} />
 						</span>
-
 						{row.label}
 					</p>
-
-					<p className="mt-1 text-sm font-bold">
-						{formatMoney(row.value)} ({row.percentage.toFixed(1)}
-						%)
+					<p className="mt-1 text-sm font-bold text-gray-200">
+						{formatMoney(row.value)} ({row.percentage.toFixed(1)}%)
 					</p>
 				</div>
 			</div>
 		</div>
 	);
 }
-
 function DonutLegend({
 	rows,
 	activeKey,
@@ -294,6 +291,8 @@ function DonutLegend({
 		<div className="grid min-w-0 flex-1 grid-cols-1 gap-x-4 gap-y-2 md:grid-cols-2 xl:grid-cols-3">
 			{visibleRows.map((row) => {
 				const isActive = activeKey === row.key;
+				const categoryName = row?.label || "Uncategorized";
+				const groupColor = getCategoryHex(categoryName) ?? "#A52D79";
 
 				return (
 					<button
@@ -323,7 +322,7 @@ function DonutLegend({
 						<span
 							className="mt-1.5 size-3 shrink-0 rounded-full"
 							style={{
-								backgroundColor: row.color,
+								backgroundColor: groupColor,
 							}}
 						/>
 
@@ -410,7 +409,7 @@ function CategoryAxisTick({
 	const label =
 		row.label.length > 22 ? `${row.label.slice(0, 21)}…` : row.label;
 	const isActive = activeKey === row.key;
-	const foreground = isActive ? row.color : "#8a8a8a";
+	const foreground = isActive ? getCategoryHex(row.label) : "#8a8a8a";
 
 	const handleKeyDown = (event: ReactKeyboardEvent<SVGGElement>): void => {
 		if (event.key === "Enter" || event.key === " ") {
@@ -551,7 +550,7 @@ export function BreakdownChart({
 							{rows.map((row) => (
 								<Cell
 									key={row.key}
-									fill={row.color}
+									fill={getCategoryHex(row.label)}
 									fillOpacity={!activeKey || activeKey === row.key ? 1 : 0.22}
 								/>
 							))}
@@ -605,7 +604,7 @@ export function BreakdownChart({
 							}}
 						>
 							{rows.map((row) => (
-								<Cell key={row.key} fill={row.color} />
+								<Cell key={row.key} fill={getCategoryHex(row.label)} />
 							))}
 						</Pie>
 						<Tooltip
@@ -614,6 +613,10 @@ export function BreakdownChart({
 							defaultIndex={activeIndex >= 0 ? activeIndex : undefined}
 							active={activeIndex >= 0 ? true : undefined}
 							cursor={false}
+							wrapperStyle={{
+								zIndex: 9,
+								pointerEvents: "none",
+							}}
 						/>
 					</PieChart>
 				</ResponsiveContainer>
@@ -773,14 +776,20 @@ export function TrendsChart({
 						tick={{ fill: "#777", fontSize: 12 }}
 						width={95}
 					/>
-					<Tooltip content={<CurrencyTooltip />} />
+					<Tooltip
+						content={<CurrencyTooltip />}
+						wrapperStyle={{
+							zIndex: 9,
+							pointerEvents: "none",
+						}}
+					/>
 					<ReferenceLine y={average} stroke="#222" strokeDasharray="4 4" />
 					{visibleCategories.map((category) => (
 						<Bar
 							key={category.key}
 							dataKey={category.label}
 							name={category.label}
-							fill={category.color}
+							fill={getCategoryHex(category.label)}
 							fillOpacity={
 								!selectedKey || selectedKey.includes(category.label) ? 1 : 0.3
 							}

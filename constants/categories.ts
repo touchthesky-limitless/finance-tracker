@@ -294,6 +294,38 @@ export const CATEGORY_COLORS: Record<string, CategoryTheme> = {
 	},
 };
 
+// ----- Color utility helpers -----
+
+// Tailwind bg class -> hex color mapping (based on Tailwind's default palette)
+export const TW_BG_TO_HEX: Record<string, string> = {
+	"bg-emerald-500": "#10B981",
+	"bg-blue-500": "#3B82F6",
+	"bg-red-400": "#F87171",
+	"bg-indigo-400": "#818CF8",
+	"bg-amber-400": "#FBBF24",
+	"bg-orange-500": "#F97316",
+	"bg-pink-500": "#EC4899",
+	"bg-yellow-600": "#EAB308",
+	"bg-rose-500": "#F43F5E",
+	"bg-purple-500": "#A855F7",
+	"bg-cyan-500": "#06B6D4",
+	"bg-sky-400": "#38BDF8",
+	"bg-slate-400": "#94A3B8",
+	"bg-fuchsia-500": "#D946EF",
+	"bg-lime-500": "#84CC16",
+	"bg-gray-400": "#9CA3AF",
+};
+
+/**
+ * Converts a category name to its hex color using getCategoryTheme.
+ * Falls back to a default gray if not found.
+ */
+export function getCategoryHex(categoryName: string): string {
+	const theme = getCategoryTheme(categoryName);
+	const bgClass = theme.bg;
+	return TW_BG_TO_HEX[bgClass] ?? "#A52D79";
+}
+
 /**
  * Finds the parent category name for any given subcategory.
  */
@@ -314,33 +346,37 @@ export function findParentCategory(subCategory: string): string {
  * Helper to get the full theme object for a category.
  */
 export function getCategoryTheme(categoryName: string): CategoryTheme {
-    // 1. Helper to attach the key to the theme object
-    const withKey = (theme: Omit<CategoryTheme, 'colorKey'>, key: string): CategoryTheme => ({
-        ...theme,
-        colorKey: key
-    });
+	// 1. Helper to attach the key to the theme object
+	const withKey = (
+		theme: Omit<CategoryTheme, "colorKey">,
+		key: string,
+	): CategoryTheme => ({
+		...theme,
+		colorKey: key,
+	});
 
-    // 2. Check if it's a System Category (e.g., "Food & drink")
-    if (PARENT_COLORS[categoryName]) {
-        // We need to find which CATEGORY_COLORS key this parent uses
-        // Or if PARENT_COLORS already maps to a key, use that.
-        return withKey(PARENT_COLORS[categoryName], categoryName);
-    }
+	// 2. Check if it's a System Category (e.g., "Food & drink")
+	if (PARENT_COLORS[categoryName]) {
+		// We need to find which CATEGORY_COLORS key this parent uses
+		// Or if PARENT_COLORS already maps to a key, use that.
+		return withKey(PARENT_COLORS[categoryName], categoryName);
+	}
 
-    // 3. Check if it's a raw Color Name (e.g., "Emerald")
-    if (CATEGORY_COLORS[categoryName]) {
-        return withKey(CATEGORY_COLORS[categoryName], categoryName);
-    }
+	// 3. Check if it's a raw Color Name (e.g., "Emerald")
+	if (CATEGORY_COLORS[categoryName]) {
+		return withKey(CATEGORY_COLORS[categoryName], categoryName);
+	}
 
-    // 4. Sub-category lookup
-    const parent = findParentCategory(categoryName);
-    const fallbackKey = parent || "Uncategorized";
-    
-    const theme = PARENT_COLORS[fallbackKey] || 
-                  CATEGORY_COLORS[fallbackKey] || 
-                  PARENT_COLORS["Uncategorized"];
+	// 4. Sub-category lookup
+	const parent = findParentCategory(categoryName);
+	const fallbackKey = parent || "Uncategorized";
 
-    return withKey(theme, fallbackKey);
+	const theme =
+		PARENT_COLORS[fallbackKey] ||
+		CATEGORY_COLORS[fallbackKey] ||
+		PARENT_COLORS["Uncategorized"];
+
+	return withKey(theme, fallbackKey);
 }
 
 /**
