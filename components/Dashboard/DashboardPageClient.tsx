@@ -75,6 +75,10 @@ import dynamic from "next/dynamic";
 
 import type { ComponentProps } from "react";
 import type { CategoryDetailDrawer as CategoryDetailDrawerType } from "@/components/Categories/CategoryDetailDrawer";
+import { useDashboardStore } from "@/store/useDashboardStore";
+import { DragDropProvider } from "@dnd-kit/react";
+import { useSortable } from "@dnd-kit/react/sortable";
+import { move } from "@dnd-kit/helpers";
 
 const CategoryDetailDrawer = dynamic<
 	ComponentProps<typeof CategoryDetailDrawerType>
@@ -224,26 +228,91 @@ const useDashboardData = () => {
 // 2. REUSABLE UI COMPONENTS
 // -----------------------------------------------------------------------------
 
+function SortableWidgetItem({
+	id,
+	index,
+	label,
+	hidden,
+	onToggle,
+}: {
+	id: string;
+	index: number;
+	label: string;
+	hidden: boolean;
+	onToggle: () => void;
+}) {
+	const { ref, handleRef, isDragging, isDropTarget } = useSortable({
+		id,
+		index,
+		type: "widget",
+	});
+
+	return (
+		<div
+			ref={ref}
+			className={`flex items-center gap-4 rounded-xl border border-gray-200 bg-gray-50/50 p-4 transition-opacity dark:border-white/5 dark:bg-white/5 ${
+				isDragging ? "opacity-50" : ""
+			} ${isDropTarget ? "ring-2 ring-cyan-500" : ""}`}
+		>
+			<div ref={handleRef} className="cursor-grab">
+				<GripVertical className="text-gray-400 dark:text-gray-500" size={18} />
+			</div>
+			<span className="flex-1 text-sm font-medium text-gray-800 dark:text-gray-200">
+				{label}
+			</span>
+			<button
+				type="button"
+				role="switch"
+				aria-checked={!hidden}
+				onClick={onToggle}
+				className={`relative h-6 w-11 rounded-full transition-colors ${
+					!hidden ? "bg-[#FF5A35]" : "bg-gray-300 dark:bg-gray-600"
+				}`}
+			>
+				<span
+					className={`absolute top-[3px] block size-[18px] rounded-full bg-white transition-all ${
+						!hidden ? "right-[3px]" : "left-[3px]"
+					}`}
+				/>
+			</button>
+		</div>
+	);
+}
+
 function CustomizeDashboardModal() {
 	const [open, setOpen] = useState(false);
-	const [widgets, setWidgets] = useState([
-		{ id: "recap", label: "Weekly Recap", active: true },
-		{ id: "budget", label: "Budget", active: true },
-		{ id: "spending", label: "Spending trend", active: true },
-		{ id: "transactions", label: "Transactions", active: true },
-		{ id: "networth", label: "Net worth", active: true },
-		{ id: "recurring", label: "Recurring transactions", active: true },
-		{ id: "investments", label: "Investments", active: true },
-		{ id: "advice", label: "Advice", active: false },
-		{ id: "credit_score", label: "Credit score", active: false },
-		{ id: "getting_started", label: "Getting started guide", active: false },
-	]);
+	const { widgets, updateOrder, setHiddenList } = useDashboardStore();
+	const [localOrder, setLocalOrder] = useState(widgets.order);
+	const [localHidden, setLocalHidden] = useState(widgets.hidden);
 
-	const toggleWidget = (id: string) => {
-		setWidgets((prev) =>
-			prev.map((w) => (w.id === id ? { ...w, active: !w.active } : w)),
-		);
+	const prevOpenRef = useRef(false);
+
+	useEffect(() => {
+		if (open && !prevOpenRef.current) {
+			setLocalOrder(widgets.order);
+			setLocalHidden(widgets.hidden);
+		}
+		prevOpenRef.current = open;
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [open]); // ✅ Only depends on `open` – no cascading updates
+
+	const handleSave = async () => {
+		await updateOrder(localOrder);
+		await setHiddenList(localHidden);
+		setOpen(false);
 	};
+
+	// ✅ Add this block before the `return` inside CustomizeDashboardModal
+	const availableWidgets = [
+		{ id: "budget", label: "Budget" },
+		{ id: "spending", label: "Spending trend" },
+		{ id: "networth", label: "Net worth" },
+		{ id: "top_categories", label: "Top Categories" },
+		{ id: "recurring", label: "Recurring transactions" },
+		{ id: "transactions", label: "Transactions" },
+		{ id: "stocks", label: "Stocks" },
+		{ id: "goals", label: "Goals" },
+	];
 
 	return (
 		<Dialog.Root open={open} onOpenChange={setOpen}>
@@ -284,36 +353,57 @@ function CustomizeDashboardModal() {
 						</Dialog.Close>
 					</div>
 
-					<div className="mt-6 grid grid-cols-1 gap-3 md:grid-cols-2">
-						{widgets.map((w) => (
-							<div
-								key={w.id}
-								className="flex items-center gap-4 rounded-xl border border-gray-200 bg-gray-50/50 p-4 dark:border-white/5 dark:bg-white/5"
-							>
-								<GripVertical
-									className="text-gray-400 dark:text-gray-500"
-									size={18}
-								/>
-								<span className="flex-1 text-sm font-medium text-gray-800 dark:text-gray-200">
-									{w.label}
-								</span>
-								<button
-									type="button"
-									role="switch"
-									aria-checked={w.active}
-									onClick={() => toggleWidget(w.id)}
-									className={`relative h-6 w-11 rounded-full transition-colors ${
-										w.active ? "bg-[#FF5A35]" : "bg-gray-300 dark:bg-gray-600"
-									}`}
-								>
-									<span
-										className={`absolute top-[3px] block size-[18px] rounded-full bg-white transition-all ${
-											w.active ? "right-[3px]" : "left-[3px]"
-										}`}
-									/>
-								</button>
+					{/* ✅ 6. Replace with Sortable DnD List */}
+					<div className="mt-6">
+						<DragDropProvider
+							onDragEnd={(event) => {
+								// Import move helper: import { move } from '@dnd-kit/helpers';
+								const newOrder = move(localOrder, event);
+								if (!arraysEqual(localOrder, newOrder)) {
+									setLocalOrder(newOrder);
+								}
+							}}
+						>
+							<div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+								{localOrder.map((id, index) => {
+									const widget = availableWidgets.find((w) => w.id === id);
+									if (!widget) return null;
+									const hidden = localHidden.includes(id);
+									return (
+										<SortableWidgetItem
+											key={id}
+											id={id}
+											index={index}
+											label={widget.label}
+											hidden={hidden}
+											onToggle={() => {
+												setLocalHidden((prev) =>
+													prev.includes(id)
+														? prev.filter((x) => x !== id)
+														: [...prev, id],
+												);
+											}}
+										/>
+									);
+								})}
 							</div>
-						))}
+						</DragDropProvider>
+
+						{/* Footer Buttons */}
+						<div className="mt-6 flex justify-end gap-3 border-t border-gray-200 pt-6 dark:border-white/10">
+							<button
+								onClick={() => setOpen(false)}
+								className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium transition hover:bg-gray-50 dark:border-white/10 dark:hover:bg-white/5"
+							>
+								Cancel
+							</button>
+							<button
+								onClick={handleSave}
+								className="rounded-lg bg-[#FF5A35] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#E04825]"
+							>
+								Save
+							</button>
+						</div>
 					</div>
 				</Dialog.Content>
 			</Dialog.Portal>
@@ -854,21 +944,30 @@ function NetWorthWidget({
 	});
 
 	return (
-		<div className="h-72 sm:h-80 md:h-96 lg:h-96 w-full flex flex-col">
-			<NetWorthChart
-				key={dateRange}
-				chartType={chartType}
-				dateRange={dateRange}
-				timeframe={timeframe}
-				points={points}
-				summary={summary}
-				breakdownGroups={breakdownGroups}
-				onChartTypeChange={setChartType}
-				onDateRangeChange={setDateRange}
-				onTimeframeChange={setTimeframe}
-				chartHeight="100%"
-				className="flex-1 min-h-0"
-			/>
+		<div className="flex flex-col h-82 sm:h-80 md:h-96 lg:h-96 w-full rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-white/5 dark:bg-[#232322] p-5">
+			{/* Manually add the GripVertical and Sparkles to match WidgetShell */}
+			<div className="flex items-center shrink-0">
+				<GripVertical className="text-gray-300 dark:text-gray-600" size={18} />
+			</div>
+
+			{/* Remove the chart's inner padding so it fits perfectly */}
+			<div className="h-72 sm:h-80 md:h-96 lg:h-96 w-full flex flex-col">
+				<NetWorthChart
+					key={dateRange}
+					chartType={chartType}
+					dateRange={dateRange}
+					timeframe={timeframe}
+					points={points}
+					summary={summary}
+					breakdownGroups={breakdownGroups}
+					onChartTypeChange={setChartType}
+					onDateRangeChange={setDateRange}
+					onTimeframeChange={setTimeframe}
+					chartHeight="100%"
+					className="w-full h-full bg-transparent border-none shadow-none p-0"
+					showChartTypeSelector={false}
+				/>
+			</div>
 		</div>
 	);
 }
@@ -1921,6 +2020,37 @@ function TopCategoriesWidget() {
 // 4. MAIN PAGE COMPONENT
 // -----------------------------------------------------------------------------
 
+function arraysEqual<T>(a: T[], b: T[]): boolean {
+	return a.length === b.length && a.every((v, i) => v === b[i]);
+}
+
+function SortableWidget({
+	id,
+	index,
+	children,
+	className = "",
+}: {
+	id: string;
+	index: number;
+	children: React.ReactNode;
+	className?: string;
+}) {
+	const { ref, isDragging, isDropTarget } = useSortable({
+		id,
+		index,
+		type: "widget",
+	});
+
+	return (
+		<div
+			ref={ref}
+			className={`${className} ${isDragging ? "opacity-50" : ""} ${isDropTarget ? "ring-2 ring-cyan-500" : ""}`}
+		>
+			{children}
+		</div>
+	);
+}
+
 export default function DashboardPageClient() {
 	const {
 		currentMonthTxs,
@@ -1931,6 +2061,53 @@ export default function DashboardPageClient() {
 	} = useDashboardData();
 
 	const { goals, savingsAccounts, isLoading: isLoadingGoals } = useGoalsData();
+	const {
+		widgets,
+		isLoading: dashboardLoading,
+		fetchDashboardWidgets,
+		updateOrder,
+	} = useDashboardStore();
+
+	useEffect(() => {
+		fetchDashboardWidgets();
+	}, [fetchDashboardWidgets]);
+
+	const visibleWidgets = useMemo(() => {
+		const widgetComponents: Record<string, React.ReactNode> = {
+			budget: <BudgetWidget txs={currentMonthTxs} />,
+			spending: <SpendingWidget transactions={transactions} />,
+			networth: (
+				<NetWorthWidget summary={summary} breakdownGroups={breakdownGroups} />
+			),
+			top_categories: <TopCategoriesWidget />,
+			recurring: <RecurringWidget />,
+			transactions: <TransactionsWidget transactions={currentMonthTxs} />,
+			stocks: <InvestmentsWidget />,
+			goals: !isLoadingGoals ? (
+				<GoalsWidget
+					goals={goals}
+					savingsAccounts={savingsAccounts as unknown as Account[]}
+				/>
+			) : null,
+		};
+
+		return widgets.order
+			.filter((id) => !widgets.hidden.includes(id))
+			.map((id) => ({ id, component: widgetComponents[id] }))
+			.filter(
+				(item) => item.component !== undefined && item.component !== null,
+			);
+	}, [
+		widgets.order,
+		widgets.hidden,
+		currentMonthTxs,
+		transactions,
+		summary,
+		breakdownGroups,
+		isLoadingGoals,
+		goals,
+		savingsAccounts,
+	]);
 
 	return (
 		<div className="min-h-screen bg-gray-50 p-4 text-gray-900 md:p-6 lg:p-8 dark:bg-[#0d0d0d] dark:text-[#f5f5f5]">
@@ -1943,29 +2120,36 @@ export default function DashboardPageClient() {
 			</div>
 
 			{/* Dashboard Grid */}
-			<div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
-				<div className="h-px bg-transparent md:hidden" />{" "}
-				{/* Spacer for mobile */}
-				{/* Left Column (First Column) */}
-				<div className="space-y-5">
-					<BudgetWidget txs={currentMonthTxs} />
-					<NetWorthWidget summary={summary} breakdownGroups={breakdownGroups} />
-					<RecurringWidget />
-				</div>
-				{/* Right Column (Second Column) */}
-				<div className="space-y-5">
-					<SpendingWidget transactions={transactions} />
-					<TopCategoriesWidget />
-					<TransactionsWidget transactions={currentMonthTxs} />
-
-					<InvestmentsWidget />
-					{!isLoadingGoals && (
-						<GoalsWidget
-							goals={goals}
-							savingsAccounts={savingsAccounts as unknown as Account[]}
-						/>
-					)}
-				</div>
+			<div className="mt-4 columns-1 gap-5 md:columns-2">
+				{dashboardLoading ? (
+					<div className="col-span-2 py-10 text-center text-gray-500">
+						Loading your dashboard widgets...
+					</div>
+				) : (
+					<DragDropProvider
+						onDragEnd={(event) => {
+							// Get the current list of widget IDs based on the visible order
+							const ids = visibleWidgets.map((w) => w.id);
+							// Use the 'move' helper to calculate the new order
+							const newIds = move(ids, event);
+							// Only update if the order actually changed
+							if (!arraysEqual(ids, newIds)) {
+								updateOrder(newIds); // ✅ Persist directly to store
+							}
+						}}
+					>
+						{visibleWidgets.map((widget, index) => (
+							<SortableWidget
+								key={widget.id}
+								id={widget.id}
+								index={index}
+								className="break-inside-avoid mb-5"
+							>
+								{widget.component}
+							</SortableWidget>
+						))}
+					</DragDropProvider>
+				)}
 			</div>
 		</div>
 	);

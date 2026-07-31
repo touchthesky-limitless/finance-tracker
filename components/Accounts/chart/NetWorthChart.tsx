@@ -58,6 +58,7 @@ interface NetWorthChartProps {
 	};
 	chartHeight?: number | string;
 	className?: string;
+	showChartTypeSelector?: boolean;
 }
 
 type BreakdownDataPoint = {
@@ -77,6 +78,7 @@ export function NetWorthChart({
 	breakdownGroups,
 	chartHeight = 280,
 	className = "",
+	showChartTypeSelector = true,
 }: NetWorthChartProps) {
 	const [chartMenuOpen, setChartMenuOpen] = useState(false);
 	const [rangeMenuOpen, setRangeMenuOpen] = useState(false);
@@ -288,26 +290,29 @@ export function NetWorthChart({
 
 					{/* Dropdowns: Side-by-side on mobile */}
 					<div className="flex flex-row flex-wrap gap-2 w-full md:w-auto mt-1 md:mt-0">
-						<Dropdown
-							key={chartType}
-							label={chartType === "performance" ? "Performance" : "Breakdown"}
-							open={chartMenuOpen}
-							onOpenChange={(open) => {
-								setChartMenuOpen(open);
-								if (open) setRangeMenuOpen(false);
-							}}
-							options={[
-								{ value: "performance", label: "Performance" },
-								{ value: "breakdown", label: "Breakdown" },
-							]}
-							value={chartType}
-							onChange={(value) => {
-								onChartTypeChange(value as ChartType);
-								setChartMenuOpen(false);
-							}}
-							className="flex-1 min-w-[90px] sm:w-52"
-						/>
-
+						{showChartTypeSelector && (
+							<Dropdown
+								key={chartType}
+								label={
+									chartType === "performance" ? "Performance" : "Breakdown"
+								}
+								open={chartMenuOpen}
+								onOpenChange={(open) => {
+									setChartMenuOpen(open);
+									if (open) setRangeMenuOpen(false);
+								}}
+								options={[
+									{ value: "performance", label: "Performance" },
+									{ value: "breakdown", label: "Breakdown" },
+								]}
+								value={chartType}
+								onChange={(value) => {
+									onChartTypeChange(value as ChartType);
+									setChartMenuOpen(false);
+								}}
+								className="flex-1 min-w-[90px] sm:w-52"
+							/>
+						)}
 						{chartType === "breakdown" ? (
 							<Dropdown
 								key={timeframe}

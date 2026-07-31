@@ -112,12 +112,14 @@ export const CategoryTrigger = forwardRef<
 			aria-expanded={isOpen}
 			{...buttonProps}
 			className={`
-  flex cursor-pointer items-center justify-center shrink-0 min-w-[32px] min-h-[32px] rounded-lg transition-colors outline-none ring-0 focus-visible:ring-0
-  ${
-		iconOnly
-			? "w-8 h-8 p-0 border border-gray-200 bg-gray-50 hover:border-gray-300 hover:bg-gray-100 dark:border-white/20 dark:bg-white/5 dark:hover:border-white/40 dark:hover:bg-white/10"
-			: "w-full justify-between px-3 py-2.5 text-left border border-transparent group-hover:border-gray-300 dark:group-hover:border-white/20"
-	}
+  flex h-10 w-full min-w-0 shrink-0 cursor-pointer items-center gap-3
+  rounded-xl border border-transparent pl-1 pr-3 text-left
+  transition-all outline-none ring-0 focus-visible:ring-2 focus-visible:ring-orange-500/30
+  ${iconOnly ? "gap-1.5 pl-0.5 pr-1" : "gap-3 pl-1 pr-3"}
+  group-hover:border-gray-300
+  group-hover:bg-gray-50
+  dark:group-hover:border-white/20
+  dark:group-hover:bg-white/5
   ${className}
 `}
 		>

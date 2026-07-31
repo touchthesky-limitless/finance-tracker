@@ -474,16 +474,21 @@ export function DataTable({
 											: `Category ID unavailable for ${categoryName}`
 									}
 									className={`
-              flex items-center justify-center shrink-0 transition-all ml-1
+              flex items-center justify-center shrink-0 transition-all
               ${
 								!isMobile
-									? "w-5 h-5 border-gray-200 bg-gray-50 rounded-lg border opacity-0 group-hover:opacity-100 group-hover:border-gray-300 dark:group-hover:border-white/20 hover:bg-gray-100 dark:hover:bg-white/5"
+									? "w-6 h-6 rounded-lg border border-transparent opacity-0 group-hover:opacity-100 group-hover:border-gray-300 dark:group-hover:border-white/20 hover:bg-gray-100 dark:hover:bg-white/5"
 									: "hidden"
 							}
               ${targetId ? "cursor-pointer" : "cursor-not-allowed"}
             `}
 								>
-									<ArrowRight size={12} strokeWidth={2} aria-hidden="true" />
+									<ArrowRight
+										size={12}
+										strokeWidth={2}
+										className="text-gray-500 dark:text-gray-400"
+										aria-hidden="true"
+									/>
 								</button>
 							)}
 						</div>
@@ -519,7 +524,7 @@ export function DataTable({
 								canNavigate ? `View ${accountName}` : "Account ID unavailable"
 							}
 							className={`
-  group flex w-full min-w-0 items-center gap-2 rounded-lg border border-transparent text-left transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E94F2D]
+  group flex h-10 w-full min-w-0 items-center gap-2 rounded-lg border border-transparent text-left transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E94F2D]
   ${!isMobile ? "px-2 py-1 hover:border-gray-300 hover:bg-gray-50 dark:hover:border-white/20 dark:hover:bg-white/5" : "p-0 justify-center"}
   ${!canNavigate ? "cursor-not-allowed opacity-50" : "cursor-pointer"}
 `}
