@@ -30,6 +30,7 @@ export default function ClientDashboardLayout({
 	const toast = useBudgetStore((state) => state.toast);
 	const setToast = useBudgetStore((state) => state.setToast);
 	const undoBulkUpdate = useBudgetStore((state) => state.undoBulkUpdate);
+	const onBack = useTransactionDrawer((state) => state.onBack);
 
 	const isMobile = useMediaQuery(MOBILE_BREAKPOINT);
 	const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -137,6 +138,7 @@ export default function ClientDashboardLayout({
 					transaction={selectedTransaction}
 					isOpen={!!selectedTransactionId}
 					onClose={closeDrawer}
+					onBack={onBack}
 					onDeleted={(_count) => {
 						//! TODO Handle deletion notification if needed
 						closeDrawer();

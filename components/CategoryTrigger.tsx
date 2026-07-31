@@ -112,11 +112,14 @@ export const CategoryTrigger = forwardRef<
 			aria-expanded={isOpen}
 			{...buttonProps}
 			className={`
-        flex cursor-pointer items-center rounded-xl border border-transparent transition-colors outline-none ring-0 focus-visible:ring-0
-        {/* ✅ Removed horizontal padding (px-3) and used 'justify-center' + 'w-full h-full' on mobile so it fills the cell perfectly without extra spacing */}
-        ${iconOnly ? "w-full h-full justify-center p-0" : "w-full justify-between px-3 py-2.5 text-left group-hover:border-gray-300 dark:group-hover:border-white/20"}
-        ${className}
-      `}
+  flex cursor-pointer items-center justify-center shrink-0 min-w-[32px] min-h-[32px] rounded-lg transition-colors outline-none ring-0 focus-visible:ring-0
+  ${
+		iconOnly
+			? "w-8 h-8 p-0 border border-gray-200 bg-gray-50 hover:border-gray-300 hover:bg-gray-100 dark:border-white/20 dark:bg-white/5 dark:hover:border-white/40 dark:hover:bg-white/10"
+			: "w-full justify-between px-3 py-2.5 text-left border border-transparent group-hover:border-gray-300 dark:group-hover:border-white/20"
+	}
+  ${className}
+`}
 		>
 			<CategoryChip
 				variant={variant}

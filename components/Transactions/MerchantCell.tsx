@@ -36,6 +36,7 @@ interface MerchantCellProps {
 	merchantItems: MerchantListItem[];
 	showNavigation?: boolean;
 	isMobile?: boolean;
+	popoverZIndex?: number;
 
 	onNavigate: () => void;
 	onOpenEditor: () => void;
@@ -120,6 +121,7 @@ export function MerchantCell({
 	onOpenEditor,
 	onMerchantChange,
 	isMobile = false,
+	popoverZIndex = 9999,
 }: MerchantCellProps) {
 	const addCustomMerchant = useBudgetStore((state) => state.addCustomMerchant);
 
@@ -337,7 +339,7 @@ export function MerchantCell({
 						flex h-10 w-full min-w-0 items-center gap-3
 						rounded-xl border border-transparent pl-1 pr-3 text-left
 						transition-all
-						${isMobile ? 'gap-1.5 pl-0.5 pr-1' : 'gap-3 pl-1 pr-3'}
+						${isMobile ? "gap-1.5 pl-0.5 pr-1" : "gap-3 pl-1 pr-3"}
 						group-hover:border-gray-300
 						group-hover:bg-gray-50
 
@@ -404,7 +406,7 @@ export function MerchantCell({
 							: `Merchant ID unavailable for ${merchantName}`
 					}
 					className={`
-						flex h-8 w-8 shrink-0 items-center
+						flex h-6 w-6 shrink-0 items-center
 						justify-center rounded-lg
 						border border-transparent
 						opacity-0 transition-all
@@ -423,7 +425,7 @@ export function MerchantCell({
 					`}
 				>
 					<ArrowRight
-						size={16}
+						size={12}
 						strokeWidth={2}
 						aria-hidden="true"
 						className={
@@ -444,7 +446,7 @@ export function MerchantCell({
 					>
 						<div
 							ref={setFloating}
-							style={floatingStyles}
+							style={{ ...floatingStyles, zIndex: popoverZIndex }}
 							{...getFloatingProps({
 								onClick: (event) => {
 									event.stopPropagation();

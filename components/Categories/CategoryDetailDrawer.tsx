@@ -1,7 +1,7 @@
 import { getCategoryTheme } from "@/constants";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { buildMonthlyRows } from "@/components/Reports/reportUtils";
-import { type Transaction } from "@/store/useBudgetStore";
+import { useBudgetStore, type Transaction } from "@/store/useBudgetStore";
 import { X } from "lucide-react";
 import { formatCurrency } from "@/utils/formatters";
 import {
@@ -14,8 +14,15 @@ import {
 	XAxis,
 	YAxis,
 } from "recharts";
-import { MerchantLogo } from "@/components/Merchants/MerchantLogo";
 import { CategoryGlyph } from "@/components/Categories/CategoryGlyph";
+import { useTransactionDrawer } from "@/store/useTransactionDrawer";
+import { DataTable } from "@/components/Transactions/DataTable";
+import { SortingState } from "@tanstack/react-table";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
+import { MOBILE_BREAKPOINT } from "@/config/breakpoints";
+import { getCategoryIdMap } from "../CashFlow/cashFlowUtils";
+import { useMerchantOptions } from "@/hooks/useMerchantOptions";
+import React from "react";
 
 const AverageLabel = ({ value }: { value: string }) => (
 	<div
@@ -36,18 +43,42 @@ const AverageLabel = ({ value }: { value: string }) => (
 	</div>
 );
 
-export function CategoryDetailDrawer({
-	category,
-	transactions,
-	isOpen,
-	onClose,
-}: {
+function normalize(value: string | null | undefined): string {
+	return value?.trim().toLowerCase() ?? "";
+}
+
+interface CategoryDetailDrawerProps {
 	category: string;
 	transactions: Transaction[];
 	isOpen: boolean;
 	onClose: () => void;
-}) {
+	onReopen: () => void;
+}
+
+export const CategoryDetailDrawer = React.memo(function CategoryDetailDrawer({
+	category,
+	transactions,
+	isOpen,
+	onClose,
+	onReopen,
+}: CategoryDetailDrawerProps) {
 	const theme = getCategoryTheme(category);
+	const openDrawer = useTransactionDrawer((state) => state.openDrawer);
+	const customCategories = useBudgetStore((state) => state.customCategories);
+	const updateTransaction = useBudgetStore((state) => state.updateTransaction);
+	const [sorting] = useState<SortingState>([{ id: "date", desc: true }]);
+	const closeDrawer = useTransactionDrawer((state) => state.closeDrawer);
+	const merchantItems = useMerchantOptions();
+	const isMobile = useMediaQuery(MOBILE_BREAKPOINT);
+	const categoryIdByName = useMemo(() => {
+		return getCategoryIdMap(customCategories);
+	}, [customCategories]);
+	const getCategoryId = useCallback(
+		(categoryName: string) => {
+			return categoryIdByName.get(normalize(categoryName));
+		},
+		[categoryIdByName],
+	);
 
 	const categoryTxs = useMemo(() => {
 		return transactions.filter(
@@ -108,28 +139,6 @@ export function CategoryDetailDrawer({
 			}));
 	}, [categoryTxs]);
 
-	const groupedTransactions = useMemo(() => {
-		const groups = new Map<string, Transaction[]>();
-		for (const tx of categoryTxs) {
-			const date = new Date(tx.date);
-			const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
-			const list = groups.get(key) || [];
-			list.push(tx);
-			groups.set(key, list);
-		}
-		return Array.from(groups.entries())
-			.sort((a, b) => b[0].localeCompare(a[0]))
-			.map(([monthKey, txs]) => ({
-				monthKey,
-				label: new Date(`${monthKey}-01`).toLocaleDateString("en-US", {
-					month: "long",
-					year: "numeric",
-				}),
-				transactions: txs.sort(
-					(a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
-				),
-			}));
-	}, [categoryTxs]);
 
 	const scrollContainerRef = useRef<HTMLDivElement>(null);
 	const monthRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -219,7 +228,7 @@ export function CategoryDetailDrawer({
 									{formatCurrency(currentMonthSpent)}
 								</p>
 								<p className="text-sm text-cyan-600 dark:text-cyan-400">
-									$124.80 left
+									$x left
 								</p>
 							</div>
 						</div>
@@ -343,57 +352,57 @@ export function CategoryDetailDrawer({
 						</table>
 					</div>
 
-					{/* Transactions list */}
-					<div className="mt-6 space-y-6">
-						{groupedTransactions.map((group, idx) => (
-							<div
-								key={group.monthKey}
-								ref={(el) => {
-									monthRefs.current[idx] = el;
-								}}
-							>
-								<h4 className="text-base font-bold text-gray-900 dark:text-[#f5f5f5]">
-									{group.label}
-								</h4>
-								<div className="mt-3 space-y-4">
-									{group.transactions.map((tx) => (
-										<div
-											key={tx.id}
-											className="flex items-center justify-between border-b border-gray-100 pb-3 dark:border-white/5"
-										>
-											<div className="flex items-center gap-4">
-												<MerchantLogo name={tx.merchant} size="sm" />
-												<div>
-													<p className="text-sm font-medium text-gray-900 dark:text-white">
-														{tx.merchant}
-													</p>
-													<p className="text-xs text-gray-500 dark:text-zinc-400">
-														{new Date(tx.date).toLocaleDateString("en-US", {
-															weekday: "long",
-															month: "long",
-															day: "numeric",
-														})}
-													</p>
-												</div>
-											</div>
-											<div className="flex items-center gap-2">
-												<CategoryGlyph
-													name={tx.category}
-													size={16}
-													className={theme.text}
-												/>
-												<span className="font-medium text-gray-900 dark:text-white">
-													{formatCurrency(Math.abs(tx.amount))}
-												</span>
-											</div>
-										</div>
-									))}
-								</div>
-							</div>
-						))}
+					{/* Transactions list using DataTable */}
+					<div className="flex-1 min-h-[300px] overflow-hidden rounded-lg border border-gray-100 bg-white dark:border-white/5 dark:bg-[#191919]">
+						<DataTable
+							transactions={categoryTxs}
+							selectedIds={[]}
+							onSelectRow={() => {}}
+							onRowClick={(transaction) => {
+								onClose(); // close category drawer
+								openDrawer(transaction.id, {
+									onBack: () => {
+										closeDrawer(); // ← close transaction drawer
+										onReopen(); // ← reopen category drawer
+									},
+								});
+							}}
+							columnVisibility={{
+								account: false,
+								merchant: true,
+								category: true,
+								amount: true,
+							}}
+							columnWidths={{
+								merchant: isMobile ? 100 : 160,
+								category: 45,
+								amount: isMobile ? 90 : 130,
+							}}
+							onCategoryChange={(id, newCategory) => {
+								updateTransaction(id, { category: newCategory });
+							}}
+							onMerchantChange={(id, merchant) => {
+								updateTransaction(id, {
+									merchant: merchant.name,
+									merchant_id: merchant.id,
+								});
+							}}
+							isEditMode={true}
+							disableDateGrouping={false}
+							currentView="all"
+							sorting={sorting}
+							merchantItems={merchantItems}
+							isMerchantNavigationEnabled={true}
+							isMobile={isMobile}
+							getCategoryId={getCategoryId}
+							isCategoryView={true}
+							showCategoryChevron={false}
+							merchantPopoverZIndex={1001}
+							forceCategoryIconOnly={true}
+						/>
 					</div>
 				</div>
 			</div>
 		</div>
 	);
-}
+});

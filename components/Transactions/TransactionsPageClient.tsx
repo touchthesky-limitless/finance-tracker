@@ -333,6 +333,7 @@ export default function TransactionsPageClient({
 	const customTags = useBudgetStore((state) => state.customTags);
 	const saveRule = useBudgetStore((state) => state.saveRule);
 	const deleteRule = useBudgetStore((state) => state.deleteRule);
+
 	const confirmedRecurringMerchants = useBudgetStore(
 		(state) => state.confirmedRecurringMerchants,
 	);
@@ -345,6 +346,7 @@ export default function TransactionsPageClient({
 	);
 	const openDrawer = useTransactionDrawer((state) => state.openDrawer);
 	const closeDrawer = useTransactionDrawer((state) => state.closeDrawer);
+	const onBack = useTransactionDrawer((state) => state.onBack);
 
 	// ✅ Deep‑link support: open drawer if initialTransactionId is provided
 	useEffect(() => {
@@ -1244,6 +1246,7 @@ export default function TransactionsPageClient({
 					transaction={selectedTransaction}
 					isOpen={!!selectedTransactionId}
 					onClose={closeDrawer}
+					onBack={onBack}
 					onDeleted={handleDeleted}
 					onDuplicate={handleDuplicate}
 					onCreateRule={handleCreateRule}

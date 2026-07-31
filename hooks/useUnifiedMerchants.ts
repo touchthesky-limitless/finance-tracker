@@ -1,9 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo } from "react";
-
+import { useCallback, useMemo } from "react";
 import { useBudgetStore, type Transaction } from "@/store/useBudgetStore";
-
 
 export interface UnifiedMerchant {
 	id: string;
@@ -35,7 +33,6 @@ export function getTransactionMerchantId(
 	const merchantId = (
 		transaction as TransactionWithMerchantId
 	).merchant_id?.trim();
-
 	return merchantId || undefined;
 }
 
@@ -44,25 +41,11 @@ function getCustomMerchantName(merchant: CustomMerchantRow): string {
 }
 
 export function useUnifiedMerchants() {
-	const transactions = useBudgetStore((state) => {
-		return state.transactions;
-	});
-
-	const merchants = useBudgetStore((state) => {
-		return state.merchants;
-	});
-
-	const fetchMerchants = useBudgetStore((state) => {
-		return state.fetchMerchants;
-	});
-
-	useEffect(() => {
-		void fetchMerchants();
-	}, [fetchMerchants]);
+	const transactions = useBudgetStore((state) => state.transactions);
+	const merchants = useBudgetStore((state) => state.merchants);
 
 	const allUnifiedMerchants = useMemo<UnifiedMerchant[]>(() => {
 		const merchantById = new Map<string, UnifiedMerchant>();
-
 		const merchantIdByName = new Map<string, string>();
 
 		// Add custom merchants first so their database IDs win when
@@ -72,12 +55,9 @@ export function useUnifiedMerchants() {
 			const name = getCustomMerchantName(customMerchant);
 			const normalizedName = normalizeMerchantName(name);
 
-			if (!id || !normalizedName) {
-				continue;
-			}
+			if (!id || !normalizedName) continue;
 
 			const isSystem = customMerchant.is_system === true;
-
 			const merchant: UnifiedMerchant = {
 				id,
 				name,
@@ -96,9 +76,7 @@ export function useUnifiedMerchants() {
 			const name = transaction.merchant?.trim();
 			const normalizedName = normalizeMerchantName(name || "");
 
-			if (!id || !normalizedName) {
-				continue;
-			}
+			if (!id || !normalizedName) continue;
 
 			if (!merchantById.has(id)) {
 				merchantById.set(id, {
@@ -114,47 +92,37 @@ export function useUnifiedMerchants() {
 			}
 		}
 
-		return Array.from(merchantById.values()).sort((first, second) => {
-			return first.name.localeCompare(second.name);
-		});
+		return Array.from(merchantById.values()).sort((first, second) =>
+			first.name.localeCompare(second.name),
+		);
 	}, [merchants, transactions]);
 
-	const merchantById = useMemo(() => {
-		return new Map(
-			allUnifiedMerchants.map((merchant) => {
-				return [merchant.id, merchant] as const;
-			}),
-		);
-	}, [allUnifiedMerchants]);
+	const merchantById = useMemo(
+		() => new Map(allUnifiedMerchants.map((m) => [m.id, m] as const)),
+		[allUnifiedMerchants],
+	);
 
 	const merchantIdByName = useMemo(() => {
 		const result = new Map<string, string>();
-
-		// Custom merchants should win over transaction-derived records.
 		for (const merchant of allUnifiedMerchants) {
 			const normalizedName = normalizeMerchantName(merchant.name);
-
 			const existingId = result.get(normalizedName);
-
 			if (!existingId || merchant.isCustom) {
 				result.set(normalizedName, merchant.id);
 			}
 		}
-
 		return result;
 	}, [allUnifiedMerchants]);
 
 	const getMerchantId = useCallback(
-		(merchantName: string): string | undefined => {
-			return merchantIdByName.get(normalizeMerchantName(merchantName));
-		},
+		(merchantName: string): string | undefined =>
+			merchantIdByName.get(normalizeMerchantName(merchantName)),
 		[merchantIdByName],
 	);
 
 	const getMerchantById = useCallback(
-		(merchantId: string): UnifiedMerchant | undefined => {
-			return merchantById.get(merchantId);
-		},
+		(merchantId: string): UnifiedMerchant | undefined =>
+			merchantById.get(merchantId),
 		[merchantById],
 	);
 

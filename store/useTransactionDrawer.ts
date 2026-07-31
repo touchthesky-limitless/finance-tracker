@@ -1,13 +1,19 @@
 import { create } from "zustand";
 
 interface TransactionDrawerState {
-  selectedTransactionId: string | null;
-  openDrawer: (transactionId: string) => void;
-  closeDrawer: () => void;
+	selectedTransactionId: string | null;
+	onBack?: () => void;
+	openDrawer: (id: string, options?: { onBack?: () => void }) => void;
+	closeDrawer: () => void;
 }
 
 export const useTransactionDrawer = create<TransactionDrawerState>((set) => ({
-  selectedTransactionId: null,
-  openDrawer: (transactionId) => set({ selectedTransactionId: transactionId }),
-  closeDrawer: () => set({ selectedTransactionId: null }),
+	selectedTransactionId: null,
+	onBack: undefined,
+	openDrawer: (id, options = {}) => {
+		set({ selectedTransactionId: id, onBack: options.onBack });
+	},
+	closeDrawer: () => {
+		set({ selectedTransactionId: null, onBack: undefined });
+	},
 }));

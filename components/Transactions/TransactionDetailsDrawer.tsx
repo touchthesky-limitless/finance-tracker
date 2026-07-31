@@ -12,6 +12,7 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import {
 	AlertCircle,
+	ArrowLeft,
 	Check,
 	Copy,
 	Ellipsis,
@@ -44,6 +45,7 @@ interface TransactionDetailsDrawerProps {
 	onDeleted: (count: number) => void;
 	onDuplicate: (transaction: Transaction) => void | Promise<void>;
 	onCreateRule: (transaction: Transaction) => void;
+	onBack?: () => void;
 }
 
 type TransactionDirection = "debit" | "credit";
@@ -71,6 +73,7 @@ export default function TransactionDetailsDrawer({
 	onDeleted,
 	onDuplicate,
 	onCreateRule,
+	onBack,
 }: TransactionDetailsDrawerProps) {
 	const router = useRouter();
 	const transactions = useBudgetStore((state) => state.transactions);
@@ -734,6 +737,21 @@ export default function TransactionDetailsDrawer({
 
 				<header className="relative flex min-h-17 shrink-0 items-center justify-between border-b border-gray-200 px-4 dark:border-white/10 sm:px-6">
 					<div className="flex min-w-0 items-center gap-2.5">
+						{onBack && (
+							<>
+								<button
+									type="button"
+									onClick={onBack}
+									className="flex items-center justify-center rounded-full p-2 hover:bg-gray-100 dark:hover:bg-white/10"
+								>
+									<ArrowLeft
+										size={20}
+										className="text-gray-700 dark:text-gray-300"
+									/>
+								</button>
+								<div className="mx-1 h-6 w-px bg-gray-300 dark:bg-white/20" />
+							</>
+						)}
 						<button
 							type="button"
 							onClick={() => void handleMarkReviewed()}

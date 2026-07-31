@@ -72,6 +72,10 @@ interface DataTableProps {
 		category?: number;
 		amount?: number;
 	};
+	isMobile?: boolean;
+	showCategoryChevron?: boolean;
+	merchantPopoverZIndex?: number;
+	forceCategoryIconOnly?: boolean;
 }
 
 type DateHeaderItem = {
@@ -260,6 +264,9 @@ export function DataTable({
 	disableDateGrouping = false,
 	onViewCategory,
 	columnWidths,
+	showCategoryChevron = true,
+	merchantPopoverZIndex,
+	forceCategoryIconOnly = false,
 }: DataTableProps) {
 	const parentRef = useRef<HTMLDivElement>(null);
 	const router = useRouter();
@@ -378,7 +385,7 @@ export function DataTable({
 				// size: isMobile ? 222 : 350,
 				// minSize: isMobile ? 140 : 160,
 				size: columnWidths?.merchant ?? (isMobile ? 222 : 350),
-    minSize: isMobile ? 140 : 160,
+				minSize: isMobile ? 140 : 160,
 				cell: (info) => {
 					const transaction = info.row.original;
 					const merchantName = String(info.getValue() || "Unknown merchant");
@@ -408,6 +415,7 @@ export function DataTable({
 							}}
 							onMerchantChange={onMerchantChange}
 							isMobile={isMobile}
+							popoverZIndex={merchantPopoverZIndex}
 						/>
 					);
 				},
@@ -416,11 +424,12 @@ export function DataTable({
 			columnHelper.accessor("category", {
 				// size: isMobile ? 20 : 300,
 				// minSize: isMobile ? 50 : 120,
-				 size: columnWidths?.category ?? (isMobile ? 20 : 300),
-    minSize: isMobile ? 50 : 120,
+				size: columnWidths?.category ?? (isMobile ? 20 : 300),
+				minSize: isMobile ? 50 : 120,
 				cell: (info) => {
 					const categoryName = String(info.getValue() || "Uncategorized");
 					const targetId = getCategoryId?.(categoryName);
+					const categoryIconOnly = isMobile || forceCategoryIconOnly;
 
 					return (
 						<div
@@ -435,9 +444,9 @@ export function DataTable({
 								<CategorySelector
 									currentCategory={categoryName}
 									variant="form"
-									showChevron={!isMobile}
-									hideChevronUntilHover={!isMobile}
-									iconOnly={isMobile}
+									showChevron={showCategoryChevron}
+									hideChevronUntilHover={showCategoryChevron}
+									iconOnly={categoryIconOnly}
 									onSelect={(newCategory) => {
 										if (newCategory === categoryName) return;
 										void onCategoryChange?.(info.row.original.id, newCategory);
@@ -465,16 +474,16 @@ export function DataTable({
 											: `Category ID unavailable for ${categoryName}`
 									}
 									className={`
-              flex items-center justify-center shrink-0 transition-all
+              flex items-center justify-center shrink-0 transition-all ml-1
               ${
 								!isMobile
-									? "w-8 h-8 rounded-lg border border-transparent opacity-0 group-hover:opacity-100 group-hover:border-gray-300 dark:group-hover:border-white/20 hover:bg-gray-100 dark:hover:bg-white/5"
+									? "w-5 h-5 border-gray-200 bg-gray-50 rounded-lg border opacity-0 group-hover:opacity-100 group-hover:border-gray-300 dark:group-hover:border-white/20 hover:bg-gray-100 dark:hover:bg-white/5"
 									: "hidden"
 							}
               ${targetId ? "cursor-pointer" : "cursor-not-allowed"}
             `}
 								>
-									<ArrowRight size={16} strokeWidth={2} aria-hidden="true" />
+									<ArrowRight size={12} strokeWidth={2} aria-hidden="true" />
 								</button>
 							)}
 						</div>
@@ -545,8 +554,8 @@ export function DataTable({
 			columnHelper.accessor("amount", {
 				// size: isMobile ? 80 : 140,
 				// minSize: isMobile ? 60 : 80,
-				   size: columnWidths?.amount ?? (isMobile ? 80 : 140),
-    minSize: isMobile ? 60 : 80,
+				size: columnWidths?.amount ?? (isMobile ? 80 : 140),
+				minSize: isMobile ? 60 : 80,
 				sortingFn: (rowA, rowB, columnId) => {
 					const firstAmount = Number(rowA.getValue(columnId));
 					const secondAmount = Number(rowB.getValue(columnId));
@@ -604,6 +613,9 @@ export function DataTable({
 		isMobile,
 		onViewCategory,
 		columnWidths,
+		showCategoryChevron,
+		merchantPopoverZIndex,
+		forceCategoryIconOnly,
 	]);
 
 	const uniqueTransactions = useMemo(() => {
