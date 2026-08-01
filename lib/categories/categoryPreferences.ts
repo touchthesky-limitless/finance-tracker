@@ -17,6 +17,10 @@ export interface CategoryPreference {
 	parentName?: string;
 	order?: number;
 	hidden?: boolean;
+	budgetType?: "fixed" | "flexible" | "non-monthly";
+	monthlyRollover?: boolean;
+	rolloverStartMonth?: string;
+	rolloverStartingBalance?: number;
 }
 
 export type GroupPreferences = Record<string, GroupPreference>;
@@ -80,7 +84,10 @@ export function parseGroupPreferences(value: unknown): GroupPreferences {
 			preference.name = name;
 		}
 
-		if (candidate.budgetMode === "group" || candidate.budgetMode === "category") {
+		if (
+			candidate.budgetMode === "group" ||
+			candidate.budgetMode === "category"
+		) {
 			preference.budgetMode = candidate.budgetMode;
 		}
 
@@ -152,6 +159,33 @@ export function parseCategoryPreferences(value: unknown): CategoryPreferences {
 			preference.hidden = candidate.hidden;
 		}
 
+		// ----- NEW FIELDS -----
+		if (
+			typeof candidate.budgetType === "string" &&
+			["fixed", "flexible", "non-monthly"].includes(candidate.budgetType)
+		) {
+			preference.budgetType = candidate.budgetType as
+				| "fixed"
+				| "flexible"
+				| "non-monthly";
+		}
+		if (typeof candidate.monthlyRollover === "boolean") {
+			preference.monthlyRollover = candidate.monthlyRollover;
+		}
+		if (
+			typeof candidate.rolloverStartMonth === "string" &&
+			candidate.rolloverStartMonth.match(/^\d{4}-\d{2}$/)
+		) {
+			preference.rolloverStartMonth = candidate.rolloverStartMonth;
+		}
+		if (
+			typeof candidate.rolloverStartingBalance === "number" &&
+			Number.isFinite(candidate.rolloverStartingBalance)
+		) {
+			preference.rolloverStartingBalance = candidate.rolloverStartingBalance;
+		}
+		// ---------------------
+
 		if (hasOwnPreferences(preference)) {
 			result[categoryId] = preference;
 		}
@@ -160,10 +194,7 @@ export function parseCategoryPreferences(value: unknown): CategoryPreferences {
 	return result;
 }
 
-function readLegacyRecord(
-	storage: StorageReader,
-	storageKey: string,
-): unknown {
+function readLegacyRecord(storage: StorageReader, storageKey: string): unknown {
 	try {
 		const storedValue = storage.getItem(storageKey);
 		return storedValue ? (JSON.parse(storedValue) as unknown) : undefined;

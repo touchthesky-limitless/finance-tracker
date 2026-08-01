@@ -27,6 +27,7 @@ import {
 	getEmojiIcon,
 } from "@/components/Categories/CategoryGlyph";
 import type { CategorySectionId } from "@/lib/categories/categoryPreferences";
+import { formatCurrency } from "@/utils/formatters";
 
 const DEFAULT_ICON = encodeEmojiIcon("❓");
 
@@ -49,6 +50,8 @@ export interface CategoryEditorValue {
 	excludedFromBudget: boolean;
 	budgetType: CategoryBudgetType;
 	monthlyRollover: boolean;
+	rolloverStartMonth?: string; // e.g. "2026-07"
+	rolloverStartingBalance?: number;
 	hidden: boolean;
 }
 
@@ -59,6 +62,8 @@ export interface CategoryEditorSaveValue {
 	excludedFromBudget: boolean;
 	budgetType: CategoryBudgetType;
 	monthlyRollover: boolean;
+	rolloverStartMonth?: string;
+	rolloverStartingBalance?: number;
 }
 
 interface CategoryEditorModalProps {
@@ -69,6 +74,7 @@ interface CategoryEditorModalProps {
 	onSave: (value: CategoryEditorSaveValue) => Promise<void>;
 	onDelete: () => void;
 	onActivate: () => Promise<void> | void;
+	isIncomeCategory?: boolean;
 }
 
 function subscribeToClient(): () => void {
@@ -105,6 +111,7 @@ export function CategoryEditorModal({
 	onSave,
 	onDelete,
 	onActivate,
+	isIncomeCategory = false,
 }: CategoryEditorModalProps) {
 	const titleId = useId();
 	const [name, setName] = useState(category.name);
@@ -121,6 +128,12 @@ export function CategoryEditorModal({
 	const [monthlyRollover, setMonthlyRollover] = useState(
 		category.monthlyRollover,
 	);
+	const [rolloverStartMonth, setRolloverStartMonth] = useState<
+		string | undefined
+	>(category.rolloverStartMonth);
+	const [rolloverStartingBalance, setRolloverStartingBalance] = useState<
+		number | undefined
+	>(category.rolloverStartingBalance);
 	const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
 	const [isSaving, setIsSaving] = useState(false);
 	const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -133,7 +146,9 @@ export function CategoryEditorModal({
 		selectedParentName !== category.parentName ||
 		excludeFromBudget !== category.excludedFromBudget ||
 		budgetType !== category.budgetType ||
-		monthlyRollover !== category.monthlyRollover;
+		monthlyRollover !== category.monthlyRollover ||
+		rolloverStartMonth !== category.rolloverStartMonth ||
+		rolloverStartingBalance !== category.rolloverStartingBalance;
 
 	useEffect(() => {
 		const previousOverflow = document.body.style.overflow;
@@ -176,6 +191,8 @@ export function CategoryEditorModal({
 				excludedFromBudget: excludeFromBudget,
 				budgetType,
 				monthlyRollover,
+				rolloverStartMonth,
+				rolloverStartingBalance,
 			});
 		} catch (error) {
 			setErrorMessage(
@@ -306,69 +323,179 @@ export function CategoryEditorModal({
 							<CategoryGroupSelect
 								value={selectedParentName}
 								groups={groups}
-								disabled={isSaving}
+								disabled={isIncomeCategory || isSaving}
 								onChange={(nextParent) => {
 									setSelectedParentName(nextParent);
 									setErrorMessage(null);
 								}}
 							/>
 						</div>
+						{!isIncomeCategory && (
+							<div>
+								<span className="mb-3 block text-base font-semibold sm:text-lg lg:text-[23px]">
+									Type
+								</span>
+								<div className="overflow-hidden rounded-[15px] border border-[#dedbd7] dark:border-white/15">
+									<BudgetTypeOption
+										value="fixed"
+										selected={budgetType === "fixed"}
+										title="Fixed"
+										description="Spending is usually the same every month and cannot be easily reduced. Great for utilities, mortgage, bills, etc."
+										onSelect={setBudgetType}
+									/>
+									<BudgetTypeOption
+										value="flexible"
+										selected={budgetType === "flexible"}
+										title="Flexible"
+										description="Spending changes monthly, and can be reduced when you want to save more money. Great for restaurants, entertainment, etc."
+										onSelect={setBudgetType}
+									>
+										{budgetType === "flexible" && (
+											<div className="mt-4 rounded-xl bg-[#f5f4f2] p-4 dark:bg-white/5">
+												<div className="flex items-center justify-between">
+													<div>
+														<p className="font-semibold">
+															Make this category a rollover fund
+														</p>
+														<p className="mt-1 text-sm leading-6 text-[#55534f] dark:text-[#c2c0bb]">
+															Carry over remaining balances or set due dates to
+															better plan for future expenses.
+														</p>
+													</div>
+													<button
+														type="button"
+														role="switch"
+														aria-checked={monthlyRollover}
+														onClick={(event) => {
+															event.stopPropagation();
+															setMonthlyRollover((prev) => {
+																// prev is the current value of monthlyRollover before update
+																if (!prev) {
+																	// Turning on: set default start month and starting balance
+																	const now = new Date();
+																	const defaultMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+																	setRolloverStartMonth(defaultMonth);
+																	setRolloverStartingBalance(0);
+																} else {
+																	// Turning off: clear the extra fields
+																	setRolloverStartMonth(undefined);
+																	setRolloverStartingBalance(undefined);
+																}
+																return !prev;
+															});
+														}}
+														className={`relative h-7 w-14 shrink-0 rounded-full transition ${
+															monthlyRollover
+																? "bg-[#ff6633]"
+																: "bg-[#989793] dark:bg-[#66645f]"
+														}`}
+													>
+														<span
+															className={`absolute top-1 size-5 rounded-full bg-white shadow-sm transition-transform ${
+																monthlyRollover
+																	? "translate-x-8"
+																	: "translate-x-1"
+															}`}
+														/>
+													</button>
+												</div>
 
-						<div>
-							<span className="mb-3 block text-base font-semibold sm:text-lg lg:text-[23px]">
-								Type
-							</span>
-							<div className="overflow-hidden rounded-[15px] border border-[#dedbd7] dark:border-white/15">
-								<BudgetTypeOption
-									value="fixed"
-									selected={budgetType === "fixed"}
-									title="Fixed"
-									description="Spending is usually the same every month and cannot be easily reduced. Great for utilities, mortgage, bills, etc."
-									onSelect={setBudgetType}
-								/>
-								<BudgetTypeOption
-									value="flexible"
-									selected={budgetType === "flexible"}
-									title="Flexible"
-									description="Spending changes monthly, and can be reduced when you want to save more money. Great for restaurants, entertainment, etc."
-									onSelect={setBudgetType}
-								>
-									<div className="mt-4 flex items-center justify-between gap-4 rounded-xl bg-[#f5f4f2] px-4 py-4 dark:bg-white/5">
-										<div>
-											<p className="font-semibold">
-												Make this category a rollover fund
-											</p>
-											<p className="mt-1 text-sm leading-6 text-[#55534f] dark:text-[#c2c0bb]">
-												Carry over remaining balances or set due dates to better
-												plan for future expenses.
-											</p>
-										</div>
-										<button
-											type="button"
-											role="switch"
-											aria-checked={monthlyRollover}
-											onClick={(event) => {
-												event.stopPropagation();
-												setMonthlyRollover((current) => !current);
-											}}
-											className={`relative h-7 w-14 shrink-0 rounded-full transition ${monthlyRollover ? "bg-[#ff6633]" : "bg-[#989793] dark:bg-[#66645f]"}`}
-										>
-											<span
-												className={`absolute top-1 size-5 rounded-full bg-white shadow-sm transition-transform ${monthlyRollover ? "translate-x-8" : "translate-x-1"}`}
-											/>
-										</button>
-									</div>
-								</BudgetTypeOption>
-								<BudgetTypeOption
-									value="non-monthly"
-									selected={budgetType === "non-monthly"}
-									title="Non-Monthly"
-									description="Spending typically happens yearly, or less frequently than monthly. Great for annual bills, quarterly payments, etc."
-									onSelect={setBudgetType}
-								/>
+												{/* Extra fields when rollover is enabled */}
+												{monthlyRollover && (
+													<div className="mt-5 space-y-4">
+														<div>
+															<label className="mb-1 block text-sm font-semibold">
+																Starting Month
+															</label>
+															<select
+																value={rolloverStartMonth || ""}
+																onChange={(e) =>
+																	setRolloverStartMonth(e.target.value)
+																}
+																className="w-full rounded-lg border border-[#d8d6d2] bg-white px-3 py-2 text-sm outline-none focus:border-[#008eae] focus:ring-2 focus:ring-[#008eae]/15 dark:border-white/15 dark:bg-[#20201f]"
+															>
+																{/* Generate month options for the next 12 months */}
+																{Array.from({ length: 12 }, (_, i) => {
+																	const date = new Date();
+																	date.setMonth(date.getMonth() + i);
+																	const monthValue = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+																	const monthLabel = date.toLocaleDateString(
+																		"en-US",
+																		{ month: "long", year: "numeric" },
+																	);
+																	return (
+																		<option key={monthValue} value={monthValue}>
+																			{monthLabel}
+																		</option>
+																	);
+																})}
+															</select>
+															<p className="mt-2 text-sm text-[#55534f] dark:text-[#c2c0bb]">
+																Your rollover balance will start carrying over
+																from this month onward. Any excess budget
+																amounts from before this date will not rollover.
+															</p>
+														</div>
+
+														<div>
+															<label className="mb-1 block text-sm font-semibold">
+																Starting Balance
+															</label>
+															<div className="relative">
+																<span className="absolute inset-y-0 left-3 flex items-center text-gray-500">
+																	$
+																</span>
+																<input
+																	type="text"
+																	value={
+																		rolloverStartingBalance != null
+																			? formatCurrency(rolloverStartingBalance)
+																			: ""
+																	}
+																	onChange={(e) => {
+																		const raw = e.target.value.replace(
+																			/[^0-9.]/g,
+																			"",
+																		);
+																		const parsed = parseFloat(raw);
+																		setRolloverStartingBalance(
+																			isNaN(parsed) ? undefined : parsed,
+																		);
+																	}}
+																	onBlur={() => {
+																		if (
+																			rolloverStartingBalance == null ||
+																			isNaN(rolloverStartingBalance)
+																		) {
+																			setRolloverStartingBalance(0);
+																		}
+																	}}
+																	inputMode="decimal"
+																	placeholder="0.00"
+																	className="w-full rounded-lg border border-[#d8d6d2] bg-white px-8 py-2 text-sm outline-none focus:border-[#008eae] focus:ring-2 focus:ring-[#008eae]/15 dark:border-white/15 dark:bg-[#20201f]"
+																/>
+															</div>
+															<p className="mt-2 text-sm text-[#55534f] dark:text-[#c2c0bb]">
+																You can start with a pre-allocated balance which
+																will start with the amount you enter above, and
+																accrue going forward from the starting month.
+															</p>
+														</div>
+													</div>
+												)}
+											</div>
+										)}
+									</BudgetTypeOption>
+									<BudgetTypeOption
+										value="non-monthly"
+										selected={budgetType === "non-monthly"}
+										title="Non-Monthly"
+										description="Spending typically happens yearly, or less frequently than monthly. Great for annual bills, quarterly payments, etc."
+										onSelect={setBudgetType}
+									/>
+								</div>
 							</div>
-						</div>
-
+						)}
 						<div className="flex min-w-0 flex-col items-stretch gap-4 rounded-[13px] border border-[#dedbd7] px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6 sm:rounded-[15px] sm:px-6 sm:py-6 lg:px-7 lg:py-7 dark:border-white/15">
 							<div className="min-w-0">
 								<h3 className="text-base font-semibold sm:text-lg lg:text-[22px]">

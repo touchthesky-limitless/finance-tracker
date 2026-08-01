@@ -1146,7 +1146,7 @@ function GroupTransactionSummary({
 	);
 }
 
-function EditGroupModal({
+export function EditGroupModal({
 	group,
 	childDialogOpen,
 	onClose,
@@ -1382,7 +1382,7 @@ function EditGroupModal({
 	);
 }
 
-function CategoryGroupSelect({
+export function CategoryGroupSelect({
 	value,
 	groups,
 	disabled,
@@ -1654,7 +1654,7 @@ function CategoryGroupSelect({
 	);
 }
 
-function CategoryGroupOptionSection({
+export function CategoryGroupOptionSection({
 	label,
 	groups,
 	value,
@@ -1699,7 +1699,7 @@ function CategoryGroupOptionSection({
 	);
 }
 
-function BudgetModeSelect({
+export function BudgetModeSelect({
 	value,
 	onChange,
 }: {
@@ -1762,7 +1762,7 @@ function BudgetModeSelect({
 	);
 }
 
-function BudgetTypeOption({
+export function BudgetTypeOption({
 	value,
 	selected,
 	title,

@@ -399,3 +399,34 @@ export function formatTooltipValue(value: unknown): string {
   }
   return '-';
 }
+
+/**
+ * Formats a number as USD with no decimals (whole dollars only).
+ * Always returns a positive number (strips negative signs).
+ * @example
+ * formatCurrencyInt(1540.6) // "$1,541"
+ * formatCurrencyInt(-1540.6) // "$1,541"
+ */
+export function formatCurrencyInt(amount: number): string {
+  if (isNaN(amount) || amount === undefined) {
+    return "$0";
+  }
+  const absAmount = Math.round(Math.abs(amount));
+  return `$${absAmount.toLocaleString()}`;
+}
+
+/**
+ * Formats a signed number as USD with no decimals (whole dollars only).
+ * Keeps the negative sign for negative values.
+ * @example
+ * formatSignedCurrencyInt(-1540.6) // "-$1,541"
+ * formatSignedCurrencyInt(1540.6) // "$1,541"
+ */
+export function formatSignedCurrencyInt(value: number): string {
+  if (!Number.isFinite(value)) {
+    return "$0";
+  }
+  const sign = value < 0 ? "-" : "";
+  const absValue = Math.round(Math.abs(value));
+  return `${sign}$${absValue.toLocaleString()}`;
+}

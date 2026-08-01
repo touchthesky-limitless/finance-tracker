@@ -8,7 +8,8 @@ export type NavigationSource =
 	| "accounts"
 	| "cash-flow"
 	| "recurring"
-	| "reports";
+	| "reports"
+	| "budget";
 
 export interface BreadcrumbConfig {
 	label: string;
@@ -41,6 +42,10 @@ const BREADCRUMBS: Record<NavigationSource, BreadcrumbConfig> = {
 	"reports": {
 		label: "Reports",
 		href: "/reports",
+	},
+	"budget": {
+		label: "Budget",
+		href: "/plan",
 	},
 };
 
@@ -88,6 +93,8 @@ export function useNavigationSource(): NavigationSource {
 		return "recurring";
 	if (pathname === "/reports" || pathname.startsWith("/reports/"))
 		return "reports";
+	if (pathname === "/plan" || pathname.startsWith("/plan/"))
+		return "budget";
 
 	return "transactions";
 }
