@@ -1,8 +1,11 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Roboto_Mono } from "next/font/google";
+import { Geist, Geist_Mono, Roboto_Mono, Inter } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import Script from "next/script";
+import { cn } from "@/lib/utils";
+
+const inter = Inter({subsets:['latin'],variable:'--font-sans'});
 
 const geistSans = Geist({
 	variable: "--font-geist-sans",
@@ -30,7 +33,7 @@ export default function RootLayout({
 	children: React.ReactNode;
 }) {
 	return (
-		<html lang="en" suppressHydrationWarning>
+		<html lang="en" suppressHydrationWarning className={cn("font-sans", inter.variable)}>
 			{/* ✅ Inject the theme script safely here to avoid React 19 warnings */}
 			<head>
 				<Script

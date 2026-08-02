@@ -78,6 +78,7 @@ export function AllocateFundsModal({
 
 	useEffect(() => {
 		if (open) {
+			// eslint-disable-next-line react-hooks/set-state-in-effect
 			setAccountId(goal.linkedAccountIds[0] ?? accounts[0]?.id ?? "");
 			setAmount("");
 			setDate(todayInputValue());
@@ -272,6 +273,7 @@ export function GoalSettingsModal({
 			return;
 		}
 
+		// eslint-disable-next-line react-hooks/set-state-in-effect
 		setName(goal.name);
 		setTargetAmount(String(goal.targetAmount || ""));
 		setTargetDate(goal.targetDate ?? "");
@@ -295,6 +297,7 @@ export function GoalSettingsModal({
 		}
 
 		const objectUrl = URL.createObjectURL(imageFile);
+		// eslint-disable-next-line react-hooks/set-state-in-effect
 		setPreviewUrl(objectUrl);
 
 		return () => {
@@ -366,7 +369,7 @@ export function GoalSettingsModal({
 						onFileChange={setImageFile}
 						className="h-full"
 					/>
-					<div className="absolute inset-x-5 bottom-5 rounded-2xl bg-white p-5 text-gray-950 shadow-xl">
+					<div className="absolute inset-x-5 bottom-5 rounded-2xl bg-white p-5 text-gray-950 shadow-xl dark:bg-[#1B1B1B] dark:text-gray-200 dark:shadow-2xl dark:shadow-black/30">
 						<div className="flex items-start gap-4">
 							<div className="min-w-0 flex-1">
 								<p className="text-xl font-medium">{name || goal.name}</p>
@@ -517,6 +520,7 @@ export function EditGoalAccountsModal({
 			return;
 		}
 
+		// eslint-disable-next-line react-hooks/set-state-in-effect
 		setDraft(
 			Object.fromEntries(
 				accounts.map((account) => {

@@ -1,5 +1,5 @@
 import { Percent, Home, ArrowUpRight, ArrowDownRight } from "lucide-react";
-import { getTrendProps } from "@/lib/utils";
+import { getTrendProps } from "@/lib/finance-utils";
 
 interface MortgageCardProps {
   program: string;

@@ -2,7 +2,7 @@ import MarketStatus from "@/components/Stocks/MarketStatus";
 import Image from "next/image";
 import { ArrowUpRight, ArrowDownRight } from "lucide-react";
 import { getFullMarketInfo } from "@/lib/date";
-import { getTrendProps } from "@/lib/utils";
+import { getTrendProps } from "@/lib/finance-utils";
 import { formatMarketCap } from "@/utils/formatters";
 
 interface FinancialCardProps {

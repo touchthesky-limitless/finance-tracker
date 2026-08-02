@@ -22,7 +22,7 @@ import {
 	stringToPastel,
 	getIconForCategory,
 	getCategoryDetails,
-} from "@/lib/utils";
+} from "@/lib/finance-utils";
 
 // --- SUB-COMPONENT: CATEGORY PICKER ---
 function CategoryPicker({

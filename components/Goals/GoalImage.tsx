@@ -1,12 +1,7 @@
 "use client";
 
 import { ImageIcon, Upload } from "lucide-react";
-import {
-	useEffect,
-	useId,
-	useState,
-	type ChangeEvent,
-} from "react";
+import { useEffect, useId, useState, type ChangeEvent } from "react";
 
 export function GoalImage({
 	src,
@@ -20,6 +15,7 @@ export function GoalImage({
 	const [failed, setFailed] = useState(false);
 
 	useEffect(() => {
+		// eslint-disable-next-line react-hooks/set-state-in-effect
 		setFailed(false);
 	}, [src]);
 
@@ -70,7 +66,7 @@ export function GoalImagePicker({
 			/>
 			<label
 				htmlFor={inputId}
-				className="absolute right-4 top-4 inline-flex cursor-pointer items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-3 font-semibold text-gray-950 shadow-lg transition hover:bg-gray-50"
+				className="absolute right-4 top-4 inline-flex cursor-pointer items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-3 font-semibold text-gray-950 shadow-lg transition hover:bg-gray-50 dark:border-white/10 dark:bg-[#191919] dark:text-gray-200 dark:shadow-xl dark:shadow-black/30 dark:hover:bg-white/5"
 			>
 				<Upload size={17} />
 				Customize image

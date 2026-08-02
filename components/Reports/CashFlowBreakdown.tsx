@@ -20,7 +20,7 @@ import {
 } from "recharts";
 
 import { findParentCategory } from "@/constants";
-import { getIconForCategory } from "@/lib/utils";
+import { getIconForCategory } from "@/lib/finance-utils";
 import { getCategoryHex } from "@/constants/categories";
 import type {
 	ChartTransactionSelection,
