@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { ChevronRight, Info, Plus } from "lucide-react";
 import { useState } from "react";
-
 import { GoalImage } from "@/components/Goals/GoalImage";
 import {
 	AllocateFundsModal,
@@ -31,8 +30,9 @@ import {
 	saveGoalAccountSetting,
 } from "@/lib/goals/repository";
 import type { SavingsGoal } from "@/lib/goals/types";
+import { Skeleton } from "@/components/ui/skeleton";
 
-export default function GoalsSavingsPageClient() {
+export function SavingsListView() {
 	const {
 		goals,
 		savingsAccounts,
@@ -50,7 +50,7 @@ export default function GoalsSavingsPageClient() {
 	const firstGoal = goals[0] ?? null;
 
 	if (isLoading) {
-		return <GoalsSavingsSkeleton />;
+		return <SavingsListSkeleton />;
 	}
 
 	return (
@@ -61,7 +61,7 @@ export default function GoalsSavingsPageClient() {
 					<div className="relative">
 						<ManageButton
 							open={manageOpen}
-							onClick={() => setManageOpen((current) => !current)}
+							onClick={() => setManageOpen((c) => !c)}
 						/>
 						<Menu open={manageOpen}>
 							<MenuItem
@@ -88,8 +88,7 @@ export default function GoalsSavingsPageClient() {
 						href="/goals/savings/new"
 						className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#ff6633] px-5 font-semibold text-white shadow-sm transition hover:bg-[#ed5528]"
 					>
-						<Plus size={18} />
-						Add goal
+						<Plus size={18} /> Add goal
 					</Link>
 				</div>
 			</header>
@@ -116,7 +115,6 @@ export default function GoalsSavingsPageClient() {
 								const linkedAccount = savingsAccounts.find((account) =>
 									goal.linkedAccountIds.includes(account.id),
 								);
-
 								return (
 									<Link
 										key={goal.id}
@@ -130,7 +128,9 @@ export default function GoalsSavingsPageClient() {
 										/>
 										<div className="min-w-0 self-center">
 											<div className="flex items-center gap-3">
-												<h2 className="truncate text-2xl font-medium">{goal.name}</h2>
+												<h2 className="truncate text-2xl font-medium">
+													{goal.name}
+												</h2>
 												<AccountLogo account={linkedAccount} size={28} />
 											</div>
 											<div className="mt-3 flex flex-wrap items-center gap-3 text-lg text-gray-500">
@@ -141,9 +141,12 @@ export default function GoalsSavingsPageClient() {
 											</div>
 										</div>
 										<div className="self-center text-left sm:text-right">
-											<p className="text-2xl font-medium">{formatCurrency(goal.saved)}</p>
+											<p className="text-2xl font-medium">
+												{formatCurrency(goal.saved)}
+											</p>
 											<p className="mt-3 text-lg text-gray-500">
-												{Math.round(progress)}% of {formatCurrency(goal.targetAmount)}
+												{Math.round(progress)}% of{" "}
+												{formatCurrency(goal.targetAmount)}
 											</p>
 										</div>
 										<div className="sm:col-start-2 sm:col-end-4">
@@ -154,9 +157,12 @@ export default function GoalsSavingsPageClient() {
 							})
 						) : (
 							<div className="px-6 py-16 text-center">
-								<h2 className="text-2xl font-bold">Create your first savings goal</h2>
+								<h2 className="text-2xl font-bold">
+									Create your first savings goal
+								</h2>
 								<p className="mx-auto mt-3 max-w-lg text-gray-500">
-									Goals are stored in Supabase and can be linked to your existing accounts.
+									Goals are stored in Supabase and can be linked to your
+									existing accounts.
 								</p>
 								<Link
 									href="/goals/savings/new"
@@ -169,7 +175,9 @@ export default function GoalsSavingsPageClient() {
 					</div>
 
 					<p className="mt-8 max-w-5xl text-base leading-8 text-gray-500 sm:text-lg">
-						Estimates only, not guarantees or personalized investment, tax or financial advice. Projected completion dates and recommended contributions depend on your assumptions and may differ materially.
+						Estimates only, not guarantees or personalized investment, tax or
+						financial advice. Projected completion dates and recommended
+						contributions depend on your assumptions and may differ materially.
 					</p>
 				</section>
 
@@ -226,10 +234,7 @@ export default function GoalsSavingsPageClient() {
 					goal={allocateGoal}
 					accounts={savingsAccounts}
 					onAllocate={async (input) => {
-						await createGoalAllocation({
-							goalId: allocateGoal.id,
-							...input,
-						});
+						await createGoalAllocation({ goalId: allocateGoal.id, ...input });
 						reload();
 					}}
 				/>
@@ -249,13 +254,16 @@ export default function GoalsSavingsPageClient() {
 	);
 }
 
-function GoalsSavingsSkeleton() {
+function SavingsListSkeleton() {
 	return (
-		<div className="min-h-screen animate-pulse bg-[#f7f6f4] p-6 dark:bg-[#171716]">
-			<div className="h-12 rounded-xl bg-gray-200 dark:bg-white/10" />
+		<div className="min-h-screen bg-[#f7f6f4] p-6 dark:bg-[#171716]">
+			<Skeleton className="h-12 w-full rounded-xl" />
 			<div className="mt-6 grid gap-6 xl:grid-cols-[1fr_390px]">
-				<div className="h-72 rounded-2xl bg-gray-200 dark:bg-white/10" />
-				<div className="h-[520px] rounded-2xl bg-gray-200 dark:bg-white/10" />
+				<div className="space-y-4">
+					<Skeleton className="h-72 w-full rounded-2xl" />
+					<Skeleton className="h-20 w-full rounded-2xl" />
+				</div>
+				<Skeleton className="h-[520px] w-full rounded-2xl" />
 			</div>
 		</div>
 	);

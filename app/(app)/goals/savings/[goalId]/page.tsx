@@ -1,5 +1,5 @@
-import GoalDetailsPageClient from "@/components/Goals/GoalDetailsPageClient";
+import { SavingsDetailView } from "@/components/Goals/views/SavingsDetailView";
 
 export default function GoalDetailsPage() {
-	return <GoalDetailsPageClient />;
+  return <SavingsDetailView />;
 }

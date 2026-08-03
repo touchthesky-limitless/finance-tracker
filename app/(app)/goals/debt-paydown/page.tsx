@@ -1,5 +1,5 @@
-import DebtPaydownPageClient from "@/components/Goals/DebtPaydownPageClient";
+import { DebtPaydownView } from "@/components/Goals/views/DebtPaydownView";
 
 export default function DebtPaydownPage() {
-	return <DebtPaydownPageClient />;
+	return <DebtPaydownView />;
 }

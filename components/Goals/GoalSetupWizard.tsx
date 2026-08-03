@@ -17,6 +17,7 @@ import { useGoalsData } from "@/hooks/useGoalsData";
 import { formatAccountName } from "@/lib/goals/accountAdapters";
 import { formatCurrency } from "@/lib/goals/formatters";
 import { createSavingsGoal, uploadGoalImage } from "@/lib/goals/repository";
+import { parseAmount } from "@/lib/goals/utils";
 
 const PRESETS = [
 	{ key: "emergency", name: "Emergency fund", emoji: "🧯" },
@@ -28,11 +29,6 @@ const PRESETS = [
 	{ key: "retirement", name: "Retirement", emoji: "🌇" },
 	{ key: "savings", name: "Savings", emoji: "🌱" },
 ] as const;
-
-function parseAmount(value: string): number {
-	const parsed = Number(value.replace(/[^0-9.]/g, ""));
-	return Number.isFinite(parsed) ? parsed : 0;
-}
 
 export default function GoalSetupWizard() {
 	const router = useRouter();

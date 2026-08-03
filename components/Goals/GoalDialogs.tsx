@@ -7,10 +7,7 @@ import {
 	type ChangeEvent,
 	type ReactNode,
 } from "react";
-import {
-	CalendarDays,
-	ChevronDown,
-} from "lucide-react";
+import { CalendarDays, ChevronDown } from "lucide-react";
 
 import { GoalImage, GoalImagePicker } from "@/components/Goals/GoalImage";
 import {
@@ -24,9 +21,7 @@ import {
 	Toggle,
 	inputClassName,
 } from "@/components/Goals/GoalsUI";
-import {
-	formatAccountName,
-} from "@/lib/goals/accountAdapters";
+import { formatAccountName } from "@/lib/goals/accountAdapters";
 import {
 	formatCurrency,
 	formatGoalDate,
@@ -39,14 +34,10 @@ import type {
 	GoalAllocation,
 	SavingsGoal,
 } from "@/lib/goals/types";
+import { parseAmount } from "@/lib/goals/utils";
 
 function todayInputValue(): string {
 	return new Date().toISOString().slice(0, 10);
-}
-
-function parseAmount(value: string): number {
-	const amount = Number(value.replace(/[^0-9.]/g, ""));
-	return Number.isFinite(amount) ? amount : 0;
 }
 
 export function AllocateFundsModal({
@@ -99,11 +90,7 @@ export function AllocateFundsModal({
 					</SecondaryButton>
 					<PrimaryButton
 						type="button"
-						disabled={
-							isSaving ||
-							!accountId ||
-							parsedAmount <= 0
-						}
+						disabled={isSaving || !accountId || parsedAmount <= 0}
 						onClick={() => {
 							setIsSaving(true);
 							setError(null);
@@ -152,7 +139,8 @@ export function AllocateFundsModal({
 							<option value="">Select account</option>
 							{accounts.map((account) => (
 								<option key={account.id} value={account.id}>
-									{formatAccountName(account)} — {formatCurrency(account.balance)}
+									{formatAccountName(account)} —{" "}
+									{formatCurrency(account.balance)}
 								</option>
 							))}
 						</select>
@@ -174,7 +162,8 @@ export function AllocateFundsModal({
 						<span className="ml-4">
 							<span className="block text-lg font-medium">{goal.name}</span>
 							<span className="block text-gray-500">
-								{formatCurrency(Math.max(0, goal.targetAmount - goal.saved))} left to save
+								{formatCurrency(Math.max(0, goal.targetAmount - goal.saved))}{" "}
+								left to save
 							</span>
 						</span>
 					</div>
@@ -217,7 +206,8 @@ export function AllocateFundsModal({
 					<div className="pr-5">
 						<p className="font-semibold">Include in budget</p>
 						<p className="mt-1 text-sm leading-6 text-gray-500">
-							When turned on, this goal allocation will be used in the actuals for your budget.
+							When turned on, this goal allocation will be used in the actuals
+							for your budget.
 						</p>
 					</div>
 					<Toggle
@@ -257,12 +247,16 @@ export function GoalSettingsModal({
 	onImageUpload: (file: File) => Promise<void>;
 }) {
 	const [name, setName] = useState(goal.name);
-	const [targetAmount, setTargetAmount] = useState(String(goal.targetAmount || ""));
+	const [targetAmount, setTargetAmount] = useState(
+		String(goal.targetAmount || ""),
+	);
 	const [targetDate, setTargetDate] = useState(goal.targetDate ?? "");
 	const [spendingReducesProgress, setSpendingReducesProgress] = useState(
 		goal.spendingReducesProgress,
 	);
-	const [monthlyAmounts, setMonthlyAmounts] = useState<Record<string, string>>({});
+	const [monthlyAmounts, setMonthlyAmounts] = useState<Record<string, string>>(
+		{},
+	);
 	const [imageFile, setImageFile] = useState<File | null>(null);
 	const [previewUrl, setPreviewUrl] = useState<string | null>(goal.imageUrl);
 	const [isSaving, setIsSaving] = useState(false);
@@ -329,7 +323,9 @@ export function GoalSettingsModal({
 							setError(null);
 							const links = linkedAccounts.map((account) => ({
 								accountId: account.id,
-								plannedMonthlyAmount: parseAmount(monthlyAmounts[account.id] ?? ""),
+								plannedMonthlyAmount: parseAmount(
+									monthlyAmounts[account.id] ?? "",
+								),
 							}));
 
 							void onSave({
@@ -381,9 +377,12 @@ export function GoalSettingsModal({
 								</div>
 							</div>
 							<div className="text-right">
-								<p className="text-xl font-medium">{formatCurrency(goal.saved)}</p>
+								<p className="text-xl font-medium">
+									{formatCurrency(goal.saved)}
+								</p>
 								<p className="mt-1 text-gray-500">
-									{Math.round(progress)}% of {formatCurrency(parseAmount(targetAmount))}
+									{Math.round(progress)}% of{" "}
+									{formatCurrency(parseAmount(targetAmount))}
 								</p>
 							</div>
 						</div>
@@ -402,7 +401,8 @@ export function GoalSettingsModal({
 
 				<div>
 					<FieldLabel>
-						Target amount <span className="font-normal text-gray-500">(optional)</span>
+						Target amount{" "}
+						<span className="font-normal text-gray-500">(optional)</span>
 					</FieldLabel>
 					<input
 						value={targetAmount}
@@ -415,7 +415,8 @@ export function GoalSettingsModal({
 				<div>
 					<div className="flex items-center">
 						<FieldLabel>
-							Target date <span className="font-normal text-gray-500">(optional)</span>
+							Target date{" "}
+							<span className="font-normal text-gray-500">(optional)</span>
 						</FieldLabel>
 						<button
 							type="button"
@@ -429,7 +430,9 @@ export function GoalSettingsModal({
 						type="month"
 						value={targetDate ? targetDate.slice(0, 7) : ""}
 						onChange={(event) => {
-							setTargetDate(event.target.value ? `${event.target.value}-01` : "");
+							setTargetDate(
+								event.target.value ? `${event.target.value}-01` : "",
+							);
 						}}
 						className={inputClassName}
 					/>
@@ -441,7 +444,8 @@ export function GoalSettingsModal({
 						<span className="ml-auto text-xl text-gray-500">
 							{formatCurrency(
 								linkedAccounts.reduce(
-									(total, account) => total + parseAmount(monthlyAmounts[account.id] ?? ""),
+									(total, account) =>
+										total + parseAmount(monthlyAmounts[account.id] ?? ""),
 									0,
 								),
 							)}
@@ -453,7 +457,9 @@ export function GoalSettingsModal({
 								<AccountLogo account={account} size={52} />
 								<div className="min-w-0 flex-1">
 									<p className="font-medium">{formatAccountName(account)}</p>
-									<p className="text-gray-500">Current balance: {formatCurrency(account.balance)}</p>
+									<p className="text-gray-500">
+										Current balance: {formatCurrency(account.balance)}
+									</p>
 								</div>
 								<input
 									value={monthlyAmounts[account.id] ?? ""}
@@ -470,7 +476,8 @@ export function GoalSettingsModal({
 						))}
 						{linkedAccounts.length === 0 && (
 							<p className="rounded-xl bg-gray-50 p-4 text-gray-500 dark:bg-white/5">
-								Link an account through Edit goal accounts to add planned contributions.
+								Link an account through Edit goal accounts to add planned
+								contributions.
 							</p>
 						)}
 					</div>
@@ -524,7 +531,9 @@ export function EditGoalAccountsModal({
 		setDraft(
 			Object.fromEntries(
 				accounts.map((account) => {
-					const setting = settings.find((item) => item.accountId === account.id);
+					const setting = settings.find(
+						(item) => item.accountId === account.id,
+					);
 					return [
 						account.id,
 						setting ?? {
@@ -573,11 +582,15 @@ export function EditGoalAccountsModal({
 			<div>
 				<h3 className="text-2xl font-bold">Using accounts with goals</h3>
 				<p className="mt-3 text-lg leading-8 text-gray-600 dark:text-gray-300">
-					Turning on an account makes its available balance visible on the goals page. Allocations always use the real account record and current balance.
+					Turning on an account makes its available balance visible on the goals
+					page. Allocations always use the real account record and current
+					balance.
 				</p>
 
 				{groups.map((group) => {
-					const groupAccounts = accounts.filter((account) => account.group === group);
+					const groupAccounts = accounts.filter(
+						(account) => account.group === group,
+					);
 
 					if (groupAccounts.length === 0) {
 						return null;
@@ -595,18 +608,28 @@ export function EditGoalAccountsModal({
 									}
 
 									return (
-										<div key={account.id} className="rounded-2xl border border-gray-200 p-5 shadow-sm dark:border-white/10">
+										<div
+											key={account.id}
+											className="rounded-2xl border border-gray-200 p-5 shadow-sm dark:border-white/10"
+										>
 											<div className="flex items-center gap-4">
 												<AccountLogo account={account} size={52} />
 												<div className="min-w-0 flex-1">
-													<p className="truncate text-lg font-medium">{formatAccountName(account)}</p>
-													<p className="text-gray-500">Account balance: {formatCurrency(account.balance)}</p>
+													<p className="truncate text-lg font-medium">
+														{formatAccountName(account)}
+													</p>
+													<p className="text-gray-500">
+														Account balance: {formatCurrency(account.balance)}
+													</p>
 												</div>
 												<Toggle
 													checked={setting.enabled}
 													onChange={(enabled) => {
 														const next = { ...setting, enabled };
-														setDraft((current) => ({ ...current, [account.id]: next }));
+														setDraft((current) => ({
+															...current,
+															[account.id]: next,
+														}));
 														saveSetting(next);
 													}}
 													label={`Use ${account.name} for goals`}
@@ -624,14 +647,22 @@ export function EditGoalAccountsModal({
 																	...setting,
 																	useEntireBalance: event.target.checked,
 																};
-																setDraft((current) => ({ ...current, [account.id]: next }));
+																setDraft((current) => ({
+																	...current,
+																	[account.id]: next,
+																}));
 																saveSetting(next);
 															}}
 															className="mt-1 size-5 accent-[#ff6633]"
 														/>
-														<span>Use entire balance and account growth toward this goal</span>
+														<span>
+															Use entire balance and account growth toward this
+															goal
+														</span>
 													</label>
-													<label className="mt-4 block font-semibold">Linked goal</label>
+													<label className="mt-4 block font-semibold">
+														Linked goal
+													</label>
 													<select
 														value={setting.linkedGoalId ?? ""}
 														onChange={(event) => {
@@ -639,14 +670,19 @@ export function EditGoalAccountsModal({
 																...setting,
 																linkedGoalId: event.target.value || null,
 															};
-															setDraft((current) => ({ ...current, [account.id]: next }));
+															setDraft((current) => ({
+																...current,
+																[account.id]: next,
+															}));
 															saveSetting(next);
 														}}
 														className={inputClassName}
 													>
 														<option value="">No linked goal</option>
 														{goals.map((goal) => (
-															<option key={goal.id} value={goal.id}>{goal.name}</option>
+															<option key={goal.id} value={goal.id}>
+																{goal.name}
+															</option>
 														))}
 													</select>
 												</div>
@@ -663,7 +699,9 @@ export function EditGoalAccountsModal({
 					);
 				})}
 
-				{error && <p className="mt-5 text-sm font-semibold text-red-600">{error}</p>}
+				{error && (
+					<p className="mt-5 text-sm font-semibold text-red-600">{error}</p>
+				)}
 			</div>
 		</Modal>
 	);
@@ -694,17 +732,24 @@ export function AllocationDetailsSheet({
 						/>
 						<div>
 							<p className="text-2xl">{goal.name}</p>
-							<p className={`mt-1 text-xl font-semibold ${allocation.kind === "spending" ? "text-red-600" : "text-emerald-600"}`}>
-								{allocation.kind === "spending" ? "−" : "+"}{formatCurrency(allocation.amount)}
+							<p
+								className={`mt-1 text-xl font-semibold ${allocation.kind === "spending" ? "text-red-600" : "text-emerald-600"}`}
+							>
+								{allocation.kind === "spending" ? "−" : "+"}
+								{formatCurrency(allocation.amount)}
 							</p>
 						</div>
 					</div>
-					<Detail label="Type">{allocation.kind === "adjustment" ? "Adjustment" : allocation.kind}</Detail>
+					<Detail label="Type">
+						{allocation.kind === "adjustment" ? "Adjustment" : allocation.kind}
+					</Detail>
 					<Detail label="Account">
 						{account ? formatAccountName(account) : "No account"}
 					</Detail>
 					<Detail label="Date">
-						{new Intl.DateTimeFormat("en-US", { dateStyle: "medium" }).format(new Date(allocation.allocatedAt))}
+						{new Intl.DateTimeFormat("en-US", { dateStyle: "medium" }).format(
+							new Date(allocation.allocatedAt),
+						)}
 					</Detail>
 					<Detail label="Budget">
 						{allocation.includeInBudget ? "Included" : "Not included"}

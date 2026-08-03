@@ -27,7 +27,6 @@ export function getDateCutoff(range: DateRange): Date | null {
 	if (range === "3M") cutoff.setMonth(cutoff.getMonth() - 3);
 	if (range === "6M") cutoff.setMonth(cutoff.getMonth() - 6);
 	if (range === "1Y") cutoff.setFullYear(cutoff.getFullYear() - 1);
-	console.log("Cutoff date for:", cutoff);
 	return cutoff;
 }
 
