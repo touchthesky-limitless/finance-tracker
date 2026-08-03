@@ -1,5 +1,4 @@
 "use client";
-"use no memo";
 
 import {
 	useCallback,
@@ -22,7 +21,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { ArrowRight, Check } from "lucide-react";
 
 import { CategorySelector } from "@/components/CategorySelector";
-import { Shimmer } from "@/components/ui/Shimmer";
+import { TransactionTableSkeleton } from "@/components/ui/skeletons/TransactionTableSkeleton";
 import { MerchantCell } from "@/components/Transactions/MerchantCell";
 import type { MerchantListItem } from "@/components/Merchants/types";
 import type { Merchant, Transaction } from "@/store/useBudgetStore";
@@ -42,6 +41,7 @@ import {
 } from "@/components/Accounts/AccountIcon";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { MOBILE_BREAKPOINT } from "@/config/breakpoints";
+import React from "react";
 
 interface DataTableProps {
 	transactions: Transaction[];
@@ -141,108 +141,7 @@ function getDateInfo(dateValue: string): {
 	};
 }
 
-interface TransactionTableSkeletonProps {
-	showSelect: boolean;
-	showMerchant: boolean;
-	showCategory: boolean;
-	showAccount: boolean;
-	showAmount: boolean;
-}
-
-function TransactionTableSkeleton({
-	showSelect,
-	showMerchant,
-	showCategory,
-	showAccount,
-	showAmount,
-}: TransactionTableSkeletonProps) {
-	return (
-		<div
-			role="status"
-			aria-label="Loading transactions"
-			aria-live="polite"
-			className="h-full min-h-0 overflow-hidden"
-		>
-			<span className="sr-only">Loading transactions…</span>
-
-			<div aria-hidden="true" className="h-full min-w-[760px]">
-				<div className="flex h-12 items-center justify-between border-b border-gray-200 bg-[#f9fafb] px-6 dark:border-white/5 dark:bg-[#232323]">
-					<Shimmer className="h-4 w-36 rounded-md" />
-					<Shimmer className="h-4 w-24 rounded-md" />
-				</div>
-
-				{Array.from({ length: 9 }, (_, rowIndex) => {
-					return (
-						<div
-							key={rowIndex}
-							className="flex h-14 items-center border-b border-gray-100 bg-white dark:border-white/5 dark:bg-[#191919]"
-						>
-							{showSelect && (
-								<div className="flex w-10 shrink-0 items-center justify-center">
-									<Shimmer className="size-5 rounded-md" />
-								</div>
-							)}
-
-							{showMerchant && (
-								<div className="flex w-[360px] shrink-0 items-center gap-3 px-2 first:pl-6">
-									<Shimmer className="size-8 shrink-0 rounded-full" />
-									<div className="min-w-0 flex-1 space-y-2">
-										<Shimmer
-											className={`h-4 rounded-md ${
-												rowIndex % 3 === 0
-													? "w-40"
-													: rowIndex % 3 === 1
-														? "w-28"
-														: "w-48"
-											}`}
-										/>
-										<Shimmer className="h-3 w-20 rounded-md" />
-									</div>
-								</div>
-							)}
-
-							{showCategory && (
-								<div className="w-[360px] shrink-0 px-2">
-									<div className="flex items-center gap-2">
-										<Shimmer className="size-7 shrink-0 rounded-full" />
-										<Shimmer
-											className={`h-4 rounded-md ${
-												rowIndex % 2 === 0 ? "w-32" : "w-24"
-											}`}
-										/>
-									</div>
-								</div>
-							)}
-
-							{showAccount && (
-								<div className="w-[300px] shrink-0 px-2">
-									<Shimmer
-										className={`h-4 rounded-md ${
-											rowIndex % 2 === 0 ? "w-36" : "w-28"
-										}`}
-									/>
-								</div>
-							)}
-
-							{showAmount && (
-								<div className="flex min-w-36 flex-1 items-center justify-end gap-3 px-4">
-									<Shimmer
-										className={`h-4 rounded-md ${
-											rowIndex % 2 === 0 ? "w-20" : "w-16"
-										}`}
-									/>
-									<Shimmer className="size-6 rounded-full" />
-								</div>
-							)}
-						</div>
-					);
-				})}
-			</div>
-		</div>
-	);
-}
-
-export function DataTable({
+function DataTableComponent({
 	transactions,
 	selectedIds,
 	onSelectRow,
@@ -799,6 +698,10 @@ export function DataTable({
 		}
 	}
 
+	const skeleton = useMemo(() => <TransactionTableSkeleton />, []);
+	// Inside DataTable component, before the return
+console.log('DataTable rendered, isLoading =', isLoading);
+
 	return (
 		<div
 			ref={parentRef}
@@ -807,13 +710,7 @@ export function DataTable({
 			className="h-full overflow-auto bg-white dark:bg-[#191919] scrollbar-hide transition-colors duration-200 relative"
 		>
 			{isLoading ? (
-				<TransactionTableSkeleton
-					showSelect={isEditMode || currentView === "review"}
-					showMerchant={columnVisibility.merchant !== false}
-					showCategory={columnVisibility.category !== false}
-					showAccount={columnVisibility.account !== false}
-					showAmount={columnVisibility.amount !== false}
-				/>
+				skeleton
 			) : flatRows.length === 0 ? (
 				<div className="h-full min-h-48 flex items-center justify-center px-6 text-sm text-gray-500 dark:text-gray-400">
 					No transactions found.
@@ -923,3 +820,5 @@ export function DataTable({
 		</div>
 	);
 }
+
+export const DataTable = React.memo(DataTableComponent);

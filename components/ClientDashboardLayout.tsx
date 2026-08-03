@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 "use client";
 
-import { useState, createContext, useContext, useMemo } from "react"; // ✅ Removed useEffect
+import { useState, createContext, useContext, useMemo } from "react";
 import { usePathname } from "next/navigation";
 import { ChartNoAxesGantt } from "lucide-react";
 import Sidebar from "@/components/Sidebar/Sidebar";
@@ -37,7 +37,6 @@ export default function ClientDashboardLayout({
 	const pathname = usePathname();
 
 	const pageTitle = useMemo(() => {
-		// Find the most specific matching path (e.g., '/transactions/details' still matches '/transactions')
 		const matchingPath = Object.keys(PAGE_TITLES).find((path) =>
 			pathname.startsWith(path),
 		);
@@ -67,7 +66,7 @@ export default function ClientDashboardLayout({
 						/>
 					</div>
 
-					{/* Mobile Drawer */}
+					{/* Mobile Drawer – conditional rendering is fine for this overlay */}
 					{isMobile && (
 						<div
 							className={`fixed inset-0 z-[999] flex ${isDrawerOpen ? "visible" : "invisible"}`}
@@ -89,32 +88,30 @@ export default function ClientDashboardLayout({
 
 					{/* Main Content Area */}
 					<div className="flex-1 flex flex-col min-w-0 overflow-y-auto relative">
-						{/* Global Mobile Header */}
-						{isMobile && (
-							<div className="sticky top-0 z-30 flex h-14 shrink-0 items-center bg-[#f9f9f9] dark:bg-[#171717] border-b border-gray-200 dark:border-white/5 px-3">
-								<button
-									onClick={() => setIsDrawerOpen(true)}
-									className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-white/5 transition-colors mr-3"
-								>
-									<ChartNoAxesGantt className="h-5 w-5 text-gray-800 dark:text-gray-200" />
-								</button>
+						{/* ✅ Global Mobile Header – always rendered, hidden on desktop via CSS */}
+						<div className="flex md:hidden sticky top-0 z-30 h-14 shrink-0 items-center bg-[#f9f9f9] dark:bg-[#171717] border-b border-gray-200 dark:border-white/5 px-3">
+							<button
+								onClick={() => setIsDrawerOpen(true)}
+								className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-white/5 transition-colors mr-3"
+							>
+								<ChartNoAxesGantt className="h-5 w-5 text-gray-800 dark:text-gray-200" />
+							</button>
 
-								<h1 className="text-[20px] font-bold tracking-tight text-gray-900 dark:text-white">
-									{pageTitle}
-								</h1>
+							<h1 className="text-[20px] font-bold tracking-tight text-gray-900 dark:text-white">
+								{pageTitle}
+							</h1>
 
-								{pathname.startsWith("/transactions") && (
-									<div className="flex h-full gap-3 ml-4 text-[14px] font-medium">
-										<button className="border-b-[3px] border-[#FF5A35] pb-2 text-[#FF5A35]">
-											All
-										</button>
-										<button className="pb-2 text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200">
-											Receipts
-										</button>
-									</div>
-								)}
-							</div>
-						)}
+							{pathname.startsWith("/transactions") && (
+								<div className="flex h-full gap-3 ml-4 text-[14px] font-medium">
+									<button className="border-b-[3px] border-[#FF5A35] pb-2 text-[#FF5A35]">
+										All
+									</button>
+									<button className="pb-2 text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200">
+										Receipts
+									</button>
+								</div>
+							)}
+						</div>
 
 						<div className="w-full">{children}</div>
 					</div>
@@ -140,15 +137,12 @@ export default function ClientDashboardLayout({
 					onClose={closeDrawer}
 					onBack={onBack}
 					onDeleted={(_count) => {
-						//! TODO Handle deletion notification if needed
 						closeDrawer();
 					}}
 					onDuplicate={(_transaction) => {
-						///! TODO Handle duplication (open new transaction modal, etc.)
 						closeDrawer();
 					}}
 					onCreateRule={(_transaction) => {
-						//! TODO Handle rule creation
 						closeDrawer();
 					}}
 				/>

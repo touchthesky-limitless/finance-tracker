@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react"; // ✅ Added useEffect
+import { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { NAV_GROUPS } from "@/config/navigation";
 import SidebarHeader from "@/components/Sidebar/SidebarHeader";

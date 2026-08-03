@@ -1,3 +1,10 @@
+/**
+ * @file TransactionsPageClient.tsx
+ * @description The main client-side orchestration component for the Transactions page.
+ * All heavy logic is extracted into custom hooks, keeping this file focused on composition.
+ * Features: table with sorting/visibility, filters, selection, summary, bulk edit, CSV upload,
+ * transaction details drawer, add/duplicate transaction, rule suggestion toast, and RuleModal.
+ */
 "use client";
 
 import {
@@ -5,296 +12,66 @@ import {
 	useEffect,
 	useMemo,
 	useState,
-	useSyncExternalStore,
-	type MouseEvent as ReactMouseEvent,
 } from "react";
 import dynamic from "next/dynamic";
-import { SortingState, VisibilityState } from "@tanstack/react-table";
 import { X } from "lucide-react";
 
-import { CATEGORY_HIERARCHY, findParentCategory } from "@/constants";
+// Store
 import {
 	type Merchant,
 	type Transaction,
 	useBudgetStore,
 } from "@/store/useBudgetStore";
+import { useTransactionToastStore } from "@/store/useTransactionToastStore";
+import { useTransactionDrawer } from "@/store/useTransactionDrawer";
+
+// Components
 import { DataTable } from "@/components/Transactions/DataTable";
 import { UndoToast } from "@/components/ui/UndoToast";
-import { Shimmer } from "@/components/ui/Shimmer";
 import CsvUploader from "@/components/CsvUploader";
 import {
 	TopToolbar,
-	type TransactionDateRange,
+	TransactionDateRange,
 } from "@/components/Transactions/TopToolbar";
 import { TableToolbar } from "@/components/Transactions/TableToolbar";
 import { SummarySidebar } from "@/components/Transactions/SummarySidebar";
 import {
 	EMPTY_TRANSACTION_FILTERS,
-	hasTransactionFilters,
-	matchesTransactionFilters,
-	type TransactionFilterData,
-	type TransactionFilterOption,
-	type TransactionFilters,
+	TransactionFilters,
 } from "@/components/Transactions/transactionFilters";
-import { useMerchantOptions } from "@/hooks/useMerchantOptions";
 import type { RuleModalSeed } from "@/components/Transactions/RuleModal";
+
 import type { TransactionRule } from "@/lib/rules/ruleEngine";
-import { MerchantRuleToast } from "@/components/Transactions/MerchantRuleToast";
-import { useTransactionToastStore } from "@/store/useTransactionToastStore";
+
 import BulkEditTransactionsDrawer from "@/components/Transactions/BulkEditTransactionsDrawer";
-import { useTransactionDrawer } from "@/store/useTransactionDrawer";
+import { MerchantRuleToast } from "@/components/Transactions/MerchantRuleToast";
 
-const DEFAULT_SORTING: SortingState = [
-	{
-		id: "date",
-		desc: true,
-	},
-];
+// Hooks & Utils
+import { useTransactionsSorting } from "@/hooks/transactions/useTransactionsSorting";
+import { useTransactionsColumnVisibility } from "@/hooks/transactions/useTransactionsColumnVisibility";
+import { useTransactionsSelection } from "@/hooks/transactions/useTransactionsSelection";
+import { useTransactionsData } from "@/hooks/transactions/useTransactionsData";
+import { useTransactionsSummary } from "@/hooks/transactions/useTransactionsSummary";
+import { useTransactionsFilters } from "@/hooks/transactions/useTransactionsFilters";
+import {
+	createBlankTransaction,
+	normalizeMerchantName,
+} from "@/utils/transactionUtils";
+import { useMerchantOptions } from "@/hooks/useMerchantOptions";
 
+// Lazy-loaded modals
 const AddTransactionModal = dynamic(
-	() => {
-		return import("@/components/Budget/AddTransactionModal");
-	},
-	{
-		ssr: false,
-	},
-);
-
-const TransactionDetailsDrawer = dynamic(
-	() => {
-		return import("@/components/Transactions/TransactionDetailsDrawer");
-	},
-	{
-		ssr: false,
-	},
-);
-
-const RuleModal = dynamic(
-	() =>
-		import("@/components/Transactions/RuleModal").then(
-			(module) => module.RuleModal,
-		),
+	() => import("@/components/Budget/AddTransactionModal"),
 	{ ssr: false },
 );
-
-function subscribeToClient(): () => void {
-	return () => {};
-}
-
-function getClientSnapshot(): boolean {
-	return true;
-}
-
-function getServerSnapshot(): boolean {
-	return false;
-}
-
-function readLocalStorage<T>(key: string, fallback: T): T {
-	if (typeof window === "undefined") {
-		return fallback;
-	}
-
-	try {
-		const storedValue = window.localStorage.getItem(key);
-
-		if (!storedValue) {
-			return fallback;
-		}
-
-		return JSON.parse(storedValue) as T;
-	} catch (error) {
-		console.error(`Failed to read localStorage key "${key}":`, error);
-
-		window.localStorage.removeItem(key);
-
-		return fallback;
-	}
-}
-
-function writeLocalStorage(key: string, value: unknown): void {
-	try {
-		window.localStorage.setItem(key, JSON.stringify(value));
-	} catch (error) {
-		console.error(`Failed to write localStorage key "${key}":`, error);
-	}
-}
-
-function normalizeCategoryName(name: string): string {
-	return name.trim().toLowerCase();
-}
-
-function normalizeMerchantName(name: string): string {
-	return name.trim().toLocaleLowerCase();
-}
-
-interface AccountFilterRecord {
-	name: string;
-	type?: string | null;
-	account_type?: string | null;
-	balance?: number | null;
-	current_balance?: number | null;
-}
-
-function getAccountFilterGroup(
-	account: AccountFilterRecord | undefined,
-	accountName: string,
-): string {
-	const searchable = [accountName, account?.type, account?.account_type]
-		.filter(Boolean)
-		.join(" ")
-		.toLowerCase();
-
-	if (
-		searchable.includes("credit") ||
-		searchable.includes("card") ||
-		searchable.includes("amex") ||
-		searchable.includes("sapphire") ||
-		searchable.includes("venture") ||
-		searchable.includes("unlimited") ||
-		searchable.includes("freedom")
-	) {
-		return "Liabilities::Credit Cards";
-	}
-
-	if (searchable.includes("mortgage")) {
-		return "Liabilities::Mortgage";
-	}
-
-	if (searchable.includes("loan")) {
-		return "Liabilities::Loans";
-	}
-
-	if (
-		searchable.includes("401") ||
-		searchable.includes("ira") ||
-		searchable.includes("investment") ||
-		searchable.includes("broker") ||
-		searchable.includes("stock") ||
-		searchable.includes("fidelity") ||
-		searchable.includes("vanguard")
-	) {
-		return "Assets::Investments";
-	}
-
-	if (
-		searchable.includes("real estate") ||
-		searchable.includes("property") ||
-		searchable.includes("home")
-	) {
-		return "Assets::Real Estate";
-	}
-
-	if (
-		searchable.includes("vehicle") ||
-		searchable.includes("car") ||
-		searchable.includes("auto")
-	) {
-		return "Assets::Vehicles";
-	}
-
-	if (
-		searchable.includes("valuable") ||
-		searchable.includes("jewelry") ||
-		searchable.includes("collectible")
-	) {
-		return "Assets::Valuables";
-	}
-
-	if (
-		searchable.includes("checking") ||
-		searchable.includes("saving") ||
-		searchable.includes("cash")
-	) {
-		return "Assets::Cash";
-	}
-
-	const balance = account?.current_balance ?? account?.balance ?? 0;
-
-	return balance < 0 ? "Liabilities::Other Liabilities" : "Assets::Cash";
-}
-
-function createBlankTransaction(): Transaction {
-	return {
-		id: crypto.randomUUID(),
-		date: new Date().toISOString().slice(0, 10),
-		merchant: "",
-		merchant_id: null,
-		description: "",
-		amount: 0,
-		category: "Uncategorized",
-		account: "",
-		account_id: null,
-		needs_review: true,
-		needs_subcat: true,
-		tags: [],
-		note: "",
-	};
-}
-
-function TransactionsPageSkeleton() {
-	return (
-		<div
-			role="status"
-			aria-label="Loading transactions page"
-			aria-live="polite"
-			className="flex h-screen flex-col bg-gray-50 font-sans text-gray-900 dark:bg-[#121212] dark:text-gray-200"
-		>
-			<span className="sr-only">Loading transactions…</span>
-
-			<header
-				aria-hidden="true"
-				className="flex h-20 shrink-0 items-center gap-4 border-b border-gray-200 bg-white px-6 dark:border-white/5 dark:bg-[#191919]"
-			>
-				<Shimmer className="h-10 w-36 rounded-xl" />
-				<Shimmer className="ml-auto h-10 w-[min(38vw,420px)] rounded-xl" />
-				<Shimmer className="h-10 w-28 rounded-xl" />
-				<Shimmer className="size-10 rounded-xl" />
-			</header>
-
-			<div
-				aria-hidden="true"
-				className="flex min-h-0 flex-1 gap-6 overflow-hidden p-6"
-			>
-				<div className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-white/5 dark:bg-[#191919]">
-					<div className="flex h-16 shrink-0 items-center gap-3 border-b border-gray-200 px-5 dark:border-white/5">
-						<Shimmer className="h-9 w-28 rounded-xl" />
-						<Shimmer className="h-9 w-24 rounded-xl" />
-						<Shimmer className="ml-auto h-9 w-36 rounded-xl" />
-					</div>
-
-					<div className="min-h-0 flex-1 overflow-hidden">
-						<div className="flex h-12 items-center justify-between border-b border-gray-200 bg-[#f9fafb] px-6 dark:border-white/5 dark:bg-[#232323]">
-							<Shimmer className="h-4 w-36 rounded-md" />
-							<Shimmer className="h-4 w-24 rounded-md" />
-						</div>
-
-						{Array.from({ length: 8 }, (_, rowIndex) => (
-							<div
-								key={rowIndex}
-								className="flex h-14 items-center gap-5 border-b border-gray-100 px-6 dark:border-white/5"
-							>
-								<Shimmer className="size-8 shrink-0 rounded-full" />
-								<Shimmer
-									className={`h-4 rounded-md ${
-										rowIndex % 2 === 0 ? "w-44" : "w-32"
-									}`}
-								/>
-								<Shimmer className="ml-auto h-4 w-24 rounded-md" />
-							</div>
-						))}
-					</div>
-				</div>
-
-				<aside className="hidden w-80 shrink-0 space-y-4 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm xl:block dark:border-white/5 dark:bg-[#191919]">
-					<Shimmer className="h-6 w-28 rounded-md" />
-					<Shimmer className="h-24 w-full rounded-2xl" />
-					<Shimmer className="h-24 w-full rounded-2xl" />
-					<Shimmer className="h-24 w-full rounded-2xl" />
-				</aside>
-			</div>
-		</div>
-	);
-}
+const TransactionDetailsDrawer = dynamic(
+	() => import("@/components/Transactions/TransactionDetailsDrawer"),
+	{ ssr: false },
+);
+const RuleModal = dynamic(
+	() => import("@/components/Transactions/RuleModal").then((m) => m.RuleModal),
+	{ ssr: false },
+);
 
 interface TransactionsPageClientProps {
 	initialTransactionId?: string;
@@ -303,44 +80,23 @@ interface TransactionsPageClientProps {
 export default function TransactionsPageClient({
 	initialTransactionId,
 }: TransactionsPageClientProps) {
-	const isClient = useSyncExternalStore(
-		subscribeToClient,
-		getClientSnapshot,
-		getServerSnapshot,
-	);
-	type AddTransactionMode = "new" | "duplicate";
 
-	const [addTransactionState, setAddTransactionState] = useState<{
-		mode: AddTransactionMode;
-		transaction: Transaction;
-	} | null>(null);
-
-	// Store selectors
+	// ---- Global stores ----
 	const transactions = useBudgetStore((state) => state.transactions);
 	const updateTransaction = useBudgetStore((state) => state.updateTransaction);
 	const setToast = useBudgetStore((state) => state.setToast);
 	const toast = useBudgetStore((state) => state.toast);
-	const customCategories = useBudgetStore((state) => state.customCategories);
-	const fetchCustomCategories = useBudgetStore(
-		(state) => state.fetchCustomCategories,
-	);
-	const reportDeletedTransactions = useTransactionToastStore((state) => {
-		return state.reportDeletedTransactions;
-	});
-	const accounts = useBudgetStore((state) => state.accounts);
-	const fetchAccounts = useBudgetStore((state) => state.fetchAccounts);
-	const fetchMerchants = useBudgetStore((state) => state.fetchMerchants);
 	const customTags = useBudgetStore((state) => state.customTags);
+	const merchants = useBudgetStore((state) => state.merchants);
+	const accounts = useBudgetStore((state) => state.accounts);
 	const saveRule = useBudgetStore((state) => state.saveRule);
 	const deleteRule = useBudgetStore((state) => state.deleteRule);
-
 	const confirmedRecurringMerchants = useBudgetStore(
 		(state) => state.confirmedRecurringMerchants,
 	);
-	const merchants = useBudgetStore((state) => {
-		return state.merchants;
-	});
-
+	const reportDeletedTransactions = useTransactionToastStore(
+		(state) => state.reportDeletedTransactions,
+	);
 	const selectedTransactionId = useTransactionDrawer(
 		(state) => state.selectedTransactionId,
 	);
@@ -348,167 +104,104 @@ export default function TransactionsPageClient({
 	const closeDrawer = useTransactionDrawer((state) => state.closeDrawer);
 	const onBack = useTransactionDrawer((state) => state.onBack);
 
-	// ✅ Deep‑link support: open drawer if initialTransactionId is provided
+	// ---- Local state (not yet extracted) ----
+	const [searchQuery, setSearchQuery] = useState("");
+	const [dateRange, setDateRange] = useState<TransactionDateRange>({
+		startDate: "",
+		endDate: "",
+	});
+	const [transactionFilters, setTransactionFilters] =
+		useState<TransactionFilters>(EMPTY_TRANSACTION_FILTERS);
+	const [currentView, setCurrentView] = useState<"all" | "review">("all");
+	const [isSummaryVisible, setIsSummaryVisible] = useState(false);
+	const [showUploader, setShowUploader] = useState(false);
+	const [isBulkEditOpen, setIsBulkEditOpen] = useState(false);
+	const [addTransactionState, setAddTransactionState] = useState<{
+		mode: "new" | "duplicate";
+		transaction: Transaction;
+	} | null>(null);
+
+	// ---- Rule suggestion state ----
+	const [transactionRuleSuggestion, setTransactionRuleSuggestion] = useState<{
+		type: "merchant" | "category";
+		transaction: Transaction;
+		merchant?: Pick<Merchant, "id" | "name">;
+		category?: string;
+	} | null>(null);
+	const [ruleModalState, setRuleModalState] = useState<{
+		rule?: TransactionRule | null;
+		seed?: RuleModalSeed | null;
+	} | null>(null);
+
+	// ---- Custom hooks ----
+	const [sorting, setSorting] = useTransactionsSorting();
+	const [columnVisibility, setColumnVisibility] =
+		useTransactionsColumnVisibility();
+	const {
+		selectedIds,
+		setSelectedIds,
+		isEditMode,
+		setIsEditMode,
+		handleSelectRow,
+	} = useTransactionsSelection();
+	const {
+		isLoading: isDataLoading,
+		filterData,
+		getSubcategoryId,
+	} = useTransactionsData();
+	const summaryStats = useTransactionsSummary(transactions);
+	const merchantItems = useMerchantOptions();
+
+	// ---- Derived data ----
+	const normalizedRecurringMerchants = useMemo(
+		() =>
+			new Set(confirmedRecurringMerchants.map((m) => m.trim().toLowerCase())),
+		[confirmedRecurringMerchants],
+	);
+
+	const { filteredTransactions, hasActiveFilters } = useTransactionsFilters(
+		transactions,
+		searchQuery,
+		dateRange,
+		transactionFilters,
+		normalizedRecurringMerchants,
+		currentView,
+	);
+
+	const selectedTransactions = useMemo(() => {
+		const selectedIdSet = new Set(selectedIds);
+		return transactions.filter((tx) => selectedIdSet.has(tx.id));
+	}, [selectedIds, transactions]);
+
+	const selectedTransaction = useMemo(() => {
+		if (!selectedTransactionId) return null;
+		return transactions.find((tx) => tx.id === selectedTransactionId) ?? null;
+	}, [selectedTransactionId, transactions]);
+
+	const ruleCategoryNames = useMemo(() => {
+		return filterData.categories
+			.filter((option) => !option.isParent)
+			.map((option) => option.value);
+	}, [filterData.categories]);
+
+	// ---- Deep‑link support ----
 	useEffect(() => {
 		if (initialTransactionId) {
 			openDrawer(initialTransactionId);
 		}
 	}, [initialTransactionId, openDrawer]);
 
-	// ✅ Derive the selected transaction from the store
-	const selectedTransaction = useMemo(() => {
-		if (!selectedTransactionId) return null;
-		return (
-			transactions.find(
-				(transaction) => transaction.id === selectedTransactionId,
-			) ?? null
-		);
-	}, [selectedTransactionId, transactions]);
-
-	// Page state
-	const [searchQuery, setSearchQuery] = useState("");
-	const [dateRange, setDateRange] = useState<TransactionDateRange>({
-		startDate: "",
-		endDate: "",
-	});
-	const merchantItems = useMerchantOptions();
-	const [transactionFilters, setTransactionFilters] =
-		useState<TransactionFilters>(EMPTY_TRANSACTION_FILTERS);
-	const [selectedIds, setSelectedIds] = useState<string[]>([]);
-	const [currentView, setCurrentView] = useState<"all" | "review">("all");
-	const [isEditMode, setIsEditMode] = useState(false);
-	const [isSummaryVisible, setIsSummaryVisible] = useState(false);
-	const [showUploader, setShowUploader] = useState(false);
-	const [isInitialDataLoading, setIsInitialDataLoading] = useState(true);
-	const [isBulkEditOpen, setIsBulkEditOpen] = useState(false);
-	const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(
-		() => {
-			return readLocalStorage<VisibilityState>("sort_cols", {});
-		},
-	);
-
-	type TransactionRuleSuggestion =
-		| {
-				type: "merchant";
-				transaction: Transaction;
-				merchant: Pick<Merchant, "id" | "name">;
-		  }
-		| {
-				type: "category";
-				transaction: Transaction;
-				category: string;
-		  };
-
-	const openAddTransaction = useCallback(() => {
-		setAddTransactionState({
-			mode: "new",
-			transaction: createBlankTransaction(),
-		});
-	}, []);
-
-	const [transactionRuleSuggestion, setTransactionRuleSuggestion] =
-		useState<TransactionRuleSuggestion | null>(null);
-
-	const [ruleModalState, setRuleModalState] = useState<{
-		rule?: TransactionRule | null;
-		seed?: RuleModalSeed | null;
-	} | null>(null);
-
-	const [sorting, setSorting] = useState<SortingState>(() => {
-		return readLocalStorage<SortingState>("custom_sort", DEFAULT_SORTING);
-	});
-
-	const selectedTransactions = useMemo(() => {
-		const selectedIdSet = new Set(selectedIds);
-
-		return transactions.filter((transaction) => {
-			return selectedIdSet.has(transaction.id);
-		});
-	}, [selectedIds, transactions]);
-
-	const merchantFilterOptions = useMemo<TransactionFilterOption[]>(() => {
-		return merchantItems.map((merchant) => {
-			return {
-				value: merchant.name,
-				label: merchant.name,
-				count: merchant.transactionCount,
-				merchant,
-			};
-		});
-	}, [merchantItems]);
-
-	// ✅ Row click handler – opens the global drawer instead of navigating
+	// ---- Handlers ----
 	const handleRowClick = useCallback(
-		(transaction: Transaction) => {
-			openDrawer(transaction.id);
-		},
+		(transaction: Transaction) => openDrawer(transaction.id),
 		[openDrawer],
 	);
 
 	const handleOpenBulkEdit = useCallback(() => {
-		if (selectedIds.length === 0) {
-			return;
-		}
-
+		if (selectedIds.length === 0) return;
 		setIsBulkEditOpen(true);
 	}, [selectedIds.length]);
 
-	// Load the reference data used by transaction rows and filters.
-	useEffect(() => {
-		let active = true;
-
-		const loadReferenceData = async (): Promise<void> => {
-			try {
-				await Promise.all([
-					fetchCustomCategories(),
-					fetchAccounts(),
-					fetchMerchants(),
-				]);
-			} catch (error) {
-				console.error("Failed to load transaction reference data:", error);
-			} finally {
-				if (active) {
-					setIsInitialDataLoading(false);
-				}
-			}
-		};
-
-		void loadReferenceData();
-
-		return () => {
-			active = false;
-		};
-	}, [fetchAccounts, fetchCustomCategories, fetchMerchants]);
-
-	// Persist sorting
-	useEffect(() => {
-		writeLocalStorage("custom_sort", sorting);
-	}, [sorting]);
-
-	// Persist column visibility
-	useEffect(() => {
-		writeLocalStorage("sort_cols", columnVisibility);
-	}, [columnVisibility]);
-
-	// Escape exits edit mode
-	useEffect(() => {
-		const handleEscape = (event: KeyboardEvent) => {
-			if (event.key !== "Escape") {
-				return;
-			}
-
-			setIsEditMode(false);
-			setSelectedIds([]);
-		};
-
-		window.addEventListener("keydown", handleEscape);
-
-		return () => {
-			window.removeEventListener("keydown", handleEscape);
-		};
-	}, []);
-
-	// ✅ Handlers for the drawer callbacks (they actually use the parameters)
 	const handleDeleted = useCallback(
 		(count: number) => {
 			reportDeletedTransactions(count);
@@ -545,521 +238,39 @@ export default function TransactionsPageClient({
 		[closeDrawer],
 	);
 
-	const filterData = useMemo<TransactionFilterData>(() => {
-		const categoryOptions: TransactionFilterOption[] = [];
-		const seenLeafNames = new Set<string>();
-		const seenParentNames = new Set<string>();
-
-		const categoryRecordsByParent = new Map<string, typeof customCategories>();
-		const rootCategoryByName = new Map<
-			string,
-			(typeof customCategories)[number]
-		>();
-
-		for (const category of customCategories) {
-			const categoryName = category.name.trim();
-
-			if (!categoryName) {
-				continue;
-			}
-
-			if (!category.parent_name?.trim()) {
-				rootCategoryByName.set(normalizeCategoryName(categoryName), category);
-				continue;
-			}
-
-			const parentKey = normalizeCategoryName(category.parent_name);
-			const children = categoryRecordsByParent.get(parentKey) ?? [];
-			children.push(category);
-			categoryRecordsByParent.set(parentKey, children);
-		}
-
-		const addParentOption = (
-			parentName: string,
-			source?: (typeof customCategories)[number],
-		) => {
-			const normalizedParent = normalizeCategoryName(parentName);
-
-			if (!parentName || seenParentNames.has(normalizedParent)) {
-				return;
-			}
-
-			seenParentNames.add(normalizedParent);
-			categoryOptions.push({
-				value: `__parent__:${parentName}`,
-				label: parentName,
-				isParent: true,
-				iconName: source?.icon_name?.trim() || parentName,
-				colorKey: source?.color_key?.trim() || parentName,
-			});
-		};
-
-		const addLeafOption = (
-			categoryName: string,
-			parentName: string,
-			source?: (typeof customCategories)[number],
-		) => {
-			const normalizedName = normalizeCategoryName(categoryName);
-
-			if (!categoryName || seenLeafNames.has(normalizedName)) {
-				return;
-			}
-
-			seenLeafNames.add(normalizedName);
-			categoryOptions.push({
-				value: categoryName,
-				label: categoryName,
-				group: parentName,
-				iconName: source?.icon_name?.trim() || categoryName,
-				colorKey: source?.color_key?.trim() || parentName,
-				secondaryLabel: source && !source.is_system ? "Custom" : undefined,
-			});
-		};
-
-		/*
-		 * CATEGORY_HIERARCHY is the canonical display order. Database-backed
-		 * categories still provide the current names, icons, colors, and custom
-		 * additions shown in Settings.
-		 */
-		for (const [parentName, hierarchyChildren] of Object.entries(
-			CATEGORY_HIERARCHY,
-		)) {
-			const parentKey = normalizeCategoryName(parentName);
-			const parentRecord = rootCategoryByName.get(parentKey);
-			const configuredChildren = categoryRecordsByParent.get(parentKey) ?? [];
-
-			addParentOption(parentName, parentRecord);
-
-			const configuredChildByName = new Map(
-				configuredChildren.map((category) => {
-					return [normalizeCategoryName(category.name), category] as const;
-				}),
-			);
-
-			/*
-			 * Once Settings data is loaded, it is the source of truth. The static
-			 * hierarchy is only a fallback before those records are available.
-			 */
-			const useStaticFallback = configuredChildren.length === 0;
-
-			for (const childName of hierarchyChildren) {
-				const configuredChild = configuredChildByName.get(
-					normalizeCategoryName(childName),
-				);
-
-				if (!configuredChild && !useStaticFallback) {
-					continue;
-				}
-
-				addLeafOption(
-					configuredChild?.name.trim() || childName,
-					parentName,
-					configuredChild,
-				);
-			}
-
-			// Custom children follow the built-in children without alphabetizing.
-			for (const child of configuredChildren) {
-				addLeafOption(child.name.trim(), parentName, child);
-			}
-		}
-
-		// Append custom parent groups after the built-in hierarchy.
-		for (const category of customCategories) {
-			if (category.parent_name?.trim()) {
-				continue;
-			}
-
-			const parentName = category.name.trim();
-
-			if (
-				!parentName ||
-				seenParentNames.has(normalizeCategoryName(parentName))
-			) {
-				continue;
-			}
-
-			addParentOption(parentName, category);
-
-			const children =
-				categoryRecordsByParent.get(normalizeCategoryName(parentName)) ?? [];
-
-			for (const child of children) {
-				addLeafOption(child.name.trim(), parentName, child);
-			}
-		}
-
-		// Keep transaction-only legacy categories available at the end.
-		for (const transaction of transactions) {
-			const categoryName = transaction.category?.trim();
-
-			if (
-				!categoryName ||
-				seenLeafNames.has(normalizeCategoryName(categoryName))
-			) {
-				continue;
-			}
-
-			const resolvedParent = findParentCategory(categoryName);
-			const parentName =
-				resolvedParent !== categoryName || CATEGORY_HIERARCHY[resolvedParent]
-					? resolvedParent
-					: "Other categories";
-
-			addParentOption(parentName);
-			addLeafOption(categoryName, parentName);
-		}
-
-		const accountNameByKey = new Map<string, string>();
-		const accountRecordByKey = new Map<string, AccountFilterRecord>();
-		const transactionCountByAccountKey = new Map<string, number>();
-
-		for (const account of accounts) {
-			const accountRecord = account as AccountFilterRecord;
-			const accountName = accountRecord.name.trim();
-
-			if (!accountName) {
-				continue;
-			}
-
-			const accountKey = accountName.toLowerCase();
-
-			accountNameByKey.set(accountKey, accountName);
-			accountRecordByKey.set(accountKey, accountRecord);
-		}
-
-		for (const transaction of transactions) {
-			const accountName = transaction.account?.trim();
-
-			if (!accountName) {
-				continue;
-			}
-
-			const accountKey = accountName.toLowerCase();
-
-			accountNameByKey.set(
-				accountKey,
-				accountNameByKey.get(accountKey) ?? accountName,
-			);
-			transactionCountByAccountKey.set(
-				accountKey,
-				(transactionCountByAccountKey.get(accountKey) ?? 0) + 1,
-			);
-		}
-
-		const accountOptions = [...accountNameByKey.entries()]
-			.map(([accountKey, accountName]) => {
-				return {
-					value: accountName,
-					label: accountName,
-					group: getAccountFilterGroup(
-						accountRecordByKey.get(accountKey),
-						accountName,
-					),
-					count: transactionCountByAccountKey.get(accountKey) ?? 0,
-				};
-			})
-			.sort((first, second) => {
-				return (
-					String(first.group).localeCompare(String(second.group)) ||
-					first.label.localeCompare(second.label)
-				);
-			});
-
-		const tagNameByKey = new Map<string, string>();
-
-		for (const tag of customTags) {
-			const tagName = tag.trim();
-
-			if (tagName) {
-				tagNameByKey.set(tagName.toLowerCase(), tagName);
-			}
-		}
-
-		for (const transaction of transactions) {
-			for (const tag of transaction.tags ?? []) {
-				const tagName = tag.trim();
-
-				if (tagName) {
-					tagNameByKey.set(
-						tagName.toLowerCase(),
-						tagNameByKey.get(tagName.toLowerCase()) ?? tagName,
-					);
-				}
-			}
-		}
-
-		const tagOptions = [...tagNameByKey.values()]
-			.sort((first, second) => first.localeCompare(second))
-			.map((tagName) => {
-				return {
-					value: tagName,
-					label: tagName,
-				};
-			});
-
-		return {
-			categories: categoryOptions,
-			merchants: merchantFilterOptions,
-			accounts: accountOptions,
-			tags: tagOptions,
-			goals: [],
-		};
-	}, [
-		accounts,
-		customCategories,
-		customTags,
-		merchantFilterOptions,
-		transactions,
-	]);
-
-	const ruleCategoryNames = useMemo(() => {
-		return filterData.categories
-			.filter((option) => !option.isParent)
-			.map((option) => option.value);
-	}, [filterData.categories]);
-
-	const normalizedRecurringMerchants = useMemo(() => {
-		return new Set(
-			confirmedRecurringMerchants.map((merchantName) => {
-				return merchantName.trim().toLowerCase();
-			}),
-		);
-	}, [confirmedRecurringMerchants]);
-
-	// Filter visible transactions
-	const filteredTransactions = useMemo(() => {
-		const normalizedSearch = searchQuery.trim().toLowerCase();
-
-		let filtered = transactions.filter((transaction) => {
-			if (normalizedSearch) {
-				const searchableValues = [
-					transaction.merchant,
-					transaction.category,
-					transaction.description,
-					transaction.account,
-					transaction.note,
-					String(transaction.amount),
-					String(Math.abs(Number(transaction.amount))),
-					...(transaction.tags ?? []),
-				];
-
-				const matchesSearch = searchableValues.some((value) => {
-					return String(value ?? "")
-						.toLowerCase()
-						.includes(normalizedSearch);
-				});
-
-				if (!matchesSearch) {
-					return false;
-				}
-			}
-
-			const transactionDate = transaction.date.slice(0, 10);
-
-			if (dateRange.startDate && transactionDate < dateRange.startDate) {
-				return false;
-			}
-
-			if (dateRange.endDate && transactionDate > dateRange.endDate) {
-				return false;
-			}
-
-			if (
-				!matchesTransactionFilters(
-					transaction,
-					transactionFilters,
-					normalizedRecurringMerchants,
-				)
-			) {
-				return false;
-			}
-
-			return true;
-		});
-
-		if (currentView === "review") {
-			filtered = filtered.filter((transaction) => {
-				return (
-					transaction.needs_review || transaction.category === "Uncategorized"
-				);
-			});
-		}
-
-		return filtered;
-	}, [
-		transactions,
-		searchQuery,
-		dateRange,
-		transactionFilters,
-		normalizedRecurringMerchants,
-		currentView,
-	]);
-
-	// Summary statistics for the complete transaction list
-	const summaryStats = useMemo(() => {
-		let largestTransaction = 0;
-		let largestExpense = 0;
-		let totalIncome = 0;
-		let totalSpending = 0;
-		let firstDate = "";
-		let lastDate = "";
-
-		for (let index = 0; index < transactions.length; index++) {
-			const transaction = transactions[index];
-			const absAmount = Math.abs(transaction.amount);
-			const date = transaction.date;
-
-			// Largest overall amount
-			if (absAmount > largestTransaction) {
-				largestTransaction = absAmount;
-			}
-
-			// Largest expense (most negative amount as positive)
-			if (transaction.amount < 0 && absAmount > largestExpense) {
-				largestExpense = absAmount;
-			}
-
-			// Income and Spending totals
-			if (transaction.amount > 0) {
-				totalIncome += transaction.amount;
-			} else {
-				totalSpending += Math.abs(transaction.amount);
-			}
-
-			// First and last dates
-			if (!firstDate || date < firstDate) {
-				firstDate = date;
-			}
-			if (!lastDate || date > lastDate) {
-				lastDate = date;
-			}
-		}
-
-		const avgTransaction =
-			transactions.length > 0
-				? (totalIncome + totalSpending) / transactions.length
-				: 0;
-
-		const formatDate = (dateStr: string) => {
-			if (!dateStr) return "N/A";
-			try {
-				return new Intl.DateTimeFormat("en-US", {
-					month: "short",
-					day: "numeric",
-					year: "numeric",
-				}).format(new Date(dateStr));
-			} catch {
-				return dateStr;
-			}
-		};
-
-		return {
-			total: transactions.length,
-			largestTx: largestTransaction,
-			largestEx: largestExpense,
-			avgTx: avgTransaction,
-			totalIncome,
-			totalSpending,
-			firstDate: formatDate(firstDate),
-			lastDate: formatDate(lastDate),
-		};
-	}, [transactions]);
-
-	// Build category name -> UUID lookup
-	const subcategoryIdByName = useMemo(() => {
-		const lookup = new Map<string, string>();
-
-		/*
-		 * Add system categories first.
-		 * In the event of bad duplicate data,
-		 * the system category keeps priority.
-		 */
-		for (let index = 0; index < customCategories.length; index++) {
-			const category = customCategories[index];
-
-			if (!category.is_system) {
-				continue;
-			}
-
-			const key = normalizeCategoryName(category.name);
-
-			lookup.set(key, category.id);
-		}
-
-		// Add user-created categories second.
-		for (let index = 0; index < customCategories.length; index++) {
-			const category = customCategories[index];
-
-			if (category.is_system) {
-				continue;
-			}
-
-			const key = normalizeCategoryName(category.name);
-
-			const existingId = lookup.get(key);
-
-			if (existingId) {
-				console.warn(`Duplicate category name detected: "${category.name}".`);
-
-				continue;
-			}
-
-			lookup.set(key, category.id);
-		}
-
-		return lookup;
-	}, [customCategories]);
-
-	const getSubcategoryId = useCallback(
-		(categoryName: string): string | undefined => {
-			return subcategoryIdByName.get(normalizeCategoryName(categoryName));
-		},
-		[subcategoryIdByName],
-	);
-
-	// Row selection
-	const handleSelectRow = useCallback((id: string, event: ReactMouseEvent) => {
-		event.stopPropagation();
-
-		setSelectedIds((previousSelectedIds) => {
-			if (previousSelectedIds.includes(id)) {
-				return previousSelectedIds.filter((selectedId) => {
-					return selectedId !== id;
-				});
-			}
-
-			return [...previousSelectedIds, id];
+	const handleClearAll = useCallback(() => {
+		setSearchQuery("");
+		setCurrentView("all");
+		setSorting([{ id: "date", desc: true }]);
+		setColumnVisibility({});
+		setDateRange({ startDate: "", endDate: "" });
+		setTransactionFilters(EMPTY_TRANSACTION_FILTERS);
+	}, [setSorting, setColumnVisibility]);
+
+	const openAddTransaction = useCallback(() => {
+		setAddTransactionState({
+			mode: "new",
+			transaction: createBlankTransaction(),
 		});
 	}, []);
 
+	// ---- Merchant & Category changes with rule suggestion ----
 	const handleMerchantChange = useCallback(
 		async (transactionId: string, merchant: Pick<Merchant, "id" | "name">) => {
-			const originalTransaction = transactions.find((transaction) => {
-				return transaction.id === transactionId;
-			});
-
-			if (!originalTransaction) {
-				return;
-			}
-
-			const isSameMerchant = originalTransaction.merchant_id
-				? originalTransaction.merchant_id === merchant.id
-				: normalizeMerchantName(originalTransaction.merchant) ===
+			const original = transactions.find((tx) => tx.id === transactionId);
+			if (!original) return;
+			const isSame = original.merchant_id
+				? original.merchant_id === merchant.id
+				: normalizeMerchantName(original.merchant) ===
 					normalizeMerchantName(merchant.name);
-
-			if (isSameMerchant) {
-				return;
-			}
-
+			if (isSame) return;
 			await updateTransaction(transactionId, {
 				merchant: merchant.name,
 				merchant_id: merchant.id,
 			});
-
 			setTransactionRuleSuggestion({
 				type: "merchant",
-				transaction: originalTransaction,
+				transaction: original,
 				merchant,
 			});
 		},
@@ -1068,69 +279,21 @@ export default function TransactionsPageClient({
 
 	const handleCategoryChange = useCallback(
 		async (transactionId: string, newCategory: string) => {
-			const originalTransaction = transactions.find((transaction) => {
-				return transaction.id === transactionId;
-			});
-
-			if (!originalTransaction) {
-				return;
-			}
-
-			if (originalTransaction.category.trim() === newCategory.trim()) {
-				return;
-			}
-
-			await updateTransaction(transactionId, {
-				category: newCategory,
-			});
-
+			const original = transactions.find((tx) => tx.id === transactionId);
+			if (!original) return;
+			if (original.category.trim() === newCategory.trim()) return;
+			await updateTransaction(transactionId, { category: newCategory });
 			setTransactionRuleSuggestion({
 				type: "category",
-				transaction: originalTransaction,
+				transaction: original,
 				category: newCategory,
 			});
 		},
 		[transactions, updateTransaction],
 	);
 
-	const isDefaultSorting =
-		sorting.length === 1 &&
-		sorting[0]?.id === "date" &&
-		sorting[0]?.desc === true;
 
-	const isSortModified = !isDefaultSorting;
-
-	const isColumnsModified = Object.values(columnVisibility).some(
-		(isVisible) => {
-			return isVisible === false;
-		},
-	);
-
-	const hasDateFilter = Boolean(dateRange.startDate || dateRange.endDate);
-
-	const hasActiveFilters =
-		Boolean(searchQuery) ||
-		hasDateFilter ||
-		hasTransactionFilters(transactionFilters) ||
-		isSortModified ||
-		isColumnsModified ||
-		currentView !== "all";
-
-	const handleClearAll = useCallback(() => {
-		setSearchQuery("");
-		setCurrentView("all");
-		setSorting(DEFAULT_SORTING);
-		setColumnVisibility({});
-		setDateRange({
-			startDate: "",
-			endDate: "",
-		});
-		setTransactionFilters(EMPTY_TRANSACTION_FILTERS);
-	}, []);
-
-	if (!isClient) {
-		return <TransactionsPageSkeleton />;
-	}
+console.log('Page: isDataLoading =', isDataLoading);
 
 	return (
 		<div className="flex flex-col h-screen font-sans bg-gray-50 dark:bg-[#121212] text-gray-900 dark:text-gray-200 transition-colors duration-200">
@@ -1151,7 +314,7 @@ export default function TransactionsPageClient({
 				showAddTransaction
 			/>
 
-			<div className="flex flex-1 min-h-0 overflow-hidden   md:gap-6 flex-col md:flex-row-reverse">
+			<div className="flex flex-1 min-h-0 overflow-hidden md:gap-6 flex-col md:flex-row-reverse">
 				<SummarySidebar
 					isVisible={isSummaryVisible}
 					stats={summaryStats}
@@ -1164,9 +327,7 @@ export default function TransactionsPageClient({
 						setIsEditMode={setIsEditMode}
 						selectedIds={selectedIds}
 						setSelectedIds={setSelectedIds}
-						visibleTransactionIds={filteredTransactions.map((transaction) => {
-							return transaction.id;
-						})}
+						visibleTransactionIds={filteredTransactions.map((tx) => tx.id)}
 						currentView={currentView}
 						setCurrentView={setCurrentView}
 						filteredLength={filteredTransactions.length}
@@ -1180,7 +341,7 @@ export default function TransactionsPageClient({
 
 					<div className="flex-1 overflow-hidden relative">
 						<DataTable
-							isLoading={isInitialDataLoading}
+							isLoading={isDataLoading}
 							transactions={filteredTransactions}
 							selectedIds={selectedIds}
 							merchantItems={merchantItems}
@@ -1199,47 +360,37 @@ export default function TransactionsPageClient({
 				</div>
 			</div>
 
+			{/* CSV Uploader */}
 			{showUploader && (
 				<div className="fixed inset-0 z-100 flex items-center justify-center p-4">
 					<button
 						type="button"
 						aria-label="Close CSV uploader"
 						className="absolute inset-0 bg-black/60 backdrop-blur-md transform-gpu"
-						onClick={() => {
-							setShowUploader(false);
-						}}
+						onClick={() => setShowUploader(false)}
 					/>
-
 					<div className="relative bg-white dark:bg-[#121212] border border-gray-200 dark:border-white/10 w-full max-w-xl rounded-3xl shadow-2xl overflow-hidden">
 						<div className="p-6 border-b border-gray-200 dark:border-white/5 flex justify-between items-center">
 							<h3 className="text-lg font-black tracking-tight text-gray-900 dark:text-white">
 								Import CSV Statement
 							</h3>
-
 							<button
 								type="button"
 								aria-label="Close CSV uploader"
-								onClick={() => {
-									setShowUploader(false);
-								}}
+								onClick={() => setShowUploader(false)}
 								className="p-2 text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5 rounded-full transition-colors"
 							>
 								<X size={20} />
 							</button>
 						</div>
-
 						<div className="p-8">
-							<CsvUploader
-								onComplete={() => {
-									setShowUploader(false);
-								}}
-							/>
+							<CsvUploader onComplete={() => setShowUploader(false)} />
 						</div>
 					</div>
 				</div>
 			)}
 
-			{/* ✅ Global drawer – driven by Zustand store */}
+			{/* Transaction Details Drawer */}
 			{selectedTransaction && (
 				<TransactionDetailsDrawer
 					key={selectedTransaction.id}
@@ -1253,60 +404,58 @@ export default function TransactionsPageClient({
 				/>
 			)}
 
+			{/* Add / Duplicate Transaction Modal */}
 			{addTransactionState && (
 				<AddTransactionModal
 					key={`${addTransactionState.mode}:${addTransactionState.transaction.id}`}
 					initialTransaction={addTransactionState.transaction}
 					isOpen
 					allowDuplicate={addTransactionState.mode === "duplicate"}
-					onClose={() => {
-						setAddTransactionState(null);
-					}}
-					onCreated={() => {
-						setAddTransactionState(null);
-					}}
+					onClose={() => setAddTransactionState(null)}
+					onCreated={() => setAddTransactionState(null)}
 				/>
 			)}
+
+			{/* Rule Suggestion Toast */}
 			{transactionRuleSuggestion && (
 				<MerchantRuleToast
 					key={[
 						transactionRuleSuggestion.type,
 						transactionRuleSuggestion.transaction.id,
 						transactionRuleSuggestion.type === "merchant"
-							? transactionRuleSuggestion.merchant.id
+							? transactionRuleSuggestion.merchant?.id
 							: transactionRuleSuggestion.category,
 					].join(":")}
 					show
 					variant={transactionRuleSuggestion.type}
 					updatedValue={
 						transactionRuleSuggestion.type === "merchant"
-							? transactionRuleSuggestion.merchant.name
-							: transactionRuleSuggestion.category
+							? transactionRuleSuggestion.merchant!.name
+							: transactionRuleSuggestion.category!
 					}
-					onDismiss={() => {
-						setTransactionRuleSuggestion(null);
-					}}
+					onDismiss={() => setTransactionRuleSuggestion(null)}
 					onCreateRule={() => {
 						if (transactionRuleSuggestion.type === "merchant") {
 							setRuleModalState({
 								seed: {
 									sourceTransaction: transactionRuleSuggestion.transaction,
-									renameMerchant: transactionRuleSuggestion.merchant,
+									renameMerchant: transactionRuleSuggestion.merchant!,
 								},
 							});
 						} else {
 							setRuleModalState({
 								seed: {
 									sourceTransaction: transactionRuleSuggestion.transaction,
-									updateCategory: transactionRuleSuggestion.category,
+									updateCategory: transactionRuleSuggestion.category!,
 								},
 							});
 						}
-
 						setTransactionRuleSuggestion(null);
 					}}
 				/>
 			)}
+
+			{/* Rule Modal */}
 			{ruleModalState && (
 				<RuleModal
 					key={
@@ -1326,12 +475,9 @@ export default function TransactionsPageClient({
 					merchants={merchants}
 					categories={ruleCategoryNames}
 					tags={customTags}
-					onClose={() => {
-						setRuleModalState(null);
-					}}
+					onClose={() => setRuleModalState(null)}
 					onSave={async (rule, options) => {
 						const result = await saveRule(rule, options.applyToExisting);
-
 						if (result.count > 0) {
 							setToast({
 								count: result.count,
@@ -1345,21 +491,20 @@ export default function TransactionsPageClient({
 				/>
 			)}
 
+			{/* Undo Toast for bulk updates */}
 			{toast && (
 				<UndoToast
 					show={true}
 					message={`Updated ${toast.count} transactions`}
 					onUndo={() => {
 						useBudgetStore.getState().undoBulkUpdate(toast.snapshot);
-
 						setToast(null);
 					}}
-					onClose={() => {
-						setToast(null);
-					}}
+					onClose={() => setToast(null)}
 				/>
 			)}
 
+			{/* Bulk Edit Drawer */}
 			{isBulkEditOpen && (
 				<BulkEditTransactionsDrawer
 					key={selectedIds.slice().sort().join(":")}
