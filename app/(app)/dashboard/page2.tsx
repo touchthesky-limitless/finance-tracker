@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import FinancialCard from "@/components/Stocks/FinancialCard";
 import MortgageCard from "@/components/MortgageCard";
 import { BudgetSummaryCards } from "@/components/Dashboard/BudgetSummaryCards";
-import { Shimmer } from "@/components/ui/Shimmer";
+import { Skeleton } from "@/components/ui/skeleton";
 import { getMortgageData } from "@/lib/mortgage";
 import { getStockData } from "@/lib/stock";
 import { getAverageMortgagePayment } from "@/lib/market-utils";
@@ -77,21 +77,20 @@ function MarketPulseSkeleton() {
 					>
 						<div className="flex items-start justify-between gap-4">
 							<div className="space-y-3">
-								<Shimmer className="h-4 w-20 rounded-md" />
-								<Shimmer className="h-8 w-32 rounded-lg" />
+								<Skeleton className="h-4 w-20" />
+								<Skeleton className="h-8 w-32 rounded-lg" />{" "}
 							</div>
-
-							<Shimmer className="size-10 rounded-xl" />
+							<Skeleton className="size-10 rounded-xl" />{" "}
 						</div>
 
 						<div className="mt-8 space-y-3">
-							<Shimmer className="h-4 w-full rounded-md" />
-							<Shimmer className="h-4 w-4/5 rounded-md" />
+							<Skeleton className="h-4 w-full" />
+							<Skeleton className="h-4 w-4/5" />
 						</div>
 
 						<div className="mt-7 flex items-center justify-between">
-							<Shimmer className="h-4 w-24 rounded-md" />
-							<Shimmer className="h-5 w-16 rounded-md" />
+							<Skeleton className="h-4 w-24" />
+							<Skeleton className="h-5 w-16" />
 						</div>
 					</div>
 				))}
@@ -100,7 +99,7 @@ function MarketPulseSkeleton() {
 	);
 }
 
-export default function DashboardPage() {
+export default function DashboardPage2() {
 	return (
 		<main className="min-h-screen space-y-10 bg-white p-8 text-gray-900 dark:bg-black dark:text-white">
 			<header>

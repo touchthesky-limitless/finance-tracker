@@ -1,12 +1,6 @@
 "use client";
 
-import {
-	useCallback,
-	useEffect,
-	useMemo,
-	useState,
-	useSyncExternalStore,
-} from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import { CashFlowBreakdownBars } from "@/components/CashFlow/CashFlowBreakdownBars";
@@ -17,7 +11,6 @@ import {
 	ViewMenu,
 } from "@/components/CashFlow/CashFlowControls";
 import { CashFlowFilterMenu } from "@/components/CashFlow/CashFlowFilterMenu";
-import { CashFlowPageSkeleton } from "@/components/CashFlow/CashFlowPageSkeleton";
 import { CashFlowSankey } from "@/components/CashFlow/CashFlowSankey";
 import { CashFlowTrendChart } from "@/components/CashFlow/CashFlowTrendChart";
 import type {
@@ -51,18 +44,6 @@ const BREAKDOWNS = ["category", "group", "merchant"] as const;
 const SANKEY_BREAKDOWNS = ["category", "group", "both"] as const;
 const HIDDEN_MODES = ["visible", "hidden", "all"] as const;
 
-function subscribeToClient(): () => void {
-	return () => {};
-}
-
-function getClientSnapshot(): boolean {
-	return true;
-}
-
-function getServerSnapshot(): boolean {
-	return false;
-}
-
 function parseEnum<T extends string>(
 	value: string | null,
 	allowed: readonly T[],
@@ -85,11 +66,6 @@ function readCsv(value: string | null): string[] {
 }
 
 export default function CashFlowPageClient() {
-	const isClient = useSyncExternalStore(
-		subscribeToClient,
-		getClientSnapshot,
-		getServerSnapshot,
-	);
 	const router = useRouter();
 	const pathname = usePathname();
 	const searchParams = useSearchParams();
@@ -114,15 +90,12 @@ export default function CashFlowPageClient() {
 	);
 	const fetchMerchants = useBudgetStore((state) => state.fetchMerchants);
 	const merchantItems = useMerchantOptions();
-	const {
-		groups: categoryGroups,
-		isLoading: areCategoryGroupsLoading,
-	} = useCategoryGroups({
+	const { groups: categoryGroups } = useCategoryGroups({
 		customCategories,
 		categoryPreferences,
 		groupPreferences,
 	});
-	const [loading, setLoading] = useState(true);
+	const [, setLoading] = useState(true);
 	const [hideIncomeAmounts, setHideIncomeAmounts] = useState(false);
 	const [hideExpenseAmounts, setHideExpenseAmounts] = useState(false);
 	const [hideSankeyAmounts, setHideSankeyAmounts] = useState(false);
@@ -226,12 +199,7 @@ export default function CashFlowPageClient() {
 	);
 
 	const periods = useMemo(() => {
-		return buildCashFlowPeriods(
-			transactions,
-			anchorDate,
-			timeframe,
-			filters,
-		);
+		return buildCashFlowPeriods(transactions, anchorDate, timeframe, filters);
 	}, [anchorDate, filters, timeframe, transactions]);
 
 	const selectedPeriod = useMemo(() => {
@@ -332,14 +300,10 @@ export default function CashFlowPageClient() {
 		return buildSankeyData(expenseCategories, expenseGroups, sankeyMode);
 	}, [expenseCategories, expenseGroups, sankeyMode]);
 
-	if (!isClient || loading || areCategoryGroupsLoading) {
-		return <CashFlowPageSkeleton />;
-	}
-
 	return (
 		<div className="min-h-screen space-y-4 bg-gray-50 p-3 text-gray-900 dark:bg-[#171716] dark:text-white">
 			<header className="sticky top-0 z-[700] -mx-3 -mt-3 flex min-h-16 flex-wrap items-center gap-4 border-b border-gray-200 bg-gray-50/95 px-5 py-3 backdrop-blur-xl dark:border-white/5 dark:bg-[#171716]/95">
-				 {!isMobile && <h1 className="text-xl font-bold">Cash Flow</h1>}
+				{!isMobile && <h1 className="text-xl font-bold">Cash Flow</h1>}
 				<div className="ml-auto flex flex-wrap items-center justify-end gap-3">
 					<TimeframeTabs
 						value={timeframe}
@@ -365,9 +329,7 @@ export default function CashFlowPageClient() {
 										? nextFilters.tags.join(",")
 										: null,
 								hidden:
-									nextFilters.hidden === "visible"
-										? null
-										: nextFilters.hidden,
+									nextFilters.hidden === "visible" ? null : nextFilters.hidden,
 							});
 						}}
 					/>

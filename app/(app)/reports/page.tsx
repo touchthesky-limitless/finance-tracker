@@ -1,5 +1,5 @@
-import { ReportsPageShell } from "@/components/Reports/ReportsPageShell";
+import ReportsPageClient from "@/components/Reports/ReportsPageClient";
 
 export default function ReportsPage() {
-	return <ReportsPageShell />;
+  return <ReportsPageClient />;
 }

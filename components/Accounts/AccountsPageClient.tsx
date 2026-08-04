@@ -5,7 +5,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Filter, Plus, RefreshCw } from "lucide-react";
 
 import { AccountGroupCard } from "@/components/Accounts/AccountGroupCard";
-import { AccountsPageSkeleton } from "@/components/Accounts/AccountsPageSkeleton";
 import {
 	DEFAULT_QUERY,
 	GROUP_ORDER,
@@ -13,7 +12,6 @@ import {
 } from "@/components/Accounts/constants";
 import { NetWorthChart } from "@/components/Accounts/chart/NetWorthChart";
 import { AccountFilterModal } from "@/components/Accounts/filters/AccountFilterPopover";
-import { useIsClient } from "@/hooks/useIsClient";
 import { AddAccountModal } from "@/components/Accounts/modals/AddAccountModal";
 import { ManualAccountForm } from "@/components/Accounts/modals/ManualAccountForm";
 import { ManualAccountPicker } from "@/components/Accounts/modals/ManualAccountPicker";
@@ -47,7 +45,6 @@ import { useNetWorthHistory } from "@/hooks/useNetWorthHistory";
 export default function AccountsPageClient() {
 	const router = useRouter();
 	const searchParams = useSearchParams();
-	const isClient = useIsClient();
 
 	const transactions = useBudgetStore((state) => state.transactions);
 	const fetchAccounts = useBudgetStore((state) => state.fetchAccounts);
@@ -356,10 +353,6 @@ export default function AccountsPageClient() {
 
 		return { assets, liabilities };
 	}, [visibleAccounts]);
-
-	if (!isClient) {
-		return <AccountsPageSkeleton />;
-	}
 
 	return (
 		<div className="min-h-screen bg-gray-50 p-2 text-gray-900 sm:p-3 md:p-5 dark:bg-[#171717] dark:text-[#f5f5f5]">

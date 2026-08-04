@@ -5,7 +5,6 @@ import {
 	useEffect,
 	useMemo,
 	useState,
-	useSyncExternalStore,
 	type ReactNode,
 } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -23,7 +22,6 @@ import { RecurringGroupingDropdown } from "@/components/Recurring/RecurringContr
 import { RecurringManagerDialog } from "@/components/Recurring/RecurringManagerDialog";
 import { RecurringMerchantSearchDialog } from "@/components/Recurring/RecurringMerchantSearchDialog";
 import { RecurringMonthlySummary } from "@/components/Recurring/RecurringMonthlySummary";
-import { RecurringPageSkeleton } from "@/components/Recurring/RecurringPageSkeleton";
 import { RecurringReviewDialog } from "@/components/Recurring/RecurringReviewDialog";
 import type {
 	AllRecurringGroupMode,
@@ -62,16 +60,6 @@ import { appendNavigationSource } from "@/lib/navigation/breadcrumb";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { MOBILE_BREAKPOINT } from "@/config/breakpoints";
 
-function subscribeToClient(): () => void {
-	return () => {};
-}
-function getClientSnapshot(): boolean {
-	return true;
-}
-function getServerSnapshot(): boolean {
-	return false;
-}
-
 type ActiveDialog =
 	| null
 	| { type: "review" }
@@ -88,11 +76,6 @@ type ActiveDialog =
 	  };
 
 export default function RecurringPageClient() {
-	const isClient = useSyncExternalStore(
-		subscribeToClient,
-		getClientSnapshot,
-		getServerSnapshot,
-	);
 	const pathname = usePathname();
 	const router = useRouter();
 	const searchParams = useSearchParams();
@@ -138,9 +121,6 @@ export default function RecurringPageClient() {
 	const suppressedSourceKeys = useRecurringStore((state) => {
 		return state.suppressedSourceKeys;
 	});
-	const recurringHydrated = useRecurringStore((state) => {
-		return state.hasHydrated;
-	});
 	const fetchRecurringData = useRecurringStore((state) => {
 		return state.fetchRecurringData;
 	});
@@ -156,7 +136,7 @@ export default function RecurringPageClient() {
 	const merchantItems = useMerchantOptions();
 	const { predictedBills } = useBudgetData("all");
 
-	const [isInitialDataLoading, setIsInitialDataLoading] = useState(true);
+	const [, setIsInitialDataLoading] = useState(true);
 	const [view, setView] = useState<"list" | "calendar">("list");
 	const [month, setMonth] = useState(() => {
 		const now = new Date();
@@ -574,10 +554,6 @@ export default function RecurringPageClient() {
 		},
 		[router],
 	);
-
-	if (!isClient || !recurringHydrated || isInitialDataLoading) {
-		return <RecurringPageSkeleton />;
-	}
 
 	return (
 		<div className="min-h-screen bg-gray-50 p-3 text-gray-900 md:p-4 dark:bg-[#171716] dark:text-white">

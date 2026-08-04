@@ -11,7 +11,6 @@ import {
 	YAxis,
 } from "recharts";
 
-import { Shimmer } from "@/components/ui/Shimmer";
 import { useBudgetStore } from "@/store/useBudgetStore";
 import { formatChartValue } from "@/utils/formatters";
 
@@ -19,44 +18,7 @@ interface AccountsChartProps {
 	isLoading?: boolean;
 }
 
-function AccountsChartSkeleton() {
-	return (
-		<div
-			role="status"
-			aria-label="Loading net worth chart"
-			aria-live="polite"
-			className="h-[300px] w-full rounded-xl border border-gray-200 bg-white p-6 transition-colors dark:border-[#2a2a2a] dark:bg-[#1c1c1c]"
-		>
-			<span className="sr-only">Loading net worth chart…</span>
-
-			<div aria-hidden="true">
-				<Shimmer className="mb-5 h-4 w-24 rounded-md" />
-
-				<div className="relative h-[220px] overflow-hidden rounded-xl border border-gray-100 p-4 dark:border-white/5">
-					<div className="absolute inset-x-4 top-1/4 border-t border-dashed border-gray-200 dark:border-white/10" />
-					<div className="absolute inset-x-4 top-1/2 border-t border-dashed border-gray-200 dark:border-white/10" />
-					<div className="absolute inset-x-4 top-3/4 border-t border-dashed border-gray-200 dark:border-white/10" />
-
-					<div className="absolute inset-x-4 bottom-4 flex items-end gap-3">
-						{[38, 62, 48, 86, 70, 108, 92, 132, 118, 150, 136, 174].map(
-							(height, index) => (
-								<Shimmer
-									key={index}
-									className="min-w-0 flex-1 rounded-t-md"
-									style={{ height }}
-								/>
-							),
-						)}
-					</div>
-				</div>
-			</div>
-		</div>
-	);
-}
-
-export default function AccountsChart({
-	isLoading = false,
-}: AccountsChartProps) {
+export default function AccountsChart({}: AccountsChartProps) {
 	const transactions = useBudgetStore((state) => state.transactions);
 
 	const data = useMemo(() => {
@@ -78,10 +40,6 @@ export default function AccountsChart({
 			value,
 		}));
 	}, [transactions]);
-
-	if (isLoading) {
-		return <AccountsChartSkeleton />;
-	}
 
 	return (
 		<div className="h-[300px] w-full rounded-xl border border-gray-200 bg-white p-6 transition-colors dark:border-[#2a2a2a] dark:bg-[#1c1c1c]">

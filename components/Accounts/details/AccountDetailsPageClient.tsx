@@ -16,9 +16,7 @@ import {
 } from "next/navigation";
 import { ChevronRight, CreditCard, X } from "lucide-react";
 import type { SortingState, VisibilityState } from "@tanstack/react-table";
-
 import { AccountActionMenu } from "@/components/Accounts/details/AccountActionMenu";
-import { AccountDetailsPageSkeleton } from "@/components/Accounts/details/AccountDetailsPageSkeleton";
 import { AccountBalanceChart } from "@/components/Accounts/details/AccountBalanceChart";
 import { AccountFiltersMenu } from "@/components/Accounts/details/AccountFiltersMenu";
 import { AccountSummaryCards } from "@/components/Accounts/details/AccountSummaryCards";
@@ -167,7 +165,7 @@ export default function AccountDetailsPageClient() {
 	const [isBulkEditOpen, setIsBulkEditOpen] = useState(false);
 	const [isMoveDialogOpen, setIsMoveDialogOpen] = useState(false);
 	const [showUploader, setShowUploader] = useState(false);
-	const [isInitialDataLoading, setIsInitialDataLoading] = useState(true);
+	const [, setIsInitialDataLoading] = useState(true);
 	const merchantItems = useMerchantOptions();
 
 	// ✅ Use query parameter instead of path
@@ -706,10 +704,6 @@ export default function AccountDetailsPageClient() {
 	const activeFilters = hasAccountTransactionFilters(filters);
 	const hasNoFilteredTransactions =
 		activeFilters && filteredTransactions.length === 0;
-
-	if (isInitialDataLoading) {
-		return <AccountDetailsPageSkeleton />;
-	}
 
 	return (
 		<div className="flex min-h-screen flex-col bg-gray-50 p-3 text-gray-900 transition-colors md:p-5 dark:bg-[#171716] dark:text-[#F4F4F2]">

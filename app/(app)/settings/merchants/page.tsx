@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import {
 	autoUpdate,
@@ -24,7 +24,6 @@ import {
 import { MerchantLogo } from "@/components/Merchants/MerchantLogo";
 import type { MerchantListItem } from "@/components/Merchants/types";
 import { SettingsContentCard } from "@/components/Settings/SettingsShell";
-import { Shimmer } from "@/components/ui/Shimmer";
 import { useMerchantOptions } from "@/hooks/useMerchantOptions";
 import { type Transaction, useBudgetStore } from "@/store/useBudgetStore";
 import {
@@ -184,34 +183,6 @@ function MerchantSortSelect({
 	);
 }
 
-function MerchantsSkeleton() {
-	return (
-		<div role="status" aria-label="Loading merchants">
-			<span className="sr-only">Loading merchants…</span>
-			<div className="space-y-0">
-				{Array.from({ length: 6 }, (_, index) => (
-					<div
-						key={index}
-						aria-hidden="true"
-						className="flex min-h-24 items-center gap-4 border-t border-black/[0.06] px-4 py-4 sm:px-7 dark:border-white/[0.06]"
-					>
-						<Shimmer className="size-13 shrink-0 rounded-full" />
-						<div className="min-w-0 flex-1 space-y-2">
-							<Shimmer
-								className={`h-5 rounded-md ${
-									index % 2 === 0 ? "w-36" : "w-52"
-								}`}
-							/>
-							<Shimmer className="h-4 w-28 rounded-md" />
-						</div>
-						<Shimmer className="h-11 w-20 rounded-xl" />
-					</div>
-				))}
-			</div>
-		</div>
-	);
-}
-
 function SettingsMerchantsPageContent() {
 	const pathname = usePathname();
 	const searchParams = useSearchParams();
@@ -232,7 +203,7 @@ function SettingsMerchantsPageContent() {
 	const [sortMode, setSortMode] = useState<MerchantSortMode>(() => {
 		return getMerchantSortMode(searchParams.get("order"));
 	});
-	const [isLoading, setIsLoading] = useState(true);
+	const [, setIsLoading] = useState(true);
 	const [loadError, setLoadError] = useState<string | null>(null);
 	const [selectedMerchant, setSelectedMerchant] =
 		useState<MerchantEditorValue | null>(null);
@@ -524,9 +495,7 @@ function SettingsMerchantsPageContent() {
 					</p>
 				)}
 
-				{isLoading ? (
-					<MerchantsSkeleton />
-				) : visibleMerchants.length === 0 ? (
+				{visibleMerchants.length === 0 ? (
 					<div className="px-5 py-20 text-center">
 						<p className="text-lg font-semibold">No merchants found</p>
 						<p className="mt-2 text-[#777671] dark:text-[#aaa9a4]">
@@ -617,15 +586,5 @@ function SettingsMerchantsPageContent() {
 }
 
 export default function SettingsMerchantsPage() {
-	return (
-		<Suspense
-			fallback={
-				<SettingsContentCard title="Merchants">
-					<MerchantsSkeleton />
-				</SettingsContentCard>
-			}
-		>
-			<SettingsMerchantsPageContent />
-		</Suspense>
-	);
+	return <SettingsMerchantsPageContent />;
 }

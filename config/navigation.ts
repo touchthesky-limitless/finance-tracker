@@ -2,8 +2,6 @@ import {
 	LayoutDashboard,
 	Receipt,
 	ChartPie,
-	BarChart3,
-	Compass,
 	WalletCards,
 	Layers2,
 	Repeat,
@@ -67,12 +65,6 @@ export const NAV_GROUPS: SidebarItemType[] = [
 	createItem("Investments", "/investments", TrendingUp),
 	createItem("Forecasting", "/forecast", Sparkles),
 	createItem("Stocks", "/stocks", ChartCandlestick),
-	createItem("Statistics", "/stats", BarChart3, {
-		isLocked: true,
-	}),
-	createItem("Insights", "/insights", Compass, {
-		isLocked: true,
-	}),
 	createItem("Calculator", "/calculator", Calculator, {
 		isLocked: true,
 	}),
