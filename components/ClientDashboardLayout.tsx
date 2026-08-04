@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 "use client";
 
 import { useState, createContext, useContext, useMemo } from "react";
@@ -30,7 +29,15 @@ export default function ClientDashboardLayout({
 	const toast = useBudgetStore((state) => state.toast);
 	const setToast = useBudgetStore((state) => state.setToast);
 	const undoBulkUpdate = useBudgetStore((state) => state.undoBulkUpdate);
-	const onBack = useTransactionDrawer((state) => state.onBack);
+
+	const {
+		selectedTransactionId,
+		onBack,
+		onDeleted,
+		onDuplicate,
+		onCreateRule,
+		closeDrawer,
+	} = useTransactionDrawer();
 
 	const isMobile = useMediaQuery(MOBILE_BREAKPOINT);
 	const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -43,10 +50,6 @@ export default function ClientDashboardLayout({
 		return matchingPath ? PAGE_TITLES[matchingPath] : "";
 	}, [pathname]);
 
-	const selectedTransactionId = useTransactionDrawer(
-		(state) => state.selectedTransactionId,
-	);
-	const closeDrawer = useTransactionDrawer((state) => state.closeDrawer);
 	const transactions = useBudgetStore((state) => state.transactions);
 
 	const selectedTransaction = useMemo(() => {
@@ -136,15 +139,9 @@ export default function ClientDashboardLayout({
 					isOpen={!!selectedTransactionId}
 					onClose={closeDrawer}
 					onBack={onBack}
-					onDeleted={(_count) => {
-						closeDrawer();
-					}}
-					onDuplicate={(_transaction) => {
-						closeDrawer();
-					}}
-					onCreateRule={(_transaction) => {
-						closeDrawer();
-					}}
+					onDeleted={onDeleted || (() => closeDrawer())}
+					onDuplicate={onDuplicate || (() => closeDrawer())}
+					onCreateRule={onCreateRule || (() => closeDrawer())}
 				/>
 			)}
 		</VersionProvider>

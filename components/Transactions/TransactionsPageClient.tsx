@@ -7,12 +7,7 @@
  */
 "use client";
 
-import {
-	useCallback,
-	useEffect,
-	useMemo,
-	useState,
-} from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { X } from "lucide-react";
 
@@ -64,10 +59,7 @@ const AddTransactionModal = dynamic(
 	() => import("@/components/Budget/AddTransactionModal"),
 	{ ssr: false },
 );
-const TransactionDetailsDrawer = dynamic(
-	() => import("@/components/Transactions/TransactionDetailsDrawer"),
-	{ ssr: false },
-);
+
 const RuleModal = dynamic(
 	() => import("@/components/Transactions/RuleModal").then((m) => m.RuleModal),
 	{ ssr: false },
@@ -80,7 +72,6 @@ interface TransactionsPageClientProps {
 export default function TransactionsPageClient({
 	initialTransactionId,
 }: TransactionsPageClientProps) {
-
 	// ---- Global stores ----
 	const transactions = useBudgetStore((state) => state.transactions);
 	const updateTransaction = useBudgetStore((state) => state.updateTransaction);
@@ -96,9 +87,6 @@ export default function TransactionsPageClient({
 	);
 	const reportDeletedTransactions = useTransactionToastStore(
 		(state) => state.reportDeletedTransactions,
-	);
-	const selectedTransactionId = useTransactionDrawer(
-		(state) => state.selectedTransactionId,
 	);
 	const openDrawer = useTransactionDrawer((state) => state.openDrawer);
 	const closeDrawer = useTransactionDrawer((state) => state.closeDrawer);
@@ -173,11 +161,6 @@ export default function TransactionsPageClient({
 		return transactions.filter((tx) => selectedIdSet.has(tx.id));
 	}, [selectedIds, transactions]);
 
-	const selectedTransaction = useMemo(() => {
-		if (!selectedTransactionId) return null;
-		return transactions.find((tx) => tx.id === selectedTransactionId) ?? null;
-	}, [selectedTransactionId, transactions]);
-
 	const ruleCategoryNames = useMemo(() => {
 		return filterData.categories
 			.filter((option) => !option.isParent)
@@ -190,12 +173,6 @@ export default function TransactionsPageClient({
 			openDrawer(initialTransactionId);
 		}
 	}, [initialTransactionId, openDrawer]);
-
-	// ---- Handlers ----
-	const handleRowClick = useCallback(
-		(transaction: Transaction) => openDrawer(transaction.id),
-		[openDrawer],
-	);
 
 	const handleOpenBulkEdit = useCallback(() => {
 		if (selectedIds.length === 0) return;
@@ -254,6 +231,19 @@ export default function TransactionsPageClient({
 		});
 	}, []);
 
+	// ---- Handlers ----
+	const handleRowClick = useCallback(
+		(transaction: Transaction) => {
+			openDrawer(transaction.id, {
+				onBack: onBack || undefined,
+				onDeleted: handleDeleted,
+				onDuplicate: handleDuplicate,
+				onCreateRule: handleCreateRule,
+			});
+		},
+		[openDrawer, onBack, handleDeleted, handleDuplicate, handleCreateRule],
+	);
+
 	// ---- Merchant & Category changes with rule suggestion ----
 	const handleMerchantChange = useCallback(
 		async (transactionId: string, merchant: Pick<Merchant, "id" | "name">) => {
@@ -291,9 +281,6 @@ export default function TransactionsPageClient({
 		},
 		[transactions, updateTransaction],
 	);
-
-
-console.log('Page: isDataLoading =', isDataLoading);
 
 	return (
 		<div className="flex flex-col h-screen font-sans bg-gray-50 dark:bg-[#121212] text-gray-900 dark:text-gray-200 transition-colors duration-200">
@@ -388,20 +375,6 @@ console.log('Page: isDataLoading =', isDataLoading);
 						</div>
 					</div>
 				</div>
-			)}
-
-			{/* Transaction Details Drawer */}
-			{selectedTransaction && (
-				<TransactionDetailsDrawer
-					key={selectedTransaction.id}
-					transaction={selectedTransaction}
-					isOpen={!!selectedTransactionId}
-					onClose={closeDrawer}
-					onBack={onBack}
-					onDeleted={handleDeleted}
-					onDuplicate={handleDuplicate}
-					onCreateRule={handleCreateRule}
-				/>
 			)}
 
 			{/* Add / Duplicate Transaction Modal */}

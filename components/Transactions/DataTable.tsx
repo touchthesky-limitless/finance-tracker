@@ -699,8 +699,6 @@ function DataTableComponent({
 	}
 
 	const skeleton = useMemo(() => <TransactionTableSkeleton />, []);
-	// Inside DataTable component, before the return
-console.log('DataTable rendered, isLoading =', isLoading);
 
 	return (
 		<div
