@@ -1,5 +1,11 @@
 "use client";
 
+/**
+ * Main transaction table component.
+ * Uses extracted hooks for date grouping and column definitions,
+ * and a dedicated virtualized list renderer.
+ */
+
 import {
 	useCallback,
 	useMemo,
@@ -8,40 +14,34 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import {
-	createColumnHelper,
-	flexRender,
 	getCoreRowModel,
 	getSortedRowModel,
 	useReactTable,
-	type Row,
 	type SortingState,
 	type VisibilityState,
 } from "@tanstack/react-table";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { ArrowRight, Check } from "lucide-react";
 
-import { CategorySelector } from "@/components/CategorySelector";
 import { TransactionTableSkeleton } from "@/components/ui/skeletons/TransactionTableSkeleton";
-import { MerchantCell } from "@/components/Transactions/MerchantCell";
 import type { MerchantListItem } from "@/components/Merchants/types";
 import type { Merchant, Transaction } from "@/store/useBudgetStore";
-import { formatCurrency, truncateText } from "@/utils/formatters";
-import {
-	getTransactionMerchantId,
-	useUnifiedMerchants,
-} from "@/hooks/useUnifiedMerchants";
+import { useUnifiedMerchants } from "@/hooks/useUnifiedMerchants";
 import {
 	appendNavigationSource,
 	type NavigationSource,
 	useNavigationSource,
 } from "@/lib/navigation/breadcrumb";
-import {
-	AccountIcon,
-	inferAccountSubgroup,
-} from "@/components/Accounts/AccountIcon";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { MOBILE_BREAKPOINT } from "@/config/breakpoints";
 import React from "react";
+
+import {
+	useDateGrouping,
+	DATE_HEADER_HEIGHT,
+	TRANSACTION_ROW_HEIGHT,
+} from "@/hooks/transactions/useDateGrouping";
+import { useTableColumns } from "@/hooks/transactions/useTableColumns";
+import { VirtualizedList } from "./VirtualizedList";
 
 interface DataTableProps {
 	transactions: Transaction[];
@@ -78,68 +78,7 @@ interface DataTableProps {
 	forceCategoryIconOnly?: boolean;
 }
 
-type DateHeaderItem = {
-	type: "header";
-	id: string;
-	date: string;
-	total: number;
-};
-
-type TransactionRowItem = {
-	type: "row";
-	id: string;
-	row: Row<Transaction>;
-};
-
-type FlatItem = DateHeaderItem | TransactionRowItem;
-
-type ActiveHeader = {
-	item: DateHeaderItem;
-	translateY: number;
-} | null;
-
-const DATE_HEADER_HEIGHT = 48;
-const TRANSACTION_ROW_HEIGHT = 56;
 const VIRTUAL_OVERSCAN = 8;
-const ACCOUNT_CHARACTER_LENGTH = 43;
-
-const dateFormatter = new Intl.DateTimeFormat("en-US", {
-	month: "long",
-	day: "numeric",
-	year: "numeric",
-	timeZone: "UTC",
-});
-
-const columnHelper = createColumnHelper<Transaction>();
-
-function getDateInfo(dateValue: string): {
-	key: string;
-	label: string;
-	timestamp: number;
-} {
-	const parsedDate = new Date(dateValue);
-
-	if (Number.isNaN(parsedDate.getTime())) {
-		return {
-			key: "unknown-date",
-			label: "Unknown date",
-			timestamp: Number.NEGATIVE_INFINITY,
-		};
-	}
-
-	const year = parsedDate.getUTCFullYear();
-	const month = parsedDate.getUTCMonth();
-	const day = parsedDate.getUTCDate();
-	const timestamp = Date.UTC(year, month, day);
-	const monthValue = String(month + 1).padStart(2, "0");
-	const dayValue = String(day).padStart(2, "0");
-
-	return {
-		key: `${year}-${monthValue}-${dayValue}`,
-		label: dateFormatter.format(new Date(timestamp)),
-		timestamp,
-	};
-}
 
 function DataTableComponent({
 	transactions,
@@ -171,12 +110,9 @@ function DataTableComponent({
 	const router = useRouter();
 	const isMobile = useMediaQuery(MOBILE_BREAKPOINT);
 
-	const selectedIdSet = useMemo(() => {
-		return new Set(selectedIds);
-	}, [selectedIds]);
+	const selectedIdSet = useMemo(() => new Set(selectedIds), [selectedIds]);
 
 	const { getMerchantId: getUnifiedMerchantId } = useUnifiedMerchants();
-
 	const resolveMerchantId = getMerchantIdOverride ?? getUnifiedMerchantId;
 	const source = useNavigationSource();
 
@@ -210,293 +146,7 @@ function DataTableComponent({
 		[router, navigationSource, source],
 	);
 
-	const columns = useMemo(() => {
-		return [
-			columnHelper.accessor("date", {
-				id: "date",
-			}),
-
-			columnHelper.display({
-				id: "select",
-				size: 40,
-				cell: (info) => {
-					const transactionId = info.row.original.id;
-					const isSelected = selectedIdSet.has(transactionId);
-
-					if (currentView === "review" && !isEditMode) {
-						return (
-							<div className="flex items-center justify-center w-full h-full">
-								<button
-									type="button"
-									onClick={(event) => {
-										event.stopPropagation();
-										onMarkReviewed?.(transactionId);
-									}}
-									disabled={!onMarkReviewed}
-									aria-label="Mark transaction as reviewed"
-									className="group w-5 h-5 rounded-full border border-gray-300 dark:border-gray-500 flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-900 dark:text-white disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500"
-								>
-									<Check
-										size={12}
-										strokeWidth={3}
-										aria-hidden="true"
-										className="opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100"
-									/>
-								</button>
-							</div>
-						);
-					}
-
-					if (isEditMode) {
-						return (
-							<div className="flex items-center justify-center w-full h-full">
-								<button
-									type="button"
-									onClick={(event) => {
-										event.stopPropagation();
-										onSelectRow(transactionId, event);
-									}}
-									aria-label={
-										isSelected ? "Deselect transaction" : "Select transaction"
-									}
-									aria-pressed={isSelected}
-									className={`w-5 h-5 rounded-sm border-2 flex items-center justify-center cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 ${
-										isSelected
-											? "bg-[#FF5A35] border-[#FF5A35]"
-											: "border-gray-300 dark:border-gray-600"
-									}`}
-								>
-									<Check
-										size={14}
-										aria-hidden="true"
-										className={isSelected ? "text-white" : "text-transparent"}
-									/>
-								</button>
-							</div>
-						);
-					}
-
-					return null;
-				},
-			}),
-
-			columnHelper.accessor("merchant", {
-				// size: isMobile ? 222 : 350,
-				// minSize: isMobile ? 140 : 160,
-				size: columnWidths?.merchant ?? (isMobile ? 222 : 350),
-				minSize: isMobile ? 140 : 160,
-				cell: (info) => {
-					const transaction = info.row.original;
-					const merchantName = String(info.getValue() || "Unknown merchant");
-					const merchantId =
-						getTransactionMerchantId(transaction) ??
-						resolveMerchantId(merchantName);
-
-					const handleMerchantNavigation = () => {
-						if (!merchantId) {
-							return;
-						}
-						const activeSource = navigationSource || source;
-						router.push(
-							appendNavigationSource(`/merchants/${merchantId}`, activeSource),
-						);
-					};
-
-					return (
-						<MerchantCell
-							transaction={transaction}
-							merchantId={merchantId}
-							merchantItems={merchantItems}
-							showNavigation={isMerchantNavigationEnabled}
-							onNavigate={handleMerchantNavigation}
-							onOpenEditor={() => {
-								onRowClick(transaction);
-							}}
-							onMerchantChange={onMerchantChange}
-							isMobile={isMobile}
-							popoverZIndex={merchantPopoverZIndex}
-						/>
-					);
-				},
-			}),
-
-			columnHelper.accessor("category", {
-				// size: isMobile ? 20 : 300,
-				// minSize: isMobile ? 50 : 120,
-				size: columnWidths?.category ?? (isMobile ? 20 : 300),
-				minSize: isMobile ? 50 : 120,
-				cell: (info) => {
-					const categoryName = String(info.getValue() || "Uncategorized");
-					const targetId = getCategoryId?.(categoryName);
-					const categoryIconOnly = isMobile || forceCategoryIconOnly;
-
-					return (
-						<div
-							onClick={(event) => {
-								event.stopPropagation();
-							}}
-							className={`group flex items-center w-full h-full ${
-								isMobile ? "justify-center" : "gap-1.5 pr-2"
-							}`}
-						>
-							<div className="flex-1 min-w-0">
-								<CategorySelector
-									currentCategory={categoryName}
-									variant="form"
-									showChevron={showCategoryChevron}
-									hideChevronUntilHover={showCategoryChevron}
-									iconOnly={categoryIconOnly}
-									onSelect={(newCategory) => {
-										if (newCategory === categoryName) return;
-										void onCategoryChange?.(info.row.original.id, newCategory);
-									}}
-								/>
-							</div>
-
-							{/* Hide View Category button on mobile */}
-							{isCategoryView && !isMobile && (
-								<button
-									type="button"
-									onClick={(event) => {
-										event.stopPropagation();
-										if (onViewCategory) {
-											onViewCategory(categoryName, targetId);
-										} else {
-											navigateToCategory(categoryName, targetId);
-										}
-									}}
-									aria-disabled={!targetId}
-									aria-label={`View ${categoryName} category`}
-									title={
-										targetId
-											? `View ${categoryName}`
-											: `Category ID unavailable for ${categoryName}`
-									}
-									className={`
-              flex items-center justify-center shrink-0 transition-all
-              ${
-								!isMobile
-									? "w-6 h-6 rounded-lg border border-transparent opacity-0 group-hover:opacity-100 group-hover:border-gray-300 dark:group-hover:border-white/20 hover:bg-gray-100 dark:hover:bg-white/5"
-									: "hidden"
-							}
-              ${targetId ? "cursor-pointer" : "cursor-not-allowed"}
-            `}
-								>
-									<ArrowRight
-										size={12}
-										strokeWidth={2}
-										className="text-gray-500 dark:text-gray-400"
-										aria-hidden="true"
-									/>
-								</button>
-							)}
-						</div>
-					);
-				},
-			}),
-			columnHelper.accessor("account", {
-				size: isMobile ? 40 : 300,
-				minSize: isMobile ? 40 : 100,
-				cell: (info) => {
-					const transaction = info.row.original;
-					const accountName = transaction.account?.trim() || "Unknown account";
-					const accountId = transaction.account_id;
-					const canNavigate = Boolean(accountId);
-					const subgroup = inferAccountSubgroup(accountName);
-
-					return (
-						<button
-							type="button"
-							disabled={!canNavigate}
-							onClick={(event) => {
-								event.stopPropagation();
-								if (!accountId) return;
-								const activeSource = navigationSource || source;
-								const url = appendNavigationSource(
-									`/accounts/details/${encodeURIComponent(accountId)}`,
-									activeSource,
-								);
-								router.push(url);
-							}}
-							aria-label={`View ${accountName} account`}
-							title={
-								canNavigate ? `View ${accountName}` : "Account ID unavailable"
-							}
-							className={`
-  group flex h-10 w-full min-w-0 items-center gap-2 rounded-lg border border-transparent text-left transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E94F2D]
-  ${!isMobile ? "px-2 py-1 hover:border-gray-300 hover:bg-gray-50 dark:hover:border-white/20 dark:hover:bg-white/5" : "p-0 justify-center"}
-  ${!canNavigate ? "cursor-not-allowed opacity-50" : "cursor-pointer"}
-`}
-						>
-							{/* ✅ Always render the icon */}
-							<AccountIcon subgroup={subgroup} />
-
-							{/* ✅ Desktop: Show text and arrow. Mobile: Hide them. */}
-							{!isMobile && (
-								<>
-									<span
-										className="min-w-0 flex-1 truncate text-[15px] text-gray-900 dark:text-white"
-										title={accountName}
-									>
-										{truncateText(accountName, ACCOUNT_CHARACTER_LENGTH)}
-									</span>
-									{canNavigate && (
-										<ArrowRight
-											size={16}
-											strokeWidth={2}
-											aria-hidden="true"
-											className="shrink-0 text-gray-500 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100 dark:text-gray-400"
-										/>
-									)}
-								</>
-							)}
-						</button>
-					);
-				},
-			}),
-
-			columnHelper.accessor("amount", {
-				// size: isMobile ? 80 : 140,
-				// minSize: isMobile ? 60 : 80,
-				size: columnWidths?.amount ?? (isMobile ? 80 : 140),
-				minSize: isMobile ? 60 : 80,
-				sortingFn: (rowA, rowB, columnId) => {
-					const firstAmount = Number(rowA.getValue(columnId));
-					const secondAmount = Number(rowB.getValue(columnId));
-					const safeAmountA = Number.isFinite(firstAmount)
-						? Math.abs(firstAmount)
-						: 0;
-					const safeAmountB = Number.isFinite(secondAmount)
-						? Math.abs(secondAmount)
-						: 0;
-					return safeAmountA - safeAmountB;
-				},
-				sortUndefined: "last",
-				cell: (info) => {
-					const parsedAmount = Number(info.getValue());
-					const amount = Number.isFinite(parsedAmount) ? parsedAmount : 0;
-					const isPositive = amount > 0;
-
-					return (
-						<div
-							className={`flex items-center justify-end w-full ${isMobile ? "pr-2" : "pr-6"}`}
-						>
-							<span
-								className={`text-right font-mono text-[15px] font-medium tabular-nums ${
-									isPositive
-										? "text-emerald-600 dark:text-emerald-400"
-										: "text-gray-900 dark:text-white"
-								}`}
-							>
-								{isPositive ? "+" : ""}
-								{formatCurrency(amount)}
-							</span>
-						</div>
-					);
-				},
-			}),
-		];
-	}, [
+	const columns = useTableColumns({
 		selectedIdSet,
 		currentView,
 		isEditMode,
@@ -520,11 +170,10 @@ function DataTableComponent({
 		showCategoryChevron,
 		merchantPopoverZIndex,
 		forceCategoryIconOnly,
-	]);
+	});
 
 	const uniqueTransactions = useMemo(() => {
 		const seen = new Set<string>();
-
 		return transactions.filter((transaction) => {
 			if (!transaction.id || seen.has(transaction.id)) {
 				return false;
@@ -538,9 +187,7 @@ function DataTableComponent({
 	const table = useReactTable({
 		data: uniqueTransactions,
 		columns,
-		getRowId: (transaction) => {
-			return transaction.id;
-		},
+		getRowId: (transaction) => transaction.id,
 		state: {
 			sorting,
 			columnVisibility: {
@@ -548,7 +195,6 @@ function DataTableComponent({
 				date: false,
 				select: isEditMode || currentView === "review",
 				amount: columnVisibility.amount !== false,
-				// ✅ Respect user toggle on desktop, but hide on mobile
 				account: isMobile ? false : (columnVisibility.account ?? true),
 			},
 		},
@@ -558,104 +204,24 @@ function DataTableComponent({
 
 	const rows = table.getRowModel().rows;
 
-	const flatRows = useMemo<FlatItem[]>(() => {
-		if (disableDateGrouping) {
-			return rows.map((row) => ({
-				type: "row" as const,
-				id: `row-${row.id}`,
-				row,
-			}));
-		}
-		const dateTotals = new Map<string, number>();
-		const rowDateInfo = new Map<
-			string,
-			{
-				key: string;
-				label: string;
-			}
-		>();
-
-		for (const row of rows) {
-			const dateInfo = getDateInfo(row.original.date);
-			const amount = Number(row.original.amount);
-
-			rowDateInfo.set(row.id, {
-				key: dateInfo.key,
-				label: dateInfo.label,
-			});
-
-			dateTotals.set(
-				dateInfo.key,
-				(dateTotals.get(dateInfo.key) ?? 0) +
-					(Number.isFinite(amount) ? amount : 0),
-			);
-		}
-
-		const result: FlatItem[] = [];
-		let previousDateKey: string | null = null;
-		let headerSequence = 0;
-
-		for (const row of rows) {
-			const dateInfo = rowDateInfo.get(row.id);
-
-			if (!dateInfo) {
-				continue;
-			}
-
-			if (dateInfo.key !== previousDateKey) {
-				result.push({
-					type: "header",
-					id: `header-${dateInfo.key}-${headerSequence}`,
-					date: dateInfo.label,
-					total: dateTotals.get(dateInfo.key) ?? 0,
-				});
-
-				previousDateKey = dateInfo.key;
-				headerSequence++;
-			}
-
-			result.push({
-				type: "row",
-				id: `row-${row.id}`,
-				row,
-			});
-		}
-
-		return result;
-	}, [disableDateGrouping, rows]);
-
-	const stickyHeaderIndexByItemIndex = useMemo(() => {
-		const indices = new Array<number>(flatRows.length);
-		let latestHeaderIndex = -1;
-
-		for (let index = 0; index < flatRows.length; index++) {
-			if (flatRows[index].type === "header") {
-				latestHeaderIndex = index;
-			}
-			indices[index] = latestHeaderIndex;
-		}
-
-		return indices;
-	}, [flatRows]);
+	const { flatRows, stickyHeaderIndexByItemIndex } = useDateGrouping(
+		rows,
+		disableDateGrouping,
+	);
 
 	const rowVirtualizer = useVirtualizer({
 		count: flatRows.length,
-		getScrollElement: () => {
-			return parentRef.current;
-		},
-		getItemKey: (index) => {
-			return flatRows[index]?.id ?? index;
-		},
-		estimateSize: (index) => {
-			return flatRows[index]?.type === "header"
+		getScrollElement: () => parentRef.current,
+		getItemKey: (index) => flatRows[index]?.id ?? index,
+		estimateSize: (index) =>
+			flatRows[index]?.type === "header"
 				? DATE_HEADER_HEIGHT
-				: TRANSACTION_ROW_HEIGHT;
-		},
+				: TRANSACTION_ROW_HEIGHT,
 		overscan: VIRTUAL_OVERSCAN,
 	});
 
 	const virtualItems = rowVirtualizer.getVirtualItems();
-	let activeHeader: ActiveHeader = null;
+	let activeHeader = null;
 
 	if (virtualItems.length > 0 && !disableDateGrouping) {
 		const scrollTop = parentRef.current?.scrollTop ?? 0;
@@ -663,7 +229,6 @@ function DataTableComponent({
 
 		for (let index = 0; index < virtualItems.length; index++) {
 			const virtualItem = virtualItems[index];
-
 			if (virtualItem.start <= scrollTop) {
 				currentTopIndex = virtualItem.index;
 				continue;
@@ -714,106 +279,14 @@ function DataTableComponent({
 					No transactions found.
 				</div>
 			) : (
-				<>
-					<div
-						className="sticky top-0 z-10 w-full"
-						style={{
-							height: 0,
-						}}
-					>
-						{activeHeader && (
-							<div
-								role="row"
-								className="absolute w-full px-6 flex items-center justify-between bg-[#F9FAFB] dark:bg-[#232323] text-gray-500 dark:text-gray-400 font-bold text-sm border-b border-gray-200 dark:border-white/5 transition-colors duration-200"
-								style={{
-									height: DATE_HEADER_HEIGHT,
-									transform: `translateY(${activeHeader.translateY}px)`,
-								}}
-							>
-								<span role="cell">{activeHeader.item.date}</span>
-								<span role="cell">
-									{formatCurrency(activeHeader.item.total)}
-								</span>
-							</div>
-						)}
-					</div>
-
-					<div
-						style={{
-							height: `${rowVirtualizer.getTotalSize()}px`,
-							position: "relative",
-						}}
-					>
-						{virtualItems.map((virtualRow) => {
-							const item = flatRows[virtualRow.index];
-
-							if (!item) {
-								return null;
-							}
-
-							if (item.type === "header") {
-								return (
-									<div
-										key={item.id}
-										role="row"
-										className="absolute w-full px-6 flex items-center justify-between bg-[#F9FAFB] dark:bg-[#232323] text-gray-500 dark:text-gray-400 font-bold text-sm border-b border-gray-200 dark:border-white/5 transition-colors duration-200"
-										style={{
-											height: DATE_HEADER_HEIGHT,
-											transform: `translateY(${virtualRow.start}px)`,
-										}}
-									>
-										<span role="cell">{item.date}</span>
-										<span role="cell">{formatCurrency(item.total)}</span>
-									</div>
-								);
-							}
-
-							const row = item.row;
-							const isSelected = selectedIdSet.has(row.original.id);
-
-							return (
-								<div
-									key={item.id}
-									role="row"
-									onClick={() => onRowClick(row.original)}
-									className={`absolute w-full flex items-center border-b border-gray-100 dark:border-white/5 transition-colors md:cursor-pointer ${
-										isSelected
-											? "bg-blue-50 dark:bg-[#FF5A35]/10"
-											: "bg-white dark:bg-[#191919] hover:bg-gray-50 dark:hover:bg-white/5"
-									}`}
-									style={{
-										height: TRANSACTION_ROW_HEIGHT,
-										transform: `translateY(${virtualRow.start}px)`,
-									}}
-								>
-									{row.getVisibleCells().map((cell, index) => {
-										const isAmount = cell.column.id === "amount";
-
-										return (
-											<div
-												key={cell.id}
-												role="cell"
-												style={{
-													width: isAmount ? "auto" : cell.column.getSize(),
-													flex: isAmount ? 1 : "none",
-													minWidth: cell.column.columnDef.minSize ?? 0,
-												}}
-												className={`min-w-0 truncate ${
-													index === 0 ? "pr-0" : "px-2"
-												}`}
-											>
-												{flexRender(
-													cell.column.columnDef.cell,
-													cell.getContext(),
-												)}
-											</div>
-										);
-									})}
-								</div>
-							);
-						})}
-					</div>
-				</>
+				<VirtualizedList
+					flatRows={flatRows}
+					rowVirtualizer={rowVirtualizer}
+					// stickyHeaderIndexByItemIndex={stickyHeaderIndexByItemIndex}
+					activeHeader={activeHeader}
+					selectedIdSet={selectedIdSet}
+					onRowClick={onRowClick}
+				/>
 			)}
 		</div>
 	);

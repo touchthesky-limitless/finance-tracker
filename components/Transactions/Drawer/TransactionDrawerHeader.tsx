@@ -1,16 +1,13 @@
 import { useRef, useState } from "react";
 import {
-	AlertCircle,
 	ArrowLeft,
 	Check,
 	Copy,
 	Ellipsis,
 	Eye,
 	EyeOff,
-
 	Repeat2,
 	Split,
-
 	Trash2,
 	X,
 	Zap,
