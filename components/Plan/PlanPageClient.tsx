@@ -12,7 +12,7 @@ import {
 import type { SavingsGoal } from "@/lib/goals/types";
 import { setGoalAccountLinks, updateSavingsGoal } from "@/lib/goals/repository";
 import { usePlanPageState } from "@/hooks/usePlanPageState";
-import { EditGroupModal } from "@/components/CategoryGroups/CategoryGroupDetailsPageClient";
+import { EditGroupModal } from "@/components/modals";
 import { FlexibleBudgetModal } from "@/components/Plan/FlexibleBudgetModal";
 import { BudgetSettingsModal } from "@/components/Plan/BudgetSettingsModal";
 import { PlanPageContributionsSection } from "@/components/Plan/PlanPageContributionsSection";
