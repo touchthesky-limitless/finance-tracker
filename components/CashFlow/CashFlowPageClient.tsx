@@ -1,18 +1,40 @@
+/**
+ * CashFlowPageClient – Main page for cash flow analysis.
+ * Handles URL state, data fetching, period selection, and rendering views.
+ */
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
-import { CashFlowBreakdownBars } from "@/components/CashFlow/CashFlowBreakdownBars";
+import { CashFlowBreakdownBars } from "./CashFlowBreakdownBars";
+import { CashFlowFilterMenu } from "./CashFlowFilterMenu";
+import { CashFlowSankey } from "./CashFlowSankey";
+import { CashFlowTrendChart } from "./CashFlowTrendChart";
 import {
 	BreakdownTabs,
 	ShareMenu,
 	TimeframeTabs,
 	ViewMenu,
-} from "@/components/CashFlow/CashFlowControls";
-import { CashFlowFilterMenu } from "@/components/CashFlow/CashFlowFilterMenu";
-import { CashFlowSankey } from "@/components/CashFlow/CashFlowSankey";
-import { CashFlowTrendChart } from "@/components/CashFlow/CashFlowTrendChart";
+} from "./CashFlowControls";
+import { useMerchantOptions } from "@/hooks/useMerchantOptions";
+import { useCategoryGroups } from "@/hooks/useCategoryGroups";
+import { useBudgetStore } from "@/store/useBudgetStore";
+import { formatMoney } from "@/utils/formatters";
+import { MOBILE_BREAKPOINT } from "@/config/breakpoints";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
+
+import {
+	parseUtcDate,
+	toDateParam,
+	startOfPeriod,
+	formatPeriodTitle,
+	buildCashFlowPeriods,
+	getSelectedPeriod,
+} from "./utils/cashFlowDateUtils";
+import { buildBreakdownItems } from "./utils/cashFlowBreakdownUtils";
+import { buildSankeyData } from "./utils/cashFlowSankeyUtils";
+
 import type {
 	CashFlowBreakdown,
 	CashFlowFilters,
@@ -20,23 +42,7 @@ import type {
 	CashFlowTimeframe,
 	CashFlowView,
 	SankeyBreakdown,
-} from "@/components/CashFlow/types";
-import {
-	buildBreakdownItems,
-	buildCashFlowPeriods,
-	buildSankeyData,
-	formatPeriodTitle,
-	getSelectedPeriod,
-	parseUtcDate,
-	startOfPeriod,
-	toDateParam,
-} from "@/components/CashFlow/cashFlowUtils";
-import { useMerchantOptions } from "@/hooks/useMerchantOptions";
-import { useCategoryGroups } from "@/hooks/useCategoryGroups";
-import { useBudgetStore } from "@/store/useBudgetStore";
-import { formatMoney } from "@/utils/formatters";
-import { MOBILE_BREAKPOINT } from "@/config/breakpoints";
-import { useMediaQuery } from "@/hooks/useMediaQuery";
+} from "./types";
 
 const TIMEFRAMES = ["month", "quarter", "year"] as const;
 const VIEWS = ["bar", "sankey"] as const;

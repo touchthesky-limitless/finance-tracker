@@ -1,17 +1,15 @@
+/**
+ * CashFlowBreakdownBars – Horizontal bar chart showing breakdown of income or expenses.
+ */
 "use client";
 
 import type { ReactNode } from "react";
 import Link from "next/link";
-
 import { CategoryIcon } from "@/components/CategoryIcon";
-import type {
-	CashFlowBreakdown,
-	CashFlowBreakdownItem,
-} from "@/components/CashFlow/types";
-import { resolveCashFlowDetailUrl } from "@/components/CashFlow/cashFlowUtils";
+import type { CashFlowBreakdown, CashFlowBreakdownItem } from "./types";
+import { resolveCashFlowDetailUrl } from "./utils/cashFlowNavigationUtils";
 import { MerchantLogo } from "@/components/Merchants/MerchantLogo";
 import { formatMoney } from "@/utils/formatters";
-
 interface CashFlowBreakdownBarsProps {
 	targetId: string;
 	title: string;

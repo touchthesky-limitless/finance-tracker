@@ -1,13 +1,14 @@
+/**
+ * CashFlowSankey – Interactive Sankey diagram for expense flows.
+ */
 "use client";
 
 import {
-	useEffect,
 	useMemo,
 	useRef,
 	useState,
 	type KeyboardEvent as ReactKeyboardEvent,
 	type MouseEvent as ReactMouseEvent,
-	type RefObject,
 } from "react";
 import {
 	sankey,
@@ -16,14 +17,11 @@ import {
 	type SankeyNode,
 } from "d3-sankey";
 import { useRouter } from "next/navigation";
-
-import type {
-	SankeyLinkDatum,
-	SankeyNodeDatum,
-} from "@/components/CashFlow/types";
-import { resolveCashFlowDetailUrl } from "@/components/CashFlow/cashFlowUtils";
+import { useResponsiveWidth } from "@/hooks/useResponsiveWidth";
+import { resolveCashFlowDetailUrl } from "./utils/cashFlowNavigationUtils";
 import { CategoryIcon } from "@/components/CategoryIcon";
 import { formatMoney } from "@/utils/formatters";
+import type { SankeyLinkDatum, SankeyNodeDatum } from "./types";
 
 const MINIMUM_DIAGRAM_WIDTH = 980;
 const MINIMUM_HEIGHT = 760;
@@ -82,65 +80,6 @@ function navigateToDetail(
 
 function clamp(value: number, minimum: number, maximum: number): number {
 	return Math.min(Math.max(value, minimum), maximum);
-}
-
-function useResponsiveWidth(
-	containerRef: RefObject<HTMLDivElement | null>,
-): number {
-	const [width, setWidth] = useState(0);
-
-	useEffect(() => {
-		const element = containerRef.current;
-
-		if (!element) {
-			return;
-		}
-
-		let frameId = 0;
-
-		const updateWidth = (nextWidth: number): void => {
-			window.cancelAnimationFrame(frameId);
-			frameId = window.requestAnimationFrame(() => {
-				setWidth((currentWidth) => {
-					const roundedWidth = Math.max(0, Math.floor(nextWidth));
-
-					return currentWidth === roundedWidth ? currentWidth : roundedWidth;
-				});
-			});
-		};
-
-		updateWidth(element.getBoundingClientRect().width);
-
-		if (typeof ResizeObserver === "undefined") {
-			const handleResize = (): void => {
-				updateWidth(element.getBoundingClientRect().width);
-			};
-
-			window.addEventListener("resize", handleResize);
-
-			return () => {
-				window.cancelAnimationFrame(frameId);
-				window.removeEventListener("resize", handleResize);
-			};
-		}
-
-		const observer = new ResizeObserver((entries) => {
-			const entry = entries[0];
-
-			if (entry) {
-				updateWidth(entry.contentRect.width);
-			}
-		});
-
-		observer.observe(element);
-
-		return () => {
-			window.cancelAnimationFrame(frameId);
-			observer.disconnect();
-		};
-	}, [containerRef]);
-
-	return width;
 }
 
 function getHorizontalPadding(width: number): number {

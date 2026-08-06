@@ -1,3 +1,6 @@
+/**
+ * CashFlowControls – UI controls for timeframe, view, breakdown, and sharing.
+ */
 "use client";
 
 import { useState, type ReactNode } from "react";
@@ -5,13 +8,12 @@ import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import * as Popover from "@radix-ui/react-popover";
 import { ChevronDown } from "lucide-react";
 import { toPng } from "html-to-image";
-
 import type {
 	CashFlowBreakdown,
 	CashFlowTimeframe,
 	CashFlowView,
 	SankeyBreakdown,
-} from "@/components/CashFlow/types";
+} from "./types";
 
 const TIMEFRAME_OPTIONS: ReadonlyArray<{
 	value: CashFlowTimeframe;
@@ -221,13 +223,10 @@ export function ShareMenu({
 				});
 			});
 
-			const computedBackground =
-				window.getComputedStyle(node).backgroundColor;
+			const computedBackground = window.getComputedStyle(node).backgroundColor;
 			const dataUrl = await toPng(node, {
 				cacheBust: true,
-				backgroundColor: transparent
-					? undefined
-					: computedBackground,
+				backgroundColor: transparent ? undefined : computedBackground,
 				pixelRatio: 2,
 			});
 			const link = document.createElement("a");
