@@ -1,3 +1,10 @@
+/*
+ * FinancialCard.tsx
+ * Renders a single stock's information in a card format. Supports both grid and list views.
+ * Displays the stock logo, symbol, name, price, change, change percent, and market cap.
+ * Optionally includes a footer with market status.
+ */
+
 import MarketStatus from "@/components/Stocks/MarketStatus";
 import Image from "next/image";
 import { ArrowUpRight, ArrowDownRight } from "lucide-react";

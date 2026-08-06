@@ -1,23 +1,29 @@
+/*
+ * StocksPageClient.tsx
+ * Main client component for the stocks page. Fetches stock data from the API,
+ * computes market info, manages search/sort/view state, and composes the
+ * header, search bar, sort controls, and stock list.
+ * Default view mode is now "list" for both desktop and mobile.
+ */
+
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Search, ArrowUpDown } from "lucide-react";
-import FinancialCard from "@/components/Stocks/FinancialCard";
-import MarketStatus from "@/components/Stocks/MarketStatus";
 import { StockData } from "@/lib/types";
-import ViewToggle from "@/components/ViewToggle";
-import { useMediaQuery } from "@/hooks/useMediaQuery";
-import { MOBILE_BREAKPOINT } from "@/config/breakpoints";
 import { getFullMarketInfo } from "@/lib/date";
+import StockHeader from "@/components/Stocks/StockHeader";
+import StockSearchBar from "@/components/Stocks/StockSearchBar";
+import StockSortControls from "@/components/Stocks/StockSortControls";
+import StockList from "@/components/Stocks/StockList";
 
 export default function StocksPageClient() {
+	// Data fetching
 	const [stocks, setStocks] = useState<StockData[]>([]);
 	const [, setLoading] = useState(true);
 
-	// Market info computed client-side
+	// Market info (computed client‑side)
 	const marketInfo = useMemo(() => {
 		const raw = getFullMarketInfo();
-		// Cast session to the correct type (it's already a union string)
 		return {
 			...raw,
 			session: raw.session as "Pre-Market" | "Open" | "After-Hours" | "Closed",
@@ -32,60 +38,36 @@ export default function StocksPageClient() {
 			.finally(() => setLoading(false));
 	}, []);
 
-	const [viewMode, setViewMode] = useState<"grid" | "list">(() => {
-		if (typeof window === "undefined") {
-			return "grid";
-		}
-		return window.matchMedia("(max-width: 767px)").matches ? "list" : "grid";
-	});
+	// View mode – now defaulting to "list" on all devices
+	const [viewMode, setViewMode] = useState<"grid" | "list">("list");
 
-	const isMobile = useMediaQuery(MOBILE_BREAKPOINT);
-
-	// Search and Sort State
+	// Search and sort state
 	const [searchQuery, setSearchQuery] = useState("");
 	const [sortBy, setSortBy] = useState<"symbol" | "price" | "changePercent">(
 		"changePercent",
 	);
 	const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
-	// Handle resize for view mode
-	useEffect(() => {
-		const handleResize = () => {
-			const isMobile = window.innerWidth < 768;
-			setViewMode(isMobile ? "list" : "grid");
-		};
-		handleResize();
-		window.addEventListener("resize", handleResize);
-		return () => window.removeEventListener("resize", handleResize);
-	}, []);
-
-	// Memoized filtering and sorting logic
+	// Filter and sort the stock list
 	const processedStocks = useMemo(() => {
-		return (
-			stocks
-				// 1. Remove nulls and ensure symbol exists
-				.filter((stock): stock is StockData => stock !== null && !!stock.symbol)
-				// 2. Filter by search query
-				.filter(
-					(stock) =>
-						stock.symbol.toLowerCase().includes(searchQuery.toLowerCase()) ||
-						(stock.name || "")
-							.toLowerCase()
-							.includes(searchQuery.toLowerCase()),
-				)
-				// 3. Sort by selected criteria
-				.sort((a, b) => {
-					let comparison = 0;
-					if (sortBy === "symbol") {
-						comparison = a.symbol.localeCompare(b.symbol);
-					} else if (sortBy === "price") {
-						comparison = (a.price ?? 0) - (b.price ?? 0);
-					} else if (sortBy === "changePercent") {
-						comparison = (a.changePercent ?? 0) - (b.changePercent ?? 0);
-					}
-					return sortOrder === "asc" ? comparison : -comparison;
-				})
-		);
+		return stocks
+			.filter((stock): stock is StockData => stock !== null && !!stock.symbol)
+			.filter(
+				(stock) =>
+					stock.symbol.toLowerCase().includes(searchQuery.toLowerCase()) ||
+					(stock.name || "").toLowerCase().includes(searchQuery.toLowerCase()),
+			)
+			.sort((a, b) => {
+				let comparison = 0;
+				if (sortBy === "symbol") {
+					comparison = a.symbol.localeCompare(b.symbol);
+				} else if (sortBy === "price") {
+					comparison = (a.price ?? 0) - (b.price ?? 0);
+				} else if (sortBy === "changePercent") {
+					comparison = (a.changePercent ?? 0) - (b.changePercent ?? 0);
+				}
+				return sortOrder === "asc" ? comparison : -comparison;
+			});
 	}, [stocks, searchQuery, sortBy, sortOrder]);
 
 	const toggleSortOrder = () => {
@@ -94,116 +76,35 @@ export default function StocksPageClient() {
 
 	return (
 		<div className="max-w-7xl mx-auto px-4 py-8">
-			<header className="mb-8 flex items-end justify-between gap-4">
-				{/* Left Side: Title and Status */}
-				<div className="flex flex-col gap-1">
-					{!isMobile && (
-						<h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-							Stocks
-						</h1>
-					)}
-					<p className="text-gray-500">
-						Real-time tracking of your favorite assets
-					</p>
-					<div className="mt-2">
-						<MarketStatus
-							date={marketInfo.date}
-							time={marketInfo.time}
-							session={marketInfo.session}
-						/>
-					</div>
-				</div>
+			{/* Header with market status and view toggle */}
+			<StockHeader
+				date={marketInfo.date}
+				time={marketInfo.time}
+				session={marketInfo.session}
+				viewMode={viewMode}
+				setViewMode={setViewMode}
+			/>
 
-				{/* Right Side: Toggle Buttons */}
-				<ViewToggle
-					viewMode={viewMode}
-					setViewMode={setViewMode}
-					iconSize={20}
-				/>
-			</header>
-
-			{/* Search & Sort Controls */}
+			{/* Search and sort controls */}
 			<div className="flex flex-row justify-between items-center gap-2 md:gap-4 mb-6">
-				{/* Search Bar */}
-				<div className="relative flex-1 md:max-w-xs">
-					<div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
-						<Search size={16} />
-					</div>
-					<input
-						type="text"
-						placeholder="Search ticker or name..."
-						value={searchQuery}
-						onChange={(e) => setSearchQuery(e.target.value)}
-						className="w-full bg-gray-50 dark:bg-[#0a0a0a] border border-gray-200 dark:border-white/5 rounded-xl py-2 pl-10 pr-4 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500/50 transition-all"
-					/>
-				</div>
-
-				{/* Sort Controls */}
-				<div className="flex items-center shrink-0 bg-gray-50 dark:bg-[#0a0a0a] border border-gray-200 dark:border-white/5 rounded-xl p-1">
-					<select
-						value={sortBy}
-						onChange={(e) => setSortBy(e.target.value as never)}
-						className="bg-transparent text-sm text-gray-700 dark:text-gray-300 py-1.5 px-2 md:px-3 focus:outline-none cursor-pointer appearance-none outline-none"
-					>
-						<option
-							value="symbol"
-							className="bg-white dark:bg-[#0d0d0d] text-gray-900 dark:text-white"
-						>
-							Ticker (A-Z)
-						</option>
-						<option
-							value="price"
-							className="bg-white dark:bg-[#0d0d0d] text-gray-900 dark:text-white"
-						>
-							Price
-						</option>
-						<option
-							value="changePercent"
-							className="bg-white dark:bg-[#0d0d0d] text-gray-900 dark:text-white"
-						>
-							% Change
-						</option>
-					</select>
-					<button
-						onClick={toggleSortOrder}
-						className="p-1.5 text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
-						title={`Sort ${sortOrder === "asc" ? "Descending" : "Ascending"}`}
-					>
-						<ArrowUpDown
-							size={16}
-							className={sortOrder === "desc" ? "rotate-180" : ""}
-						/>
-					</button>
-				</div>
+				<StockSearchBar
+					searchQuery={searchQuery}
+					setSearchQuery={setSearchQuery}
+				/>
+				<StockSortControls
+					sortBy={sortBy}
+					setSortBy={setSortBy}
+					sortOrder={sortOrder}
+					toggleSortOrder={toggleSortOrder}
+				/>
 			</div>
 
-			{/* DATA GRID / LIST */}
-			{processedStocks.length === 0 ? (
-				<div className="text-center py-12 text-gray-500 dark:text-gray-400 text-sm border border-dashed border-gray-200 dark:border-white/10 rounded-3xl">
-					No assets found matching &quot;{searchQuery}&quot;
-				</div>
-			) : (
-				<div
-					className={`grid gap-3 ${
-						viewMode === "grid"
-							? "grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
-							: "grid-cols-1"
-					}`}
-				>
-					{processedStocks.map((stock) => (
-						<FinancialCard
-							key={stock.symbol}
-							{...stock}
-							name={stock.name || "Unknown Company"}
-							price={stock.price ?? 0}
-							change={stock.change ?? 0}
-							changePercent={stock.changePercent ?? 0}
-							viewMode={viewMode}
-							marketCap={stock.marketCap}
-						/>
-					))}
-				</div>
-			)}
+			{/* Stock grid/list */}
+			<StockList
+				stocks={processedStocks}
+				viewMode={viewMode}
+				searchQuery={searchQuery}
+			/>
 		</div>
 	);
 }

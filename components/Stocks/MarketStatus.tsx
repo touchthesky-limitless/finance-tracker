@@ -1,3 +1,9 @@
+/*
+ * MarketStatus.tsx
+ * Displays the current market date, time, and session (Pre‑Market, Open, After‑Hours, or Closed)
+ * with a color‑coded badge. Used in the stocks page header and optionally in FinancialCard footers.
+ */
+
 interface MarketStatusProps {
 	date: string;
 	time: string;
