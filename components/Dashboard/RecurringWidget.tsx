@@ -9,7 +9,7 @@ import { useRouter } from "next/navigation";
 import { Check, FlagTriangleRight, Hourglass, Receipt } from "lucide-react";
 import { useBudgetStore } from "@/store/useBudgetStore";
 import { useRecurringStore } from "@/store/useRecurringStore";
-import { getOccurrencesForMonth } from "@/components/Recurring/recurringUtils";
+import { getOccurrencesForMonth } from "@/components/Recurring/utils";
 import { formatDateShort, formatCurrency } from "@/utils/formatters";
 import { CategoryGlyph } from "@/components/Categories/CategoryGlyph";
 import { MerchantLogo } from "@/components/Merchants/MerchantLogo";

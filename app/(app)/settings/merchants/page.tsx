@@ -20,7 +20,7 @@ import {
 	MerchantEditorModal,
 	MerchantMergeDialog,
 	type MerchantEditorValue,
-} from "@/components/Merchants/MerchantEditorModal";
+} from "@/components/Merchants";
 import { MerchantLogo } from "@/components/Merchants/MerchantLogo";
 import type { MerchantListItem } from "@/components/Merchants/types";
 import { SettingsContentCard } from "@/components/Settings/SettingsShell";

@@ -1,10 +1,12 @@
+/**
+ * Dropdown menu for recurring row actions.
+ */
 "use client";
 
 import { useState, type ReactNode } from "react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { Eye, MoreHorizontal, Pencil, X } from "lucide-react";
-
-import type { RecurringRecord } from "@/components/Recurring/types";
+import type { RecurringRecord } from "../types";
 
 export function RecurringRowMenu({
 	record,
@@ -23,7 +25,6 @@ export function RecurringRowMenu({
 		action: (record: RecurringRecord) => void,
 	): void => {
 		setOpen(false);
-
 		window.requestAnimationFrame(() => {
 			action(record);
 		});
@@ -45,34 +46,24 @@ export function RecurringRowMenu({
 				<DropdownMenu.Content
 					align="end"
 					sideOffset={8}
-					onCloseAutoFocus={(event) => {
-						event.preventDefault();
-					}}
+					onCloseAutoFocus={(event) => event.preventDefault()}
 					className="z-[1120] min-w-80 rounded-2xl border border-gray-200 bg-white p-3 shadow-2xl outline-none dark:border-white/15 dark:bg-[#232322]"
 				>
 					<MenuItem
 						icon={<Eye size={19} />}
 						label="View merchant"
-						onSelect={() => {
-							runAfterMenuCloses(onViewMerchant);
-						}}
+						onSelect={() => runAfterMenuCloses(onViewMerchant)}
 					/>
-
 					<MenuItem
 						icon={<Pencil size={18} />}
 						label="Edit merchant details"
-						onSelect={() => {
-							runAfterMenuCloses(onEdit);
-						}}
+						onSelect={() => runAfterMenuCloses(onEdit)}
 					/>
-
 					<MenuItem
 						danger
 						icon={<X size={18} />}
 						label="Mark merchant as not recurring"
-						onSelect={() => {
-							runAfterMenuCloses(onMarkNotRecurring);
-						}}
+						onSelect={() => runAfterMenuCloses(onMarkNotRecurring)}
 					/>
 				</DropdownMenu.Content>
 			</DropdownMenu.Portal>

@@ -1,3 +1,6 @@
+/**
+ * Recurring module type definitions.
+ */
 import type { Transaction } from "@/store/useBudgetStore";
 
 export type RecurringType = "income" | "expense" | "credit-card";

@@ -1,3 +1,6 @@
+/**
+ * Reusable dialog component for recurring‑related modals.
+ */
 "use client";
 
 import type { ReactNode } from "react";
@@ -89,7 +92,6 @@ export function RecurringDialog({
 							opacity: 1;
 						}
 					}
-
 					@keyframes recurring-overlay-out {
 						from {
 							opacity: 1;
@@ -98,7 +100,6 @@ export function RecurringDialog({
 							opacity: 0;
 						}
 					}
-
 					@keyframes recurring-dialog-in {
 						from {
 							opacity: 0;
@@ -109,7 +110,6 @@ export function RecurringDialog({
 							scale: 1;
 						}
 					}
-
 					@keyframes recurring-dialog-out {
 						from {
 							opacity: 1;

@@ -1,3 +1,6 @@
+/**
+ * Main content area for recurring: list, calendar, or all view.
+ */
 "use client";
 
 import { useMemo, useState } from "react";
@@ -6,15 +9,15 @@ import { Check, ChevronDown, Landmark } from "lucide-react";
 
 import { CategoryIcon } from "@/components/CategoryIcon";
 import { MerchantLogo } from "@/components/Merchants/MerchantLogo";
-import { RecurringCalendarMerchantPopover } from "@/components/Recurring/RecurringCalendarMerchantPopover";
-import { RecurringRowMenu } from "@/components/Recurring/RecurringRowMenu";
-import { SortableHeader } from "@/components/Recurring/RecurringControls";
+import { RecurringCalendarMerchantPopover } from "../ui/RecurringCalendarMerchantPopover";
+import { RecurringRowMenu } from "../ui/RecurringRowMenu";
+import { SortableHeader } from "../ui/RecurringControls";
 import type {
 	AllRecurringGroupMode,
 	RecurringOccurrence,
 	RecurringRecord,
 	RecurringSortState,
-} from "@/components/Recurring/types";
+} from "../types";
 import {
 	formatLongDate,
 	formatRelativeDays,
@@ -24,13 +27,14 @@ import {
 	sortOccurrences,
 	sortRecords,
 	toDateInputValue,
-} from "@/components/Recurring/recurringUtils";
+} from "../utils";
 import type { Transaction } from "@/store/useBudgetStore";
 import { formatMoney } from "@/utils/formatters";
 import {
 	appendNavigationSource,
 	NavigationSource,
 } from "@/lib/navigation/breadcrumb";
+import { getCategoryTheme } from "@/constants";
 
 interface RecurringContentProps {
 	records: RecurringRecord[];
@@ -46,7 +50,7 @@ interface RecurringContentProps {
 	onEdit: (record: RecurringRecord) => void;
 	onMarkNotRecurring: (record: RecurringRecord) => void;
 	onOpenTransaction: (id: string) => void;
-	navigationSource?: NavigationSource; // ✅ receives from parent
+	navigationSource?: NavigationSource;
 }
 
 export function RecurringContent(props: RecurringContentProps) {
@@ -62,7 +66,7 @@ export function RecurringContent(props: RecurringContentProps) {
 						No recurring items yet.
 					</h3>
 					<p className="mx-auto mt-2 max-w-sm text-lg leading-relaxed text-gray-600 dark:text-gray-300">
-						We couldn&apos;t find recurring items for the selected month.
+						We couldn't find recurring items for the selected month.
 					</p>
 					<button
 						type="button"
@@ -252,9 +256,7 @@ function OccurrenceRow({
 						)}&endDate=${toDateInputValue(occurrence.date)}`,
 					);
 				}}
-				title={`${formatLongDate(occurrence.date)} (${formatRelativeDays(
-					occurrence.date,
-				)})`}
+				title={`${formatLongDate(occurrence.date)} (${formatRelativeDays(occurrence.date)})`}
 				className={`text-left text-base font-semibold transition-colors hover:text-cyan-600 focus-visible:text-cyan-600 dark:hover:text-cyan-400 dark:focus-visible:text-cyan-400 ${
 					occurrence.status === "overdue"
 						? "text-orange-500"
@@ -328,6 +330,9 @@ function LinkedAccount({ record }: { record: RecurringRecord }) {
 
 function LinkedCategory({ record }: { record: RecurringRecord }) {
 	const router = useRouter();
+	const categoryName = record.categoryName || "Uncategorized";
+	const categoryTheme = getCategoryTheme(categoryName);
+	const colorClass = categoryTheme?.text ?? "text-gray-400";
 	return (
 		<button
 			type="button"
@@ -345,7 +350,11 @@ function LinkedCategory({ record }: { record: RecurringRecord }) {
 			title={record.categoryName || "Uncategorized"}
 			className="group flex min-w-0 items-center gap-3 text-left disabled:cursor-default"
 		>
-			<CategoryIcon name={record.categoryName || "Uncategorized"} size={19} />
+			<CategoryIcon
+				name={record.categoryName || "Uncategorized"}
+				size={19}
+				colorClass={colorClass}
+			/>
 			<span className="truncate text-base font-medium text-gray-900 transition-colors group-hover:text-cyan-600 group-focus-visible:text-cyan-600 dark:text-white dark:group-hover:text-cyan-400 dark:group-focus-visible:text-cyan-400">
 				{record.categoryName || "Uncategorized"}
 			</span>
@@ -596,7 +605,6 @@ function RecurringCalendarView({
 
 	for (const occurrence of occurrences) {
 		const day = occurrence.date.getUTCDate();
-
 		occurrencesByDay.set(day, [
 			...(occurrencesByDay.get(day) ?? []),
 			occurrence,
@@ -605,7 +613,6 @@ function RecurringCalendarView({
 
 	const cells = Array.from({ length: 42 }, (_, index) => {
 		const day = index - firstDay + 1;
-
 		return day >= 1 && day <= daysInMonth ? day : null;
 	});
 
@@ -620,54 +627,47 @@ function RecurringCalendarView({
 					"Thursday",
 					"Friday",
 					"Saturday",
-				].map((day) => {
-					return (
-						<div key={day} className="py-5">
-							{day}
-						</div>
-					);
-				})}
+				].map((day) => (
+					<div key={day} className="py-5">
+						{day}
+					</div>
+				))}
 			</div>
 
 			<div className="grid grid-cols-7">
-				{cells.map((day, index) => {
-					return (
-						<div
-							key={index}
-							className="min-h-32 border-b border-r border-gray-100 p-3 dark:border-white/5"
-						>
-							{day && (
-								<span
-									className={`grid size-7 place-items-center rounded-full text-sm font-semibold ${
-										day === today.getDate() &&
-										monthIndex === today.getMonth() &&
-										year === today.getFullYear()
-											? "bg-[#FF6633] text-white"
-											: ""
-									}`}
-								>
-									{day}
-								</span>
-							)}
-
-							<div className="mt-2 space-y-1">
-								{day &&
-									(occurrencesByDay.get(day) ?? []).map((occurrence) => {
-										return (
-											<RecurringCalendarMerchantPopover
-												key={occurrence.id}
-												occurrence={occurrence}
-												transactions={transactions}
-												onEdit={onEdit}
-												onMarkNotRecurring={onMarkNotRecurring}
-												navigationSource={navigationSource}
-											/>
-										);
-									})}
-							</div>
+				{cells.map((day, index) => (
+					<div
+						key={index}
+						className="min-h-32 border-b border-r border-gray-100 p-3 dark:border-white/5"
+					>
+						{day && (
+							<span
+								className={`grid size-7 place-items-center rounded-full text-sm font-semibold ${
+									day === today.getDate() &&
+									monthIndex === today.getMonth() &&
+									year === today.getFullYear()
+										? "bg-[#FF6633] text-white"
+										: ""
+								}`}
+							>
+								{day}
+							</span>
+						)}
+						<div className="mt-2 space-y-1">
+							{day &&
+								(occurrencesByDay.get(day) ?? []).map((occurrence) => (
+									<RecurringCalendarMerchantPopover
+										key={occurrence.id}
+										occurrence={occurrence}
+										transactions={transactions}
+										onEdit={onEdit}
+										onMarkNotRecurring={onMarkNotRecurring}
+										navigationSource={navigationSource}
+									/>
+								))}
 						</div>
-					);
-				})}
+					</div>
+				))}
 			</div>
 		</div>
 	);

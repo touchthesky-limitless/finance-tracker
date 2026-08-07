@@ -1,3 +1,6 @@
+/**
+ * Dialog for searching and selecting a merchant.
+ */
 "use client";
 
 import { useMemo, useState } from "react";
@@ -5,7 +8,7 @@ import { Search } from "lucide-react";
 
 import { MerchantLogo } from "@/components/Merchants/MerchantLogo";
 import type { MerchantListItem } from "@/components/Merchants/types";
-import { RecurringDialog } from "@/components/Recurring/RecurringDialog";
+import { RecurringDialog } from "../ui/RecurringDialog";
 
 export function RecurringMerchantSearchDialog({
 	open,
@@ -55,6 +58,7 @@ function SearchSession({
 			)
 			.slice(0, 15);
 	}, [merchantItems, normalizedQuery]);
+
 	return (
 		<RecurringDialog
 			open={open}

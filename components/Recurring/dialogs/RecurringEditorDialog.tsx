@@ -1,3 +1,6 @@
+/**
+ * Dialog for editing a recurring merchant.
+ */
 "use client";
 
 import { useRef, useState, type ChangeEvent, type ReactNode } from "react";
@@ -6,21 +9,21 @@ import { Loader2 } from "lucide-react";
 import { type MerchantEditorValue } from "@/components/Merchants/MerchantEditorModal";
 import { MerchantLogo } from "@/components/Merchants/MerchantLogo";
 import type { MerchantListItem } from "@/components/Merchants/types";
-import { RecurringDatePicker } from "@/components/Recurring/RecurringDatePicker";
-import { RecurringDialog } from "@/components/Recurring/RecurringDialog";
+import { RecurringDatePicker } from "../ui/RecurringDatePicker";
+import { RecurringDialog } from "../ui/RecurringDialog";
 import type {
 	RecurringCandidate,
 	RecurringFrequency,
 	RecurringRecord,
 	RecurringStatus,
 	RecurringType,
-} from "@/components/Recurring/types";
+} from "../types";
 import {
 	createRecordFromCandidate,
 	getFrequencyLabel,
 	getTypeLabel,
 	RECURRING_FREQUENCIES,
-} from "@/components/Recurring/recurringUtils";
+} from "../utils";
 import type { Account, CustomCategory } from "@/store/useBudgetStore";
 
 const FIELD_CLASS =
@@ -46,21 +49,17 @@ function sanitizeAmountInput(value: string): string {
 	const cleaned = value.replaceAll(",", "").replace(/[^0-9.]/g, "");
 	const [whole = "", ...decimalParts] = cleaned.split(".");
 	const decimal = decimalParts.join("").slice(0, 2);
-
 	if (cleaned.includes(".")) {
 		return `${whole}.${decimal}`;
 	}
-
 	return whole;
 }
 
 function normalizeAmountInput(value: string, fallback: number): string {
 	const parsed = Number(value);
-
 	if (!Number.isFinite(parsed) || parsed < 0) {
 		return fallback.toFixed(2);
 	}
-
 	return parsed.toFixed(2);
 }
 
@@ -139,7 +138,6 @@ function EditorSession({
 		if (base.merchantId) {
 			return merchant.id === base.merchantId;
 		}
-
 		return (
 			merchant.name.trim().toLowerCase() ===
 			base.merchantName.trim().toLowerCase()
@@ -148,7 +146,6 @@ function EditorSession({
 
 	const mergeSource: MerchantEditorValue = {
 		id: base.merchantId ?? candidate.merchantId ?? base.id,
-		// Use the persisted source identity for transaction matching.
 		name: base.merchantName,
 		logoUrl,
 		transactionCount:
@@ -158,36 +155,26 @@ function EditorSession({
 
 	const handlePhotoChange = (event: ChangeEvent<HTMLInputElement>): void => {
 		const file = event.target.files?.[0];
-
 		event.target.value = "";
-
-		if (!file) {
-			return;
-		}
-
+		if (!file) return;
 		if (!file.type.startsWith("image/")) {
 			setErrorMessage("Choose a valid image file.");
 			return;
 		}
-
 		if (file.size > 2 * 1024 * 1024) {
 			setErrorMessage("Merchant photos must be 2 MB or smaller.");
 			return;
 		}
-
 		const reader = new FileReader();
-
 		reader.addEventListener("load", () => {
 			if (typeof reader.result === "string") {
 				setLogoUrl(reader.result);
 				setErrorMessage(null);
 			}
 		});
-
 		reader.addEventListener("error", () => {
 			setErrorMessage("The selected image could not be read.");
 		});
-
 		reader.readAsDataURL(file);
 	};
 
@@ -202,17 +189,12 @@ function EditorSession({
 	};
 
 	const createNextRecord = (): RecurringRecord => {
-		const account = accounts.find((item) => {
-			return item.id === base.accountId;
-		});
-		const category = categories.find((item) => {
-			return item.id === base.categoryId;
-		});
+		const account = accounts.find((item) => item.id === base.accountId);
+		const category = categories.find((item) => item.id === base.categoryId);
 		const nextAmount = amountIsValid ? parsedAmount : base.amount;
 		const nextStartingDate = startingDateIsValid
 			? startingDate
 			: base.startingDate;
-
 		return {
 			...base,
 			merchantName: cleanMerchantName || base.merchantName,
@@ -231,13 +213,9 @@ function EditorSession({
 	};
 
 	const handleSave = async (): Promise<void> => {
-		if (!canSave) {
-			return;
-		}
-
+		if (!canSave) return;
 		setIsSaving(true);
 		setErrorMessage(null);
-
 		try {
 			await onSave(createNextRecord());
 		} catch (error) {
@@ -272,7 +250,6 @@ function EditorSession({
 						size="lg"
 						className="!size-14"
 					/>
-
 					<input
 						ref={fileInputRef}
 						type="file"
@@ -280,24 +257,18 @@ function EditorSession({
 						onChange={handlePhotoChange}
 						className="sr-only"
 					/>
-
 					<div className="flex flex-wrap gap-3">
 						<button
 							type="button"
-							onClick={() => {
-								fileInputRef.current?.click();
-							}}
+							onClick={() => fileInputRef.current?.click()}
 							disabled={isSaving}
 							className="h-10 rounded-lg border border-gray-300 px-5 text-base font-bold transition-colors hover:bg-gray-50 disabled:opacity-50 dark:border-white/15 dark:hover:bg-white/6"
 						>
 							Choose photo
 						</button>
-
 						<button
 							type="button"
-							onClick={() => {
-								setLogoUrl(null);
-							}}
+							onClick={() => setLogoUrl(null)}
 							disabled={isSaving || !logoUrl}
 							className="h-10 rounded-lg border border-gray-300 px-5 text-base font-bold transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-45 dark:border-white/15 dark:hover:bg-white/6"
 						>
@@ -310,9 +281,7 @@ function EditorSession({
 					<Field label="Merchant name">
 						<input
 							value={merchantName}
-							onChange={(event) => {
-								setMerchantName(event.target.value);
-							}}
+							onChange={(event) => setMerchantName(event.target.value)}
 							disabled={isSaving}
 							className={FIELD_CLASS}
 						/>
@@ -325,7 +294,6 @@ function EditorSession({
 							<h3 className="text-base font-bold">
 								Mark this merchant as recurring
 							</h3>
-
 							<p className="mt-2 max-w-[600px] text-sm leading-6 text-gray-600 dark:text-gray-300">
 								This merchant will show on the Recurring section with expected
 								upcoming transactions.{" "}
@@ -337,15 +305,12 @@ function EditorSession({
 								</a>
 							</p>
 						</div>
-
 						<button
 							type="button"
 							role="switch"
 							aria-label="Mark merchant as recurring"
 							aria-checked={isRecurring}
-							onClick={() => {
-								updateRecurringEnabled(!isRecurring);
-							}}
+							onClick={() => updateRecurringEnabled(!isRecurring)}
 							disabled={isSaving}
 							className={`relative mt-1 inline-flex h-7 w-[52px] shrink-0 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/40 disabled:opacity-50 ${
 								isRecurring ? "bg-[#FF6633]" : "bg-gray-400 dark:bg-gray-600"
@@ -372,30 +337,24 @@ function EditorSession({
 								<SelectField
 									label="Recurring frequency"
 									value={frequency}
-									onChange={(value) => {
-										setFrequency(value as RecurringFrequency);
-									}}
-									options={RECURRING_FREQUENCIES.map((value) => {
-										return {
-											value,
-											label: getFrequencyLabel(value),
-										};
-									})}
+									onChange={(value) =>
+										setFrequency(value as RecurringFrequency)
+									}
+									options={RECURRING_FREQUENCIES.map((value) => ({
+										value,
+										label: getFrequencyLabel(value),
+									}))}
 								/>
 
 								<SelectField
 									label="Recurring type"
 									value={type}
-									onChange={(value) => {
-										setType(value as RecurringType);
-									}}
+									onChange={(value) => setType(value as RecurringType)}
 									options={(["income", "expense", "credit-card"] as const).map(
-										(value) => {
-											return {
-												value,
-												label: getTypeLabel(value),
-											};
-										},
+										(value) => ({
+											value,
+											label: getTypeLabel(value),
+										}),
 									)}
 								/>
 
@@ -405,7 +364,6 @@ function EditorSession({
 										onChange={setStartingDate}
 										disabled={isSaving}
 									/>
-
 									<p className="mt-3 text-sm leading-6 text-gray-500 dark:text-gray-400">
 										This date is used to forecast future transactions at this
 										merchant
@@ -417,18 +375,15 @@ function EditorSession({
 										<span className="pointer-events-none absolute inset-y-0 left-4 flex items-center text-sm font-semibold text-gray-500 dark:text-gray-400">
 											$
 										</span>
-
 										<input
 											value={amount}
-											onChange={(event) => {
-												setAmount(sanitizeAmountInput(event.target.value));
-											}}
-											onBlur={() => {
-												setAmount(normalizeAmountInput(amount, base.amount));
-											}}
-											onFocus={(event) => {
-												event.currentTarget.select();
-											}}
+											onChange={(event) =>
+												setAmount(sanitizeAmountInput(event.target.value))
+											}
+											onBlur={() =>
+												setAmount(normalizeAmountInput(amount, base.amount))
+											}
+											onFocus={(event) => event.currentTarget.select()}
 											disabled={isSaving}
 											inputMode="decimal"
 											aria-label="Recurring amount"
@@ -440,25 +395,17 @@ function EditorSession({
 								<SelectField
 									label="Recurring status"
 									value={status}
-									onChange={(value) => {
-										updateStatus(value as RecurringStatus);
-									}}
+									onChange={(value) => updateStatus(value as RecurringStatus)}
 									options={[
-										{
-											value: "active",
-											label: "Active",
-										},
-										{
-											value: "canceled",
-											label: "Canceled",
-										},
+										{ value: "active", label: "Active" },
+										{ value: "canceled", label: "Canceled" },
 									]}
 								/>
 
 								<p className="-mt-3 text-sm leading-6 text-gray-500 dark:text-gray-400">
-									If you set the status to Canceled, we&apos;ll show past
-									transactions on the recurring calendar, but won&apos;t
-									forecast any future transactions.
+									If you set the status to Canceled, we'll show past
+									transactions on the recurring calendar, but won't forecast any
+									future transactions.
 								</p>
 							</div>
 						</div>
@@ -476,13 +423,11 @@ function EditorSession({
 				{existingRecord && (
 					<button
 						type="button"
-						onClick={() => {
-							onRequestMerge(mergeSource, createNextRecord());
-						}}
+						onClick={() => onRequestMerge(mergeSource, createNextRecord())}
 						disabled={isSaving}
 						className="h-10 rounded-lg border border-red-400/30 px-5 text-base font-bold text-red-500 transition-colors hover:bg-red-50 disabled:opacity-50 dark:text-red-400 dark:hover:bg-red-500/10"
 					>
-						Merge &amp; delete
+						Merge & delete
 					</button>
 				)}
 
@@ -499,9 +444,7 @@ function EditorSession({
 
 				<button
 					type="button"
-					onClick={() => {
-						void handleSave();
-					}}
+					onClick={() => void handleSave()}
 					disabled={!canSave || isCovered}
 					className="inline-flex h-10 min-w-20 items-center justify-center gap-2 rounded-xl bg-[#FF6633] px-4 text-sm font-bold text-white transition-colors hover:bg-[#E95325] disabled:cursor-not-allowed disabled:bg-[#FFAA91]"
 				>
@@ -531,27 +474,20 @@ function SelectField({
 	label: string;
 	value: string;
 	onChange: (value: string) => void;
-	options: Array<{
-		value: string;
-		label: string;
-	}>;
+	options: Array<{ value: string; label: string }>;
 }) {
 	return (
 		<Field label={label}>
 			<select
 				value={value}
-				onChange={(event) => {
-					onChange(event.target.value);
-				}}
+				onChange={(event) => onChange(event.target.value)}
 				className={`${FIELD_CLASS} appearance-none`}
 			>
-				{options.map((option) => {
-					return (
-						<option key={option.value} value={option.value}>
-							{option.label}
-						</option>
-					);
-				})}
+				{options.map((option) => (
+					<option key={option.value} value={option.value}>
+						{option.label}
+					</option>
+				))}
 			</select>
 		</Field>
 	);

@@ -1,3 +1,6 @@
+/**
+ * Filter popover for recurring items.
+ */
 "use client";
 
 import { useMemo, useState } from "react";
@@ -11,18 +14,18 @@ import {
 	type TransactionFilterOption,
 	type TransactionFilters,
 } from "@/components/Transactions/transactionFilters";
-import type {
+import {
 	RecurringFilters,
 	RecurringFrequency,
+    EMPTY_RECURRING_FILTERS,
 	RecurringType,
-} from "@/components/Recurring/types";
-import { EMPTY_RECURRING_FILTERS } from "@/components/Recurring/types";
+} from "../types";
 import {
 	countRecurringFilters,
 	getFrequencyLabel,
 	getTypeLabel,
 	RECURRING_FREQUENCIES,
-} from "@/components/Recurring/recurringUtils";
+} from "../utils";
 
 interface RecurringFilterPopoverProps {
 	filters: RecurringFilters;
@@ -38,6 +41,7 @@ export function RecurringFilterPopover({
 	const [open, setOpen] = useState(false);
 	const appliedCount = countRecurringFilters(filters);
 	const signature = JSON.stringify(filters);
+
 	return (
 		<Popover.Root open={open} onOpenChange={setOpen}>
 			<Popover.Trigger asChild>
@@ -111,6 +115,7 @@ function RecurringFilterSession({
 		values.includes(value)
 			? values.filter((item) => item !== value)
 			: [...values, value];
+
 	const customSections = [
 		{
 			id: "recurring-type",
@@ -145,6 +150,7 @@ function RecurringFilterSession({
 		categoryIds: transactionDraft.categoryNames,
 	};
 	const dirty = JSON.stringify(combinedDraft) !== JSON.stringify(filters);
+
 	return (
 		<TransactionFilterPanel
 			filters={transactionDraft}

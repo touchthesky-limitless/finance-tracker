@@ -10,6 +10,7 @@ import {
 	Plus,
 } from "lucide-react";
 import type { SortingState, VisibilityState } from "@tanstack/react-table";
+import { useState, useEffect } from "react";
 
 interface ColumnOption {
 	id: string;
@@ -75,6 +76,12 @@ export function TableToolbar({
 	columnOptions = DEFAULT_COLUMN_OPTIONS,
 	leadingContent,
 }: TableToolbarProps) {
+	const [mounted, setMounted] = useState(false);
+	useEffect(() => {
+		// Defer to avoid synchronous setState warning
+		setTimeout(() => setMounted(true), 0);
+	}, []);
+
 	const activeSortLabel = SORT_OPTIONS.find((option) => {
 		return option.id === sorting[0]?.id && option.desc === sorting[0]?.desc;
 	})?.label;
@@ -206,14 +213,16 @@ export function TableToolbar({
 						</button>
 
 						<span className="text-[15px] font-bold text-gray-900 dark:text-white whitespace-nowrap flex items-center gap-1">
-	{/* ✅ Mobile: completely hidden. Desktop: Shows "N selected" */}
-	<span className="hidden sm:inline">{selectedIds.length} selected</span>
-	
-	{/* Mobile: hidden. Desktop: Shows "(ESC)" */}
-	<span className="ml-1 font-normal text-gray-500 hidden sm:inline">
-		(ESC)
-	</span>
-</span>
+							{/* ✅ Mobile: completely hidden. Desktop: Shows "N selected" */}
+							<span className="hidden sm:inline">
+								{selectedIds.length} selected
+							</span>
+
+							{/* Mobile: hidden. Desktop: Shows "(ESC)" */}
+							<span className="ml-1 font-normal text-gray-500 hidden sm:inline">
+								(ESC)
+							</span>
+						</span>
 					</div>
 				) : (
 					<>
@@ -238,7 +247,7 @@ export function TableToolbar({
 											className="text-gray-500 dark:text-gray-400"
 										/>
 
-										{isViewModified && (
+										{mounted && isViewModified && (
 											<span className="absolute -right-1 -top-1 size-2.5 rounded-full border-2 border-white bg-blue-500 dark:border-[#191919] dark:bg-[#38bdf8]" />
 										)}
 									</button>
@@ -357,7 +366,7 @@ export function TableToolbar({
 								size={15}
 								className="shrink-0 text-gray-500 dark:text-gray-400"
 							/>
-							{isSortModified && (
+							{mounted && isSortModified && (
 								<span className="absolute -right-1 -top-1 size-2.5 rounded-full border-2 border-white bg-blue-500 dark:border-[#191919] dark:bg-[#38bdf8]" />
 							)}
 						</button>
@@ -403,7 +412,7 @@ export function TableToolbar({
 						>
 							<Columns size={15} className="text-gray-500 dark:text-gray-400" />
 							<span className="hidden sm:inline">Columns</span>
-							{isColumnsModified && (
+							{mounted && isColumnsModified && (
 								<span className="absolute -right-1 -top-1 size-2.5 rounded-full border-2 border-white bg-blue-500 dark:border-[#191919] dark:bg-[#38bdf8]" />
 							)}
 						</button>

@@ -1,13 +1,15 @@
+/**
+ * Sortable header and grouping dropdown for recurring lists.
+ */
 "use client";
 
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { Check, ChevronDown } from "lucide-react";
-
 import type {
 	AllRecurringGroupMode,
 	RecurringSortKey,
 	RecurringSortState,
-} from "@/components/Recurring/types";
+} from "../types";
 
 export function SortableHeader({
 	label,
@@ -35,7 +37,9 @@ export function SortableHeader({
 			className={`inline-flex items-center gap-1 text-left text-sm font-semibold text-gray-500 transition hover:text-gray-900 dark:text-gray-400 dark:hover:text-white ${className}`}
 		>
 			{label}
-			{active && <span aria-hidden="true">{sort.direction === "asc" ? "↑" : "↓"}</span>}
+			{active && (
+				<span aria-hidden="true">{sort.direction === "asc" ? "↑" : "↓"}</span>
+			)}
 		</button>
 	);
 }
@@ -56,7 +60,9 @@ export function RecurringGroupingDropdown({
 	value: AllRecurringGroupMode;
 	onChange: (value: AllRecurringGroupMode) => void;
 }) {
-	const currentLabel = GROUP_OPTIONS.find((option) => option.value === value)?.label;
+	const currentLabel = GROUP_OPTIONS.find(
+		(option) => option.value === value,
+	)?.label;
 	return (
 		<DropdownMenu.Root>
 			<DropdownMenu.Trigger asChild>
@@ -81,7 +87,9 @@ export function RecurringGroupingDropdown({
 							className="flex min-h-14 cursor-pointer items-center justify-between rounded-xl px-5 text-lg font-semibold text-gray-900 outline-none transition hover:bg-gray-100 dark:text-white dark:hover:bg-white/7"
 						>
 							{option.label}
-							{value === option.value && <Check size={19} className="text-[#FF6633]" />}
+							{value === option.value && (
+								<Check size={19} className="text-[#FF6633]" />
+							)}
 						</DropdownMenu.Item>
 					))}
 				</DropdownMenu.Content>

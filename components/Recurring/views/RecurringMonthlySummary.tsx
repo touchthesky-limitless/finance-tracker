@@ -1,12 +1,11 @@
+/**
+ * Monthly summary section with income/expense/credit card columns.
+ */
 "use client";
 
 import { ArrowLeft, ArrowRight, CalendarDays, Info, List } from "lucide-react";
-
-import type {
-	RecurringOccurrence,
-	RecurringType,
-} from "@/components/Recurring/types";
-import { formatMonthTitle } from "@/components/Recurring/recurringUtils";
+import type { RecurringOccurrence, RecurringType } from "../types";
+import { formatMonthTitle } from "../utils";
 import { formatMoney } from "@/utils/formatters";
 
 export function RecurringMonthlySummary({
@@ -59,14 +58,22 @@ export function RecurringMonthlySummary({
 					<button
 						type="button"
 						onClick={() => onViewChange("list")}
-						className={`flex items-center gap-2 px-4 py-2.5 font-semibold ${view === "list" ? "bg-gray-100 dark:bg-white/8" : "hover:bg-gray-100 dark:hover:bg-white/5"}`}
+						className={`flex items-center gap-2 px-4 py-2.5 font-semibold ${
+							view === "list"
+								? "bg-gray-100 dark:bg-white/8"
+								: "hover:bg-gray-100 dark:hover:bg-white/5"
+						}`}
 					>
 						<List size={18} /> List
 					</button>
 					<button
 						type="button"
 						onClick={() => onViewChange("calendar")}
-						className={`flex items-center gap-2 border-l border-gray-300 px-4 py-2.5 font-semibold dark:border-white/15 ${view === "calendar" ? "bg-gray-100 dark:bg-white/8" : "hover:bg-gray-100 dark:hover:bg-white/5"}`}
+						className={`flex items-center gap-2 border-l border-gray-300 px-4 py-2.5 font-semibold dark:border-white/15 ${
+							view === "calendar"
+								? "bg-gray-100 dark:bg-white/8"
+								: "hover:bg-gray-100 dark:hover:bg-white/5"
+						}`}
 					>
 						<CalendarDays size={18} /> Calendar
 					</button>
@@ -118,6 +125,7 @@ function SummaryColumn({
 		.filter((item) => item.status === "complete")
 		.reduce((sum, item) => sum + item.record.amount, 0);
 	const remaining = Math.max(0, total - paid);
+
 	return (
 		<div className="min-h-32 px-6 py-6">
 			<div className="flex items-center gap-2">

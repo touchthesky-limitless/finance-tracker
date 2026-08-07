@@ -1,10 +1,12 @@
+/**
+ * Dialog for adding recurring items via sync, manual, or search.
+ */
 "use client";
 
 import type { ReactNode } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { PlusCircle, RefreshCw, Search, X } from "lucide-react";
-
-import type { RecurringType } from "@/components/Recurring/types";
+import type { RecurringType } from "../types";
 
 interface RecurringManagerDialogProps {
 	open: boolean;
@@ -56,7 +58,7 @@ export function RecurringManagerDialog({
 								onClick={onClose}
 								aria-label="Close Add recurring"
 								title="Close"
-								className="ml-auto rounded-full p-2 text-gray-500 transition-colors hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2  dark:text-gray-300 dark:hover:bg-white/8 "
+								className="ml-auto rounded-full p-2 text-gray-500 transition-colors hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 dark:text-gray-300 dark:hover:bg-white/8"
 							>
 								<X size={26} />
 							</button>
@@ -71,7 +73,6 @@ export function RecurringManagerDialog({
 								onOpenSearch("credit-card");
 							}}
 						/>
-
 						<ManagerCard
 							icon={<PlusCircle size={31} />}
 							title="Add a recurring merchant manually"
@@ -79,7 +80,6 @@ export function RecurringManagerDialog({
 								onOpenSearch("expense");
 							}}
 						/>
-
 						<ManagerCard
 							icon={<Search size={32} />}
 							title="Find recurring merchants in your accounts"
@@ -96,40 +96,33 @@ export function RecurringManagerDialog({
 						from {
 							opacity: 0;
 						}
-
 						to {
 							opacity: 1;
 						}
 					}
-
 					@keyframes recurring-overlay-out {
 						from {
 							opacity: 1;
 						}
-
 						to {
 							opacity: 0;
 						}
 					}
-
 					@keyframes recurring-dialog-in {
 						from {
 							opacity: 0;
 							scale: 0.97;
 						}
-
 						to {
 							opacity: 1;
 							scale: 1;
 						}
 					}
-
 					@keyframes recurring-dialog-out {
 						from {
 							opacity: 1;
 							scale: 1;
 						}
-
 						to {
 							opacity: 0;
 							scale: 0.98;
@@ -163,14 +156,13 @@ function ManagerCard({
 			}`}
 		>
 			<span
-				className={`transition-colors  ${
+				className={`transition-colors ${
 					muted ? "text-gray-500" : "text-[#FF6633]"
 				}`}
 			>
 				{icon}
 			</span>
-
-			<span className="max-w-64 text-xl font-bold leading-relaxed transition-colors ">
+			<span className="max-w-64 text-xl font-bold leading-relaxed transition-colors">
 				{title}
 			</span>
 		</button>

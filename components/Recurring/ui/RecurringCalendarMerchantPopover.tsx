@@ -1,3 +1,6 @@
+/**
+ * Popover displayed when clicking a merchant on the calendar view.
+ */
 "use client";
 
 import { useMemo, useState } from "react";
@@ -7,19 +10,13 @@ import { CalendarDays } from "lucide-react";
 
 import { CategoryIcon } from "@/components/CategoryIcon";
 import { MerchantLogo } from "@/components/Merchants/MerchantLogo";
-import { RecurringRowMenu } from "@/components/Recurring/RecurringRowMenu";
-import type {
-	RecurringOccurrence,
-	RecurringRecord,
-} from "@/components/Recurring/types";
-import {
-	formatLongDate,
-	getFrequencyLabel,
-	normalize,
-} from "@/components/Recurring/recurringUtils";
+import { RecurringRowMenu } from "./RecurringRowMenu";
+import type { RecurringOccurrence, RecurringRecord } from "../types";
+import { formatLongDate, getFrequencyLabel, normalize } from "../utils";
 import type { Transaction } from "@/store/useBudgetStore";
 import { formatSignedCurrency } from "@/utils/formatters";
 import type { NavigationSource } from "@/lib/navigation/breadcrumb";
+import { getCategoryTheme } from "@/constants";
 
 interface RecurringCalendarMerchantPopoverProps {
 	occurrence: RecurringOccurrence;
@@ -31,7 +28,6 @@ interface RecurringCalendarMerchantPopoverProps {
 
 function absoluteAmount(value: number | null | undefined): number {
 	const amount = Number(value);
-
 	return Number.isFinite(amount) ? Math.abs(amount) : 0;
 }
 
@@ -42,7 +38,6 @@ function matchesMerchant(
 	if (record.merchantId && transaction.merchant_id) {
 		return record.merchantId === transaction.merchant_id;
 	}
-
 	return normalize(record.merchantName) === normalize(transaction.merchant);
 }
 
@@ -58,21 +53,16 @@ export function RecurringCalendarMerchantPopover({
 
 	const merchantTransactions = useMemo(() => {
 		return transactions
-			.filter((transaction) => {
-				return matchesMerchant(record, transaction);
-			})
-			.sort((first, second) => {
-				return String(second.date ?? "").localeCompare(
-					String(first.date ?? ""),
-				);
-			});
+			.filter((transaction) => matchesMerchant(record, transaction))
+			.sort((first, second) =>
+				String(second.date ?? "").localeCompare(String(first.date ?? "")),
+			);
 	}, [record, transactions]);
 
 	const recentTransactions = merchantTransactions.slice(0, 3);
 	const matchedTransaction = occurrence.matchedTransactionId
-		? (transactions.find((transaction) => {
-				return transaction.id === occurrence.matchedTransactionId;
-			}) ?? null)
+		? (transactions.find((t) => t.id === occurrence.matchedTransactionId) ??
+			null)
 		: null;
 	const expectedAmount = absoluteAmount(record.amount);
 	const displayAmount = matchedTransaction
@@ -87,7 +77,6 @@ export function RecurringCalendarMerchantPopover({
 			router.push(`/merchants/${encodeURIComponent(record.merchantId)}`);
 			return;
 		}
-
 		router.push(
 			`/transactions?merchantNames=${encodeURIComponent(record.merchantName)}`,
 		);
@@ -97,7 +86,6 @@ export function RecurringCalendarMerchantPopover({
 		action: (record: RecurringRecord) => void,
 	): void => {
 		setOpen(false);
-
 		window.requestAnimationFrame(() => {
 			action(record);
 		});
@@ -115,16 +103,13 @@ export function RecurringCalendarMerchantPopover({
 			<Popover.Trigger asChild>
 				<button
 					type="button"
-					title={`${record.merchantName || "Merchant"} · ${formatSignedCurrency(
-						displayAmount,
-					)}`}
+					title={`${record.merchantName || "Merchant"} · ${formatSignedCurrency(displayAmount)}`}
 					className={`flex w-full items-center justify-between gap-2 truncate rounded-lg px-2 py-1.5 text-left text-xs font-bold transition-colors hover:text-cyan-100 focus-visible:text-cyan-100 ${statusClasses}`}
 				>
 					<span className="truncate">
 						{occurrence.status === "complete" ? "✓" : "×"}{" "}
 						{record.merchantName || "Merchant"}
 					</span>
-
 					<span className="shrink-0">
 						{formatSignedCurrency(displayAmount)}
 					</span>
@@ -137,9 +122,7 @@ export function RecurringCalendarMerchantPopover({
 					align="start"
 					sideOffset={10}
 					collisionPadding={16}
-					onCloseAutoFocus={(event) => {
-						event.preventDefault();
-					}}
+					onCloseAutoFocus={(event) => event.preventDefault()}
 					className="z-[900] w-[510px] max-w-[calc(100vw-32px)] overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl outline-none dark:border-white/15 dark:bg-[#232322]"
 				>
 					<div className="flex items-center gap-5 px-6 py-6">
@@ -149,7 +132,6 @@ export function RecurringCalendarMerchantPopover({
 							size="lg"
 							className="!size-[72px]"
 						/>
-
 						<div className="min-w-0 flex-1">
 							<h3 className="truncate text-xl font-bold text-gray-900 dark:text-white">
 								{record.merchantName || "Merchant"}
@@ -158,23 +140,19 @@ export function RecurringCalendarMerchantPopover({
 								{getFrequencyLabel(record.frequency)}
 							</p>
 						</div>
-
 						<p className="shrink-0 text-xl font-bold text-gray-900 dark:text-white">
 							{formatSignedCurrency(displayAmount)}
 						</p>
-
 						<RecurringRowMenu
 							record={record}
 							onViewMerchant={() => {
 								setOpen(false);
 								viewMerchant();
 							}}
-							onEdit={() => {
-								runAfterPopoverCloses(onEdit);
-							}}
-							onMarkNotRecurring={() => {
-								runAfterPopoverCloses(onMarkNotRecurring);
-							}}
+							onEdit={() => runAfterPopoverCloses(onEdit)}
+							onMarkNotRecurring={() =>
+								runAfterPopoverCloses(onMarkNotRecurring)
+							}
 						/>
 					</div>
 
@@ -194,7 +172,10 @@ export function RecurringCalendarMerchantPopover({
 					<div className="divide-y divide-gray-100 dark:divide-white/5">
 						{recentTransactions.map((transaction) => {
 							const transactionAmount = absoluteAmount(transaction.amount);
-
+							const categoryName =
+								transaction.category || record.categoryName || "Uncategorized";
+							const categoryTheme = getCategoryTheme(categoryName);
+							const colorClass = categoryTheme?.text ?? "text-gray-400";
 							return (
 								<button
 									key={transaction.id}
@@ -214,24 +195,21 @@ export function RecurringCalendarMerchantPopover({
 											"Uncategorized"
 										}
 										size={20}
+										colorClass={colorClass}
 									/>
-
 									<span className="truncate text-base font-semibold text-gray-900 transition-colors group-hover:text-cyan-600 group-focus-visible:text-cyan-600 dark:text-white dark:group-hover:text-cyan-400 dark:group-focus-visible:text-cyan-400">
 										{formatLongDate(transaction.date)}
 									</span>
-
 									<CalendarDays
 										size={17}
 										className="text-gray-500 dark:text-gray-400"
 									/>
-
 									<span className="text-right text-base font-bold text-gray-900 transition-colors group-hover:text-cyan-600 group-focus-visible:text-cyan-600 dark:text-white dark:group-hover:text-cyan-400 dark:group-focus-visible:text-cyan-400">
 										{formatSignedCurrency(transactionAmount)}
 									</span>
 								</button>
 							);
 						})}
-
 						{recentTransactions.length === 0 && (
 							<div className="px-6 py-10 text-center text-sm text-gray-500 dark:text-gray-400">
 								No recent transactions found.
