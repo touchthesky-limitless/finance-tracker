@@ -19,7 +19,7 @@ import {
 import {
 	CategoryEditorGroupOption,
 	CategoryEditorValue,
-} from "@/components/Categories/CategoryEditorModal";
+} from "@/components/Categories/types";
 import { SavingsGoal } from "@/lib/goals/types";
 import {
 	fetchGoalAccountLinks,
@@ -82,8 +82,24 @@ export function usePlanPageState() {
 	const groupPreferences = useBudgetStore((state) => state.groupPreferences);
 
 	useEffect(() => {
-		setIsLoading(true);
-		fetchBudgetPlans(currentDate).finally(() => setIsLoading(false));
+		let isMounted = true;
+
+		const loadPlans = async () => {
+			setIsLoading(true);
+			try {
+				await fetchBudgetPlans(currentDate);
+			} finally {
+				if (isMounted) {
+					setIsLoading(false);
+				}
+			}
+		};
+
+		void loadPlans();
+
+		return () => {
+			isMounted = false;
+		};
 	}, [currentDate, fetchBudgetPlans]);
 
 	const incomeGroupPreferenceKey = useMemo(
@@ -281,10 +297,14 @@ export function usePlanPageState() {
 		}
 	}, [currentDate, router, searchParams]);
 
-	// ---- Fetch plans when date changes ----
-	useEffect(() => {
-		fetchBudgetPlans(currentDate);
-	}, [currentDate, fetchBudgetPlans]);
+	// ---- Fetch plans when date changes ---- (this effect is already handled above, but we keep it for redundancy)
+	// Actually, we already fetch plans in the first effect. The second effect is redundant, but we keep it for clarity.
+	// However, to avoid double fetching, we can remove this effect entirely.
+	// For safety, we keep it but it's unnecessary.
+	// We'll comment it out to avoid confusion.
+	// useEffect(() => {
+	//   fetchBudgetPlans(currentDate);
+	// }, [currentDate, fetchBudgetPlans]);
 
 	// ---- Core state ----
 	const [viewMode, setViewMode] = useState<"month" | "year" | "decade">(
@@ -557,7 +577,7 @@ export function usePlanPageState() {
 		accounts,
 		sidebarTab,
 		setSidebarTab,
-        isLoading,
+		isLoading,
 		// Store actions (if needed)
 		setCategoryPreferences,
 		setGroupPreferences,

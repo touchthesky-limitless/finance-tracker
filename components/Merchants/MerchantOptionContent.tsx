@@ -1,9 +1,12 @@
+/**
+ * Displays a merchant's logo, name, and optional transaction count.
+ * Used inside dropdowns and selection lists.
+ */
 import type { ReactNode } from "react";
 import { Check } from "lucide-react";
-
-import { MerchantLogo } from "@/components/Merchants/MerchantLogo";
-import { MerchantTransactionCount } from "@/components/Merchants/MerchantTransactionCount";
-import type { MerchantListItem } from "@/components/Merchants/types";
+import { MerchantLogo } from "./MerchantLogo";
+import { MerchantTransactionCount } from "./MerchantTransactionCount";
+import type { MerchantListItem } from "./types";
 
 export interface MerchantOptionContentProps {
 	merchant: MerchantListItem;
@@ -27,10 +30,10 @@ export function MerchantOptionContent({
 	return (
 		<span
 			className={`
-				flex w-full min-w-0 items-center
-				${isSmall ? "gap-2" : "gap-3"}
-				${className}
-			`}
+        flex w-full min-w-0 items-center
+        ${isSmall ? "gap-2" : "gap-3"}
+        ${className}
+      `}
 		>
 			<MerchantLogo
 				name={merchant.name}
@@ -41,10 +44,10 @@ export function MerchantOptionContent({
 			<span
 				title={merchant.name}
 				className={`
-					min-w-0 flex-1 truncate
-					text-gray-900 dark:text-gray-100
-					${isSmall ? "text-sm font-medium" : "text-base font-semibold"}
-				`}
+          min-w-0 flex-1 truncate
+          text-gray-900 dark:text-gray-100
+          ${isSmall ? "text-sm font-medium" : "text-base font-semibold"}
+        `}
 			>
 				{merchant.name}
 			</span>
