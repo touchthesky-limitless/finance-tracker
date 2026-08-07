@@ -1,7 +1,7 @@
 import { CATEGORY_HIERARCHY, findParentCategory, getCategoryTheme } from "@/constants";
 import type { CustomCategory, Transaction } from "@/store/useBudgetStore";
 import type { CategoryPreferences } from "@/lib/categories/categoryPreferences";
-import { CategoryBudgetType } from "@/components/Categories/CategoryEditorModal";
+import { CategoryBudgetType } from "@/components/Categories/types";
 
 export function getGroupFromCategory(
     categoryName: string,

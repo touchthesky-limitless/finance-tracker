@@ -8,7 +8,7 @@ import { useRouter } from "next/navigation";
 import * as Popover from "@radix-ui/react-popover";
 import { CalendarDays } from "lucide-react";
 
-import { CategoryIcon } from "@/components/CategoryIcon";
+import { CategoryIconWithTheme } from "@/components/CategoryIconWithTheme";
 import { MerchantLogo } from "@/components/Merchants/MerchantLogo";
 import { RecurringRowMenu } from "./RecurringRowMenu";
 import type { RecurringOccurrence, RecurringRecord } from "../types";
@@ -16,7 +16,6 @@ import { formatLongDate, getFrequencyLabel, normalize } from "../utils";
 import type { Transaction } from "@/store/useBudgetStore";
 import { formatSignedCurrency } from "@/utils/formatters";
 import type { NavigationSource } from "@/lib/navigation/breadcrumb";
-import { getCategoryTheme } from "@/constants";
 
 interface RecurringCalendarMerchantPopoverProps {
 	occurrence: RecurringOccurrence;
@@ -172,10 +171,6 @@ export function RecurringCalendarMerchantPopover({
 					<div className="divide-y divide-gray-100 dark:divide-white/5">
 						{recentTransactions.map((transaction) => {
 							const transactionAmount = absoluteAmount(transaction.amount);
-							const categoryName =
-								transaction.category || record.categoryName || "Uncategorized";
-							const categoryTheme = getCategoryTheme(categoryName);
-							const colorClass = categoryTheme?.text ?? "text-gray-400";
 							return (
 								<button
 									key={transaction.id}
@@ -188,14 +183,13 @@ export function RecurringCalendarMerchantPopover({
 									}}
 									className="group grid min-h-[84px] w-full grid-cols-[36px_minmax(0,1fr)_28px_110px] items-center gap-3 px-6 text-left transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-cyan-500/30 dark:hover:bg-white/[0.035]"
 								>
-									<CategoryIcon
+									<CategoryIconWithTheme
 										name={
 											transaction.category ||
 											record.categoryName ||
 											"Uncategorized"
 										}
 										size={20}
-										colorClass={colorClass}
 									/>
 									<span className="truncate text-base font-semibold text-gray-900 transition-colors group-hover:text-cyan-600 group-focus-visible:text-cyan-600 dark:text-white dark:group-hover:text-cyan-400 dark:group-focus-visible:text-cyan-400">
 										{formatLongDate(transaction.date)}

@@ -7,7 +7,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, ChevronDown, Landmark } from "lucide-react";
 
-import { CategoryIcon } from "@/components/CategoryIcon";
+import { CategoryIconWithTheme } from "@/components/CategoryIconWithTheme";
 import { MerchantLogo } from "@/components/Merchants/MerchantLogo";
 import { RecurringCalendarMerchantPopover } from "../ui/RecurringCalendarMerchantPopover";
 import { RecurringRowMenu } from "../ui/RecurringRowMenu";
@@ -34,7 +34,6 @@ import {
 	appendNavigationSource,
 	NavigationSource,
 } from "@/lib/navigation/breadcrumb";
-import { getCategoryTheme } from "@/constants";
 
 interface RecurringContentProps {
 	records: RecurringRecord[];
@@ -330,9 +329,6 @@ function LinkedAccount({ record }: { record: RecurringRecord }) {
 
 function LinkedCategory({ record }: { record: RecurringRecord }) {
 	const router = useRouter();
-	const categoryName = record.categoryName || "Uncategorized";
-	const categoryTheme = getCategoryTheme(categoryName);
-	const colorClass = categoryTheme?.text ?? "text-gray-400";
 	return (
 		<button
 			type="button"
@@ -350,10 +346,9 @@ function LinkedCategory({ record }: { record: RecurringRecord }) {
 			title={record.categoryName || "Uncategorized"}
 			className="group flex min-w-0 items-center gap-3 text-left disabled:cursor-default"
 		>
-			<CategoryIcon
+			<CategoryIconWithTheme
 				name={record.categoryName || "Uncategorized"}
 				size={19}
-				colorClass={colorClass}
 			/>
 			<span className="truncate text-base font-medium text-gray-900 transition-colors group-hover:text-cyan-600 group-focus-visible:text-cyan-600 dark:text-white dark:group-hover:text-cyan-400 dark:group-focus-visible:text-cyan-400">
 				{record.categoryName || "Uncategorized"}
