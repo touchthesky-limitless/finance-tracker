@@ -1,10 +1,10 @@
 "use client";
 
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { Zap, Settings, ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronDown, ChevronUp, Settings, Zap } from "lucide-react";
 
-import ThemeToggle from "@/components/ThemeToggle";
 import { LogoutButton } from "@/components/LogoutButton";
+import ThemeToggle from "@/components/ThemeToggle";
 
 interface ProfileDropdownProps {
 	isCollapsed?: boolean;
@@ -14,7 +14,6 @@ export default function ProfileDropdown({ isCollapsed }: ProfileDropdownProps) {
 	return (
 		<DropdownMenu.Root>
 			<DropdownMenu.Trigger asChild>
-				{/* Add 'group' here so children can detect the button's state */}
 				<button
 					className={`group flex items-center transition-colors outline-none
             bg-white hover:bg-gray-100 border border-transparent hover:border-gray-200
@@ -39,7 +38,6 @@ export default function ProfileDropdown({ isCollapsed }: ProfileDropdownProps) {
 
 					{!isCollapsed && (
 						<div className="relative w-4 h-4 text-gray-500 dark:text-gray-400 shrink-0">
-							{/* Use group-data-[state=open] to check the parent button's state */}
 							<ChevronDown
 								size={16}
 								className="absolute inset-0 transition-opacity duration-200 group-data-[state=open]:opacity-0"
@@ -58,7 +56,6 @@ export default function ProfileDropdown({ isCollapsed }: ProfileDropdownProps) {
 					side="top"
 					align={isCollapsed ? "center" : "start"}
 					sideOffset={16}
-					// ✅ Updated z-index to z-[9999] to sit above everything else
 					className="w-50 rounded-2xl shadow-2xl p-2 animate-in fade-in zoom-in-95 z-[9999]
                         bg-white border border-gray-200
                         dark:bg-[#1e1e1e] dark:border-[#2a2a2a]"
@@ -97,6 +94,22 @@ export default function ProfileDropdown({ isCollapsed }: ProfileDropdownProps) {
 					{/* 3. Custom Logout Button */}
 					<div className="px-1 pb-1">
 						<LogoutButton />
+					</div>
+
+					{/* Apistemic Attribution Link */}
+					<DropdownMenu.Separator className="h-px my-2 bg-gray-200 dark:bg-[#2a2a2a]" />
+					<div className="px-3 pt-2 pb-1 text-center">
+						<p className="text-[8px] text-gray-400 dark:text-gray-500">
+							Logos by{" "}
+							<a
+								href="https://logos.apistemic.com"
+								target="_blank"
+								rel="noopener noreferrer"
+								className="underline hover:text-gray-600 dark:hover:text-gray-300"
+							>
+								apistemic logos
+							</a>
+						</p>
 					</div>
 				</DropdownMenu.Content>
 			</DropdownMenu.Portal>

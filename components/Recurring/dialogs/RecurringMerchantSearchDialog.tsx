@@ -3,10 +3,10 @@
  */
 "use client";
 
-import { useMemo, useState } from "react";
 import { Search } from "lucide-react";
+import { useMemo, useState } from "react";
 
-import { MerchantLogo } from "@/components/Merchants/MerchantLogo";
+import { MerchantLogoWithLookup } from "@/components/MerchantLogoWithLookup";
 import type { MerchantListItem } from "@/components/Merchants/types";
 import { RecurringDialog } from "../ui/RecurringDialog";
 
@@ -91,29 +91,31 @@ function SearchSession({
 					</div>
 				) : visible.length > 0 ? (
 					<div className="mt-7 divide-y divide-gray-100 dark:divide-white/5">
-						{visible.map((merchant) => (
-							<button
-								key={merchant.id}
-								type="button"
-								onClick={() => onSelect(merchant)}
-								className="flex min-h-24 w-full items-center gap-5 rounded-xl px-1 text-left transition hover:bg-gray-50 dark:hover:bg-white/[0.03]"
-							>
-								<MerchantLogo
-									name={merchant.name}
-									logoUrl={merchant.logoUrl}
-									size="lg"
-									className="!size-[82px]"
-								/>
-								<div className="min-w-0">
-									<p className="truncate text-lg font-bold">
-										<HighlightedName name={merchant.name} query={query} />
-									</p>
-									<p className="mt-1 text-base font-semibold text-gray-600 dark:text-gray-300">
-										{merchant.transactionCount} transactions
-									</p>
-								</div>
-							</button>
-						))}
+						{visible.map((merchant) => {
+							return (
+								<button
+									key={merchant.id}
+									type="button"
+									onClick={() => onSelect(merchant)}
+									className="flex min-h-24 w-full items-center gap-5 rounded-xl px-1 text-left transition hover:bg-gray-50 dark:hover:bg-white/[0.03]"
+								>
+									<MerchantLogoWithLookup
+										merchant={merchant}
+										size="lg"
+										className="!size-[82px]"
+										fallback="letter"
+									/>
+									<div className="min-w-0">
+										<p className="truncate text-lg font-bold">
+											<HighlightedName name={merchant.name} query={query} />
+										</p>
+										<p className="mt-1 text-base font-semibold text-gray-600 dark:text-gray-300">
+											{merchant.transactionCount} transactions
+										</p>
+									</div>
+								</button>
+							);
+						})}
 					</div>
 				) : (
 					<div className="grid min-h-64 place-items-center text-center text-gray-500 dark:text-gray-400">

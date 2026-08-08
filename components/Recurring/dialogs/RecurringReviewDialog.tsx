@@ -3,18 +3,19 @@
  */
 "use client";
 
-import { useState, type ReactNode } from "react";
 import { LoaderCircle } from "lucide-react";
+import { useState, type ReactNode } from "react";
 
 import { CategoryIcon } from "@/components/CategoryIcon";
-import { MerchantLogo } from "@/components/Merchants/MerchantLogo";
-import { RecurringDialog } from "../ui/RecurringDialog";
+import { MerchantLogoWithLookup } from "@/components/MerchantLogoWithLookup";
+import { formatMoney } from "@/utils/formatters";
 import type {
 	RecurringCandidate,
 	RecurringFrequency,
 	RecurringRecord,
 	RecurringType,
 } from "../types";
+import { RecurringDialog } from "../ui/RecurringDialog";
 import {
 	createRecordFromCandidate,
 	formatLongDate,
@@ -22,7 +23,6 @@ import {
 	getTypeLabel,
 	RECURRING_FREQUENCIES,
 } from "../utils";
-import { formatMoney } from "@/utils/formatters";
 
 const MINIMUM_SAVE_FEEDBACK_MS = 500;
 
@@ -167,6 +167,13 @@ function ReviewCandidateForm({
 		});
 	};
 
+	const merchant = {
+		id: candidate.merchantId ?? candidate.key,
+		name: candidate.merchantName,
+		logoUrl: candidate.logoUrl,
+		transactionCount: candidate.transactions.length,
+	};
+
 	return (
 		<>
 			<div className="max-h-[calc(100vh-180px)] overflow-y-auto p-8">
@@ -176,11 +183,11 @@ function ReviewCandidateForm({
 
 				<section className="overflow-hidden rounded-2xl border border-gray-200 dark:border-white/10">
 					<div className="flex items-center gap-5 p-7">
-						<MerchantLogo
-							name={candidate.merchantName}
-							logoUrl={candidate.logoUrl}
+						<MerchantLogoWithLookup
+							merchant={merchant}
 							size="lg"
 							className="!size-[72px]"
+							fallback="letter"
 						/>
 						<div className="min-w-0 flex-1">
 							<h3 className="truncate text-xl font-bold">

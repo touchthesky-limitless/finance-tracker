@@ -3,21 +3,28 @@
  */
 "use client";
 
-import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import { Check, ChevronDown, Landmark } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useMemo, useState } from "react";
 
 import { CategoryIconWithTheme } from "@/components/CategoryIconWithTheme";
+import { MerchantLogoWithLookup } from "@/components/MerchantLogoWithLookup";
 import { MerchantLogo } from "@/components/Merchants/MerchantLogo";
-import { RecurringCalendarMerchantPopover } from "../ui/RecurringCalendarMerchantPopover";
-import { RecurringRowMenu } from "../ui/RecurringRowMenu";
-import { SortableHeader } from "../ui/RecurringControls";
+import {
+	appendNavigationSource,
+	NavigationSource,
+} from "@/lib/navigation/breadcrumb";
+import type { Transaction } from "@/store/useBudgetStore";
+import { formatMoney } from "@/utils/formatters";
 import type {
 	AllRecurringGroupMode,
 	RecurringOccurrence,
 	RecurringRecord,
 	RecurringSortState,
 } from "../types";
+import { RecurringCalendarMerchantPopover } from "../ui/RecurringCalendarMerchantPopover";
+import { SortableHeader } from "../ui/RecurringControls";
+import { RecurringRowMenu } from "../ui/RecurringRowMenu";
 import {
 	formatLongDate,
 	formatRelativeDays,
@@ -28,12 +35,6 @@ import {
 	sortRecords,
 	toDateInputValue,
 } from "../utils";
-import type { Transaction } from "@/store/useBudgetStore";
-import { formatMoney } from "@/utils/formatters";
-import {
-	appendNavigationSource,
-	NavigationSource,
-} from "@/lib/navigation/breadcrumb";
 
 interface RecurringContentProps {
 	records: RecurringRecord[];
@@ -223,6 +224,13 @@ function OccurrenceRow({
 		}
 	};
 
+	const merchant = {
+		id: record.merchantId ?? record.id,
+		name: record.merchantName,
+		logoUrl: record.logoUrl,
+		transactionCount: 0,
+	};
+
 	return (
 		<div className="grid min-h-[82px] grid-cols-[minmax(230px,1.1fr)_minmax(150px,.65fr)_minmax(220px,1fr)_minmax(220px,1fr)_140px_60px] items-center border-b border-gray-100 px-6 last:border-0 dark:border-white/5">
 			<button
@@ -232,10 +240,11 @@ function OccurrenceRow({
 				title={record.merchantName || "Merchant"}
 				className="group flex min-w-0 items-center gap-4 text-left disabled:cursor-default"
 			>
-				<MerchantLogo
-					name={record.merchantName}
-					logoUrl={record.logoUrl}
+				<MerchantLogoWithLookup
+					merchant={merchant}
 					size="lg"
+					className="!size-14"
+					fallback="letter"
 				/>
 				<span className="min-w-0">
 					<span className="block truncate text-base font-bold text-gray-900 transition-colors group-hover:text-cyan-600 group-focus-visible:text-cyan-600 dark:text-white dark:group-hover:text-cyan-400 dark:group-focus-visible:text-cyan-400">

@@ -3,19 +3,19 @@
  */
 "use client";
 
-import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import * as Popover from "@radix-ui/react-popover";
 import { CalendarDays } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useMemo, useState } from "react";
 
 import { CategoryIconWithTheme } from "@/components/CategoryIconWithTheme";
-import { MerchantLogo } from "@/components/Merchants/MerchantLogo";
-import { RecurringRowMenu } from "./RecurringRowMenu";
-import type { RecurringOccurrence, RecurringRecord } from "../types";
-import { formatLongDate, getFrequencyLabel, normalize } from "../utils";
+import { MerchantLogoWithLookup } from "@/components/MerchantLogoWithLookup";
+import type { NavigationSource } from "@/lib/navigation/breadcrumb";
 import type { Transaction } from "@/store/useBudgetStore";
 import { formatSignedCurrency } from "@/utils/formatters";
-import type { NavigationSource } from "@/lib/navigation/breadcrumb";
+import type { RecurringOccurrence, RecurringRecord } from "../types";
+import { formatLongDate, getFrequencyLabel, normalize } from "../utils";
+import { RecurringRowMenu } from "./RecurringRowMenu";
 
 interface RecurringCalendarMerchantPopoverProps {
 	occurrence: RecurringOccurrence;
@@ -97,6 +97,13 @@ export function RecurringCalendarMerchantPopover({
 				? "bg-rose-600 text-white"
 				: "bg-amber-400 text-amber-950";
 
+	const merchantForLogo = {
+		id: record.merchantId ?? record.id,
+		name: record.merchantName || "Merchant",
+		logoUrl: record.logoUrl,
+		transactionCount: 0,
+	};
+
 	return (
 		<Popover.Root open={open} onOpenChange={setOpen} modal={false}>
 			<Popover.Trigger asChild>
@@ -125,11 +132,11 @@ export function RecurringCalendarMerchantPopover({
 					className="z-[900] w-[510px] max-w-[calc(100vw-32px)] overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl outline-none dark:border-white/15 dark:bg-[#232322]"
 				>
 					<div className="flex items-center gap-5 px-6 py-6">
-						<MerchantLogo
-							name={record.merchantName || "Merchant"}
-							logoUrl={record.logoUrl}
+						<MerchantLogoWithLookup
+							merchant={merchantForLogo}
 							size="lg"
 							className="!size-[72px]"
+							fallback="letter"
 						/>
 						<div className="min-w-0 flex-1">
 							<h3 className="truncate text-xl font-bold text-gray-900 dark:text-white">

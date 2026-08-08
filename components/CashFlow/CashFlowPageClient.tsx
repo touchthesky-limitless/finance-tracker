@@ -397,6 +397,7 @@ export default function CashFlowPageClient() {
 						emptyTitle="No income"
 						emptyDescription="No matching income for the selected range."
 						hideAmounts={hideIncomeAmounts}
+						merchantItems={merchantItems}
 						headerActions={
 							<>
 								<BreakdownTabs
@@ -429,6 +430,7 @@ export default function CashFlowPageClient() {
 						emptyTitle="No expenses"
 						emptyDescription="No matching expenses for the selected range."
 						hideAmounts={hideExpenseAmounts}
+						merchantItems={merchantItems}
 						headerActions={
 							<>
 								<BreakdownTabs

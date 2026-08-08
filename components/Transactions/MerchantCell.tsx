@@ -1,6 +1,25 @@
+/**
+ * A table cell that displays a merchant with an inline editor.
+ *
+ * Features:
+ * - Shows the merchant name, logo (via MerchantLogo), and a dropdown chevron.
+ * - Allows inline merchant change via a floating popover.
+ * - Includes a navigation arrow to the merchant detail page (if enabled).
+ *
+ * Logo resolution is delegated to the useMerchantLogoConfig hook,
+ * which centralises domain guessing, skip lists, and overrides.
+ *
+ * Props:
+ * - transaction: The transaction to which this merchant belongs.
+ * - merchantId: ID of the currently assigned merchant (optional).
+ * - merchantItems: Full list of available merchants.
+ * - showNavigation: Whether to show the navigation arrow.
+ * - isMobile: Adjusts styling for small screens.
+ * - popoverZIndex: Z‑index for the floating popover.
+ * - onNavigate, onOpenEditor, onMerchantChange: Callbacks for interactions.
+ */
 "use client";
 
-import { useMemo, useRef, useState } from "react";
 import {
 	autoUpdate,
 	flip,
@@ -22,13 +41,14 @@ import {
 	Plus,
 	Search,
 } from "lucide-react";
+import { useMemo, useRef, useState } from "react";
 
+import { MerchantOptionContent } from "@/components/Merchants/MerchantOptionContent";
+import type { MerchantListItem } from "@/components/Merchants/types";
 import type { Merchant, Transaction } from "@/store/useBudgetStore";
 import { useBudgetStore } from "@/store/useBudgetStore";
-import type { MerchantListItem } from "@/components/Merchants/types";
-import { MerchantOptionContent } from "@/components/Merchants/MerchantOptionContent";
-import { MerchantLogo } from "@/components/Merchants/MerchantLogo";
 import { truncateText } from "@/utils/formatters";
+import { MerchantLogoWithLookup } from "../MerchantLogoWithLookup";
 
 interface MerchantCellProps {
 	transaction: Transaction;
@@ -314,10 +334,17 @@ export function MerchantCell({
 		}
 	};
 
-	const currentMerchant = useMemo(() => {
-		if (!merchantId) return undefined;
-		return merchantItems.find((m) => m.id === merchantId);
-	}, [merchantItems, merchantId]);
+	const foundMerchant = useMemo(
+		() => merchantItems.find((m) => m.id === merchantId) ?? null,
+		[merchantId, merchantItems],
+	);
+
+	const merchantForLogo = foundMerchant ?? {
+		id: merchantId ?? "",
+		name: merchantName,
+		logoUrl: null,
+		transactionCount: 0,
+	};
 
 	return (
 		<div className="group flex h-full w-full items-center gap-1.5 pr-2">
@@ -352,12 +379,11 @@ export function MerchantCell({
 						focus-visible:ring-orange-500/30
 					`}
 				>
-					{/* ✅ Replaced the first-letter manual div with MerchantLogo */}
-					<MerchantLogo
-						name={merchantName}
-						logoUrl={currentMerchant?.logoUrl}
+					<MerchantLogoWithLookup
+						merchant={merchantForLogo}
 						size="md"
 						className="h-7 w-7 shrink-0"
+						fallback="letter"
 					/>
 
 					<span

@@ -48,6 +48,7 @@ export default function Footer() {
 						>
 							Finnhub
 						</a>
+						<a href="https://logos.apistemic.com">apistemic logos</a>
 					</div>
 				</div>
 

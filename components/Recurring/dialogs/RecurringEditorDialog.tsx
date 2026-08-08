@@ -3,14 +3,19 @@
  */
 "use client";
 
-import { useRef, useState, type ChangeEvent, type ReactNode } from "react";
 import { Loader2 } from "lucide-react";
+import {
+	useMemo,
+	useRef,
+	useState,
+	type ChangeEvent,
+	type ReactNode,
+} from "react";
 
+import { MerchantLogoWithLookup } from "@/components/MerchantLogoWithLookup";
 import { type MerchantEditorValue } from "@/components/Merchants/MerchantEditorModal";
-import { MerchantLogo } from "@/components/Merchants/MerchantLogo";
 import type { MerchantListItem } from "@/components/Merchants/types";
-import { RecurringDatePicker } from "../ui/RecurringDatePicker";
-import { RecurringDialog } from "../ui/RecurringDialog";
+import type { Account, CustomCategory } from "@/store/useBudgetStore";
 import type {
 	RecurringCandidate,
 	RecurringFrequency,
@@ -18,13 +23,14 @@ import type {
 	RecurringStatus,
 	RecurringType,
 } from "../types";
+import { RecurringDatePicker } from "../ui/RecurringDatePicker";
+import { RecurringDialog } from "../ui/RecurringDialog";
 import {
 	createRecordFromCandidate,
 	getFrequencyLabel,
 	getTypeLabel,
 	RECURRING_FREQUENCIES,
 } from "../utils";
-import type { Account, CustomCategory } from "@/store/useBudgetStore";
 
 const FIELD_CLASS =
 	"h-12 w-full rounded-lg border border-gray-300 bg-white px-4 text-sm font-semibold text-gray-900 outline-none transition-colors focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/10 dark:bg-[#20201f] dark:text-white";
@@ -134,15 +140,17 @@ function EditorSession({
 		(!isRecurring || (amountIsValid && startingDateIsValid)) &&
 		!isSaving;
 
-	const merchantItem = merchantItems.find((merchant) => {
-		if (base.merchantId) {
-			return merchant.id === base.merchantId;
-		}
-		return (
-			merchant.name.trim().toLowerCase() ===
-			base.merchantName.trim().toLowerCase()
-		);
-	});
+	const merchantItem = useMemo(() => {
+		return merchantItems.find((merchant) => {
+			if (base.merchantId) {
+				return merchant.id === base.merchantId;
+			}
+			return (
+				merchant.name.trim().toLowerCase() ===
+				base.merchantName.trim().toLowerCase()
+			);
+		});
+	}, [merchantItems, base.merchantId, base.merchantName]);
 
 	const mergeSource: MerchantEditorValue = {
 		id: base.merchantId ?? candidate.merchantId ?? base.id,
@@ -229,6 +237,17 @@ function EditorSession({
 		}
 	};
 
+	const merchantForLogo = useMemo(() => {
+		return (
+			merchantItem ?? {
+				id: base.merchantId ?? base.id,
+				name: base.merchantName,
+				logoUrl: base.logoUrl,
+				transactionCount: 0,
+			}
+		);
+	}, [merchantItem, base.merchantId, base.id, base.merchantName, base.logoUrl]);
+
 	return (
 		<RecurringDialog
 			open={open}
@@ -244,11 +263,11 @@ function EditorSession({
 		>
 			<div className="max-h-[calc(100vh-132px)] overflow-y-auto px-5 py-5 sm:px-6">
 				<div className="flex flex-col gap-5 sm:flex-row sm:items-center">
-					<MerchantLogo
-						name={cleanMerchantName || base.merchantName}
-						logoUrl={logoUrl}
+					<MerchantLogoWithLookup
+						merchant={merchantForLogo}
 						size="lg"
 						className="!size-14"
+						fallback="letter"
 					/>
 					<input
 						ref={fileInputRef}

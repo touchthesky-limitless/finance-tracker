@@ -4,18 +4,18 @@
  */
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
-import { Check, FlagTriangleRight, Hourglass, Receipt } from "lucide-react";
-import { useBudgetStore } from "@/store/useBudgetStore";
-import { useRecurringStore } from "@/store/useRecurringStore";
-import { getOccurrencesForMonth } from "@/components/Recurring/utils";
-import { formatDateShort, formatCurrency } from "@/utils/formatters";
 import { CategoryGlyph } from "@/components/Categories/CategoryGlyph";
-import { MerchantLogo } from "@/components/Merchants/MerchantLogo";
+import { RecurringOccurrence } from "@/components/Recurring/types";
+import { getOccurrencesForMonth } from "@/components/Recurring/utils";
 import { getCategoryTheme } from "@/constants/categories";
 import { appendNavigationSource } from "@/lib/navigation/breadcrumb";
-import { RecurringOccurrence } from "@/components/Recurring/types";
+import { useBudgetStore } from "@/store/useBudgetStore";
+import { useRecurringStore } from "@/store/useRecurringStore";
+import { formatCurrency, formatDateShort } from "@/utils/formatters";
+import { Check, FlagTriangleRight, Hourglass, Receipt } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
+import { MerchantLogoWithLookup } from "../MerchantLogoWithLookup";
 import { WidgetShell } from "./WidgetShell";
 
 export function RecurringWidget() {
@@ -150,6 +150,13 @@ export function RecurringWidget() {
 						);
 						const categoryColor = theme.text;
 
+						const merchant = {
+							id: record.merchantId ?? "",
+							name: record.merchantName,
+							logoUrl: record.logoUrl ?? null,
+							transactionCount: 0,
+						};
+
 						return (
 							<div
 								key={occ.id}
@@ -172,11 +179,7 @@ export function RecurringWidget() {
 											disabled={!record.merchantId}
 											className={`shrink-0 disabled:cursor-default ${categoryColor}`}
 										>
-											<MerchantLogo
-												name={record.merchantName}
-												logoUrl={record.logoUrl}
-												size="sm"
-											/>
+											<MerchantLogoWithLookup merchant={merchant} size="sm" />
 										</button>
 										<div className="flex min-w-0 flex-col">
 											<button

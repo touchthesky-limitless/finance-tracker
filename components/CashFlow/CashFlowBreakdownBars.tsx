@@ -3,13 +3,14 @@
  */
 "use client";
 
-import type { ReactNode } from "react";
-import Link from "next/link";
 import { CategoryIcon } from "@/components/CategoryIcon";
+import { formatMoney } from "@/utils/formatters";
+import Link from "next/link";
+import { type ReactNode } from "react";
+import { MerchantListItem } from "../Merchants";
 import type { CashFlowBreakdown, CashFlowBreakdownItem } from "./types";
 import { resolveCashFlowDetailUrl } from "./utils/cashFlowNavigationUtils";
-import { MerchantLogo } from "@/components/Merchants/MerchantLogo";
-import { formatMoney } from "@/utils/formatters";
+import { MerchantLogoWithLookup } from "../MerchantLogoWithLookup";
 interface CashFlowBreakdownBarsProps {
 	targetId: string;
 	title: string;
@@ -20,6 +21,7 @@ interface CashFlowBreakdownBarsProps {
 	emptyDescription: string;
 	headerActions: ReactNode;
 	hideAmounts: boolean;
+	merchantItems?: MerchantListItem[];
 }
 
 export function CashFlowBreakdownBars({
@@ -32,6 +34,7 @@ export function CashFlowBreakdownBars({
 	emptyDescription,
 	headerActions,
 	hideAmounts,
+	merchantItems,
 }: CashFlowBreakdownBarsProps) {
 	const maxAmount = Math.max(
 		...items.map((item) => {
@@ -98,7 +101,12 @@ export function CashFlowBreakdownBars({
 
 								<span className="pointer-events-none relative z-10 flex min-w-0 flex-1 items-center gap-3 px-7 py-2.5">
 									{breakdown === "merchant" ? (
-										<MerchantLogo name={item.label} logoUrl={null} size="sm" />
+										<MerchantLogoWithLookup
+											key={item.id}
+											item={item}
+											merchantItems={merchantItems}
+											size="sm"
+										/>
 									) : (
 										<CategoryIcon name={item.iconName} size={18} />
 									)}
